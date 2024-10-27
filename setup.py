@@ -14,6 +14,7 @@ setup(
         "inquirer",
         "libsvm",
         "lxml",
+        "pandas",
         "plotly",
         "prettytable",
         "rasterio",
