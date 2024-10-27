@@ -1,4 +1,4 @@
-# Calcium Imaging Analysis Pipeline for 1- & 2-Photon Microscopy
+# Calcium Imaging Analysis Pipeline for 2-Photon Microscopy (1-Photon in progress)
 
 ## Requirements
 
