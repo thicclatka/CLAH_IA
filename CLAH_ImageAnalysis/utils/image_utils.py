@@ -1,0 +1,178 @@
+import numpy as np
+import cv2
+from CLAH_ImageAnalysis.utils import fig_tools
+from CLAH_ImageAnalysis.utils import text_dict
+
+
+def read_image(path_to_image: str) -> np.ndarray:
+    """Read an image from the given path using rasterio.
+
+    Parameters:
+        image_path (str): The path to the image file.
+
+    Returns:
+        np.ndarray: The image as a numpy array.
+    """
+
+    import rasterio
+    from rasterio.errors import NotGeoreferencedWarning
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
+        with rasterio.open(path_to_image) as src:
+            img = src.read(1)
+    return img
+
+
+def apply_gamma_correction(image: np.ndarray, gamma: float = 0.5) -> np.ndarray:
+    """
+    Apply gamma correction to enhance brightness in darker areas.
+
+    Parameters:
+        image (numpy.ndarray): The input image.
+        gamma (float): The gamma value for the correction. Default is 0.5.
+
+    Returns:
+        numpy.ndarray: The gamma-corrected image.
+    """
+    return np.power(image, gamma)
+
+
+def equalize_histogram(image: np.ndarray) -> np.ndarray:
+    """
+    Equalize the histogram of the combined image for better contrast.
+
+    Parameters:
+        image (numpy.ndarray): The input image to be equalized.
+
+    Returns:
+        numpy.ndarray: The equalized image.
+    """
+
+    from skimage import exposure
+
+    return exposure.equalize_adapthist(image)
+
+
+def blur_image(image: np.ndarray, sigma: float = 1) -> np.ndarray:
+    """
+    Apply Gaussian blur to the input image.
+
+    Parameters:
+        image (numpy.ndarray): The input image.
+        sigma (float): The standard deviation of the Gaussian kernel. Default is 1.
+
+    Returns:
+        numpy.ndarray: The blurred image.
+    """
+    from scipy.ndimage import gaussian_filter
+
+    return gaussian_filter(image, sigma=sigma)
+
+
+def normalize_image(image: np.ndarray, output_dtype: type = np.uint8) -> np.ndarray:
+    """
+    Normalize an image to a specific dtype. Convert to uint8, uint16, or keep
+    as float32/float64 with values between 0 and 1.
+
+    Parameters:
+        image (np.ndarray): Input image array.
+        output_dtype (type): Desired output data type (e.g., np.uint8, np.uint16,
+                                np.float32, np.float64).
+
+    Returns:
+        np.ndarray: Normalized image.
+
+    Raises:
+        ValueError: If output_dtype is not supported.
+    """
+    allowed_types = [np.uint8, np.uint16, np.float32, np.float64]
+    if output_dtype not in allowed_types:
+        raise ValueError(
+            f"output_dtype must be one of {allowed_types}, got {output_dtype}"
+        )
+
+    image_max = image.max()
+    if image_max == 0:
+        return np.zeros_like(image, dtype=output_dtype)
+
+    normalized_image = image.astype(np.float64) / image_max
+
+    if output_dtype in [np.float32, np.float64]:
+        return normalized_image.astype(output_dtype)
+
+    max_val = np.iinfo(output_dtype).max
+    scaled_image = (normalized_image * max_val).astype(output_dtype)
+
+    return scaled_image
+
+
+def create_combined_arr_wOverlap(
+    array_list: list[np.ndarray],
+    overlap_threshold: float,
+    overlap_enhance_factor: float,
+) -> np.ndarray:
+    """
+    Create a combined array with overlap enhancement.
+
+    Parameters:
+        array_list (list[np.ndarray]): A list of numpy arrays to combine.
+        overlap_threshold (float): The threshold for overlap detection.
+        overlap_enhance_factor (float): The factor to enhance overlap.
+
+    Returns:
+        np.ndarray: The combined array with overlap enhancement.
+    """
+
+    RBG = ([1, 0, 0], [0, 0, 1], [0, 1, 0])
+    if isinstance(array_list, list):
+        height, width = array_list[0].shape
+    elif isinstance(array_list, np.ndarray):
+        height, width = array_list.shape
+
+    combined = np.zeros((height, width, 3))
+    for i, arr in enumerate(array_list):
+        color = fig_tools.hex_to_rgba(RBG[i % 3])[:3]  # ignore alpha
+        # extend array to operate over RBG
+        colorized_arr = np.stack([arr * color[c] for c in range(3)], axis=-1)
+        combined += colorized_arr
+    # Detect overlaps, where at least 2 channels have non-zero values
+    overlap_mask = combined.sum(axis=-1) - combined.max(axis=-1) > overlap_threshold
+    # enhance overlap
+    for c in range(3):
+        combined[:, :, c][overlap_mask] *= overlap_enhance_factor
+    # apply gamma correction
+    combined = np.clip(apply_gamma_correction(combined), 0, 1)
+    # histogram equalization
+    combined = equalize_histogram(combined)
+    return combined
+
+
+def get_DSImage_filename() -> str:
+    """
+    Get the filename for a downsampled image.
+    """
+
+    file_tag = text_dict()["file_tag"]
+    return (
+        file_tag["AVGCA"]
+        + file_tag["TEMPFILT"]
+        + file_tag["DOWNSAMPLE"]
+        + file_tag["IMG"]
+    )
+
+
+def resize_to_square(image: np.ndarray) -> np.ndarray:
+    """
+    Resize an image to a square shape based on smallest dimension via cv2 interpolation.
+
+    Parameters:
+        image (np.ndarray): Input image array.
+
+    Returns:
+        np.ndarray: Resized image array.
+    """
+
+    size = min(image.shape)
+    return cv2.resize(image, (size, size), interpolation=cv2.INTER_AREA)

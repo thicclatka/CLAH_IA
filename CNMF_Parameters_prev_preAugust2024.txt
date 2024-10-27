@@ -1,0 +1,28 @@
+CNMF Parameters (N/A - August 2024)
+[Previous]
+
+P = 1
+GNB = 2
+GSIG = [4, 4]
+MERGE_THRESH = 0.5
+INIT_METH = greedy_roi
+ISDENDRITES = False
+ALPHA_SNMF = False
+MIN_SNR = 4
+RVAL_THR = 0.8
+CNN_THR = 0.8
+FPS = 10
+K = 15
+RF = 25
+STRIDE = 8
+MEMORY_FACT = 1
+NPROC = 1
+DECAY = 4
+METH_DECONV = oasis
+CHECK_NAN = 1
+USE_CNN = False
+ONLY_INIT_PATCH = False
+CE_THRESH = 0.8
+CE_VMAX = 0.75
+QUANTILE_MIN = 8
+FRAME_WINDOW = 250
