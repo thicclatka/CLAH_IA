@@ -21,7 +21,7 @@ source activate caiman
 pip install -e . # remove -e if you don't want to install in editable mode
 
 # Installing CLAH Image Analysis
-git clone git@github.com:thicclatka/CLAH_ImageAnalysis.git
+git clone git@github.com:thicclatka/CLAH_IA.git
 pip install -e /path/to/CLAH_IA # remove -e if you don't want to install in editable mode
 
 ```
@@ -37,16 +37,16 @@ pip install git+https://github.com/RichieHakim/roiextractors
 
 For single sessions:
 
-1. Moco2segDict
-2. quickTuning (need .tdml to run)
+1. [Moco2segDict (M2SD)](#motion-correction-to-segmented-dictionary-moco2segdict)
+2. [quickTuning (QT)](#quick-tuning) (need .tdml to run)
 
 For multiple sessions:
 
-1. M2SD -> QT (Using data directory with single session folders)
-2. wrapMultSessStruc
-3. cellRegistrar_wROICaT (Using data directory with multisession folders from here)
-4. PostCR_CueCellFinder
-5. CR_CI_collater
+1. [M2SD](#motion-correction-to-segmented-dictionary-moco2segdict) -> [QT](#quick-tuning) (Using data directory with single session folders)
+2. [wrapMultSessStruc](#wrapmultsessstruc)
+3. [cellRegistrar_wROICaT](#cell-registrar-wroicat) (Using data directory with multisession folders from here)
+4. [PostCR_CueCellFinder](#post-cell-registrar-cue-cell-finder-postcr_cuecellfinder)
+5. [CR_CI_collater](#cell-registrar-cluster-info-collater-cr_ci_collater)
 
 ### Structure for folder/path names
 
