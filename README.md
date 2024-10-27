@@ -345,3 +345,10 @@ options:
                         Whether to export .svg for figures in addition to the usual .png output.
                         Default is False.
 ```
+
+## GUI
+
+TODO:
+
+- [ ] Test/clean up already existing GUI functions
+- [ ] add web-based GUI for running functions over remote connections
