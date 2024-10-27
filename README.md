@@ -8,13 +8,11 @@
 
 ## Setup
 
-Follow the instructions found on [CaImAn](https://github.com/thicclatka/CaImAn) for installation, but found the best success by following the [dev-mode installation instructions](https://github.com/flatironinstitute/CaImAn/blob/main/docs/source/Installation.rst#section-1b-development-mode-install), which involves creating an environment for caiman via anaconda/mamba.
-
-Following the dev-mode option, start first by installing [Anaconda](https://docs.anaconda.com/anaconda/install/). With anaconda installed, clone CaImAn's repo, create an environment for CaImAn via conda, activate the environment, and install CaImAn's required packages. Once CaImAn is installed, you can clone this repo and install via pip. See below for the exact commands used to install CaImAn and this repo on a UNIX system (MacOS or Linux).
+Following the [dev-mode option installation instructions on CaImAn](https://github.com/flatironinstitute/CaImAn/blob/main/docs/source/Installation.rst#section-1b-development-mode-install), start first by installing [Anaconda](https://docs.anaconda.com/anaconda/install/). With anaconda installed, clone CaImAn's repo, create an environment for CaImAn via conda, activate the environment, and install CaImAn's required packages. Once CaImAn is installed, you can clone this repo and install via pip. See below for the exact commands used to install CaImAn and this repo on a UNIX system (MacOS or Linux).
 
 ```bash
 # Installing CaImAn
-git clone git@github.com:flatironinstitute/CaImAn.git # or git@github.com:thicclatka/CaImAn.git for my fork
+git clone git@github.com:thicclatka/CaImAn.git # use my fork of CaImAn
 cd /path/to/CaImAn/
 conda env create -f environment.yml -n caiman
 source activate caiman
@@ -322,8 +320,8 @@ options:
 - I:
   - json with cluster info (\_cluster_info_ROICaT.json)
 - O:
-  - csv with cluster info for all subjects (/path/to/MultiSess/dir/~GroupData/ClusterInfo_all.csv)
-  - csv with cluster info averages by group (/path/to/MultiSess/dir/~GroupData/ClusterInfo_means.csv)
+  - csv with cluster info for all subjects (/path/to/\_MS_dir/~GroupData/ClusterInfo_all.csv)
+  - csv with cluster info averages by group (/path/to/\_MS_dir/~GroupData/ClusterInfo_means.csv)
 
 How to run:
 
