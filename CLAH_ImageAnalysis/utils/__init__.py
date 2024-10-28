@@ -7,7 +7,7 @@ __all__ = [
     "debug_utils",
     "wrappers4output",
     "folder_tools",
-    "array_toolkit",
+    # "array_toolkit",
     "enum_utils",
     "saveNloadUtils",
     "mdata_extractor",
@@ -39,7 +39,8 @@ if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from . import debug_utils
     from .wrappers4output import *
     from .folder_tools import *
-    from .array_toolkit import *
+
+    # from .array_toolkit import *
     from . import enum_utils
     from . import saveNloadUtils
     from .mdata_extractor import *
