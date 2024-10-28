@@ -35,15 +35,15 @@ file_tag = text_lib["file_tag"]
 
 def start_cluster(
     N_PROC: int | None = None,
-) -> tuple[cm.cluster.CaimanCluster, cm.cluster.CaimanDistributedView, int]:
+) -> tuple[object, object, int]:
     """Starts a local cluster for parallel processing.
 
     Parameters:
         N_PROC (int, optional): Number of processes to use. Defaults to None, which means all available cores will be used.
 
     Returns:
-        c (caiman.cluster.CaimanCluster): Caiman cluster object.
-        dview (caiman.cluster.CaimanDistributedView): Caiman distributed view object.
+        c (object): Caiman cluster object.
+        dview (object): Caiman distributed view object.
         n_processes (int): Number of processes used.
     """
 
@@ -55,13 +55,11 @@ def start_cluster(
     return c, dview, n_processes
 
 
-def stop_cluster(
-    dview: cm.cluster.CaimanDistributedView, remove_log: bool = False
-) -> None:
+def stop_cluster(dview: object, remove_log: bool = False) -> None:
     """Stops the Caiman cluster.
 
     Parameters:
-        dview (caiman.cluster.CaimanDistributedView): Caiman distributed view object.
+        dview (object): Caiman distributed view object.
         remove_log (bool, optional): Whether to remove log files. Defaults to False.
     """
     cm.stop_server(dview=dview)
@@ -261,3 +259,16 @@ def create_weight_matrix_for_blending(
     return cm.motion_correction.create_weight_matrix_for_blending(
         img, overlaps, strides
     )
+
+
+def apply_high_pass_filter_space(img: np.ndarray, gSig_filt: tuple) -> np.ndarray:
+    """Applies high-pass filter to the image.
+
+    Parameters:
+        img (numpy.ndarray): Input image.
+        gSig_filt (tuple): Filter size for high-pass filter.
+
+    Returns:
+        numpy.ndarray: High-pass filtered image.
+    """
+    return cm.motion_correction.high_pass_filter_space(img, gSig_filt)
