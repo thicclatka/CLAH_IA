@@ -15,18 +15,18 @@ Following the [dev-mode option installation instructions on CaImAn](https://gith
 git clone git@github.com:thicclatka/CaImAn.git # use my fork of CaImAn
 cd /path/to/CaImAn/
 conda env create -f environment.yml -n caiman
-source activate caiman
+conda activate caiman # activate environment
 pip install -e . # remove -e if you don't want to install in editable mode
 
 # Installing CLAH Image Analysis
 git clone git@github.com:thicclatka/CLAH_IA.git
 pip install -e /path/to/CLAH_IA # remove -e if you don't want to install in editable mode
-
 ```
 
 To set up [ROICaT](https://github.com/RichieHakim/ROICaT), activate caiman environment, and run this:
 
 ```bash
+conda activate caiman # activate environment
 pip install roicat[all]==1.3.3
 pip install git+https://github.com/RichieHakim/roiextractors
 ```
@@ -141,7 +141,7 @@ options:
                         Window size in pixels for the morphological filter that enables
                         background subtraction (preprocessing for miniscope data).
                         Default is None. If None, but 1-photon data is detected,
-                        will prompt user to enter a kernel window size, with a default of 20.
+                        will prompt user to enter a kernel window size, with a default of 20. [***STILL TESTING***]
 ```
 
 ### [Unit Analysis](./CLAH_ImageAnalysis/unitAnalysis/__init__.py)
@@ -346,9 +346,15 @@ options:
                         Default is False.
 ```
 
-## GUI
+## [GUI](./CLAH_ImageAnalysis/GUI)
 
 TODO:
 
 - [ ] Test/clean up already existing GUI functions
 - [ ] add web-based GUI for running functions over remote connections
+
+## [Decode](./CLAH_ImageAnalysis/decoder)
+
+TODO:
+
+- [ ] Add usage/explanation for decoder funcs
