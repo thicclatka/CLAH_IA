@@ -353,7 +353,7 @@ TODO:
 - [ ] Test/clean up already existing GUI functions
 - [ ] add web-based GUI for running functions over remote connections
 
-## [Decode](./CLAH_ImageAnalysis/decoder)
+## [Decoder](./CLAH_ImageAnalysis/decoder)
 
 TODO:
 
