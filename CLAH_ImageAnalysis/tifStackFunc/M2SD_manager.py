@@ -553,15 +553,21 @@ class M2SD_manager(BC):
             )
 
             # apply morphology tophat filter to each frame
-            for frame in tqdm(hf_arr["imaging"], desc="Creating filtered image stack"):
-                # subtract min value to remove glow/vignette effect
+            for frame in tqdm(hf_arr["imaging"], desc="Preprocessing 1-photon data"):
+                # # subtract min value to remove glow/vignette effect
                 frame2use = frame - frame.min()
                 # denoise frame
                 frame2use = self.dep.filter_utils.apply_median_blur_filter(
                     array_stack=frame2use, window_size=3
                 )
-                frame2use = self.dep.filter_utils.apply_morphology_tophat_filter(
-                    array_stack=frame2use, window_size=self.kernel_window_size
+                # frame2use = self.dep.filter_utils.apply_morphology_tophat_filter(
+                #     array_stack=frame2use, window_size=self.kernel_window_size
+                # )
+
+                # use high-pass filter to remove low-frequency signal
+                # via caiman funcs
+                frame2use = self.utils.caiman_utils.apply_high_pass_filter_space(
+                    frame2use, gSig_filt=(2, 2)
                 )
                 frame2use = (frame2use - frame2use.min()) / (
                     frame2use.max() - frame2use.min()
@@ -664,6 +670,7 @@ class M2SD_manager(BC):
             # stop server
             self.utils.caiman_utils.stop_cluster(dview=self.dview, remove_log=True)
             print("Cluster stopped")
+            print()
         else:
             # stop dview cluster
             self.dview.terminate()
@@ -1397,6 +1404,6 @@ class M2SD_manager(BC):
         print("Clearing variables to save space for next iteration", end="", flush=True)
         # clears variables and activates garbage collector
         with self.StatusPrinter.garbage_collector():
-            # clear vars via init global vars
+            # clear vars via init iterable vars
             self._init_vars4Iter()
         self.print_done_small_proc()

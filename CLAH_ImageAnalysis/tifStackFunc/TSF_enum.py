@@ -33,6 +33,7 @@ class MOCO_Params(Enum):
     BORDER_NAN = True  # how to handle NaNs at the border
     PW_RIGID = True  # use patch-wise rigid registration
     USE_CUDA = True  # use cuda for registration
+    GSIG_FILT = None  # filter size for high-pass filter
 
 
 class MOCO_Params4OnePhoton(Enum):
@@ -53,6 +54,7 @@ class MOCO_Params4OnePhoton(Enum):
     BORDER_NAN = True
     PW_RIGID = True
     USE_CUDA = True
+    GSIG_FILT = None  # filter size for high-pass filter
 
 
 # GLOBAL VAR of OPTS for CNMF_Params

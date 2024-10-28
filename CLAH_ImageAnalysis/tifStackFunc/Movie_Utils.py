@@ -163,4 +163,7 @@ def save_movie(
         with h5py.File(fname, "w") as hf:
             ds = hf.create_dataset("mov", data=movie)
             ds.attrs["DIMENSION_LABELS"] = ["t", "y", "x"]
-            ds.attrs["element_size_um"] = np.array(element_size_um)
+            if element_size_um is not None:
+                ds.attrs["element_size_um"] = np.array(element_size_um)
+            else:
+                ds.attrs["element_size_um"] = np.array([np.nan, np.nan, np.nan])

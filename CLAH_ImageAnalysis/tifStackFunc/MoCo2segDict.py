@@ -285,10 +285,8 @@ class MoCo2segDict(M2SDM):
         # background is b dot f
         self.find_residual_postSeg()
 
-        # STOP CLUSTER and clean up log files
-        # print("Stopping cluster", end="", flush=True)
+        # STOP CLUSTER
         self.stop_cluster(final=True)
-        # print(done_str)
 
 
 ######################################################

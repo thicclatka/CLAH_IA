@@ -1,6 +1,8 @@
-from caiman import load as cm_load
+# from caiman import load as cm_load
 from caiman.motion_correction import MotionCorrect
-from caiman.motion_correction import motion_correct_oneP_nonrigid
+# from caiman.motion_correction import high_pass_filter_space
+
+# from caiman.motion_correction import motion_correct_oneP_nonrigid
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
 
@@ -18,6 +20,7 @@ def NoRMCorre(
     max_deviation_rigid: int | None = None,
     shifts_opencv: bool | None = None,
     nonneg_movie: bool | None = None,
+    gSig_filt: int | None = None,
     pw_rigid: bool | None = None,
     use_cuda: bool | None = None,
     border_nan: bool | None = None,
@@ -41,7 +44,7 @@ def NoRMCorre(
         nonneg_movie (bool, optional): Ensure non-negative movie. Defaults to MOCOpar["NONNEG"].
         pw_rigid (bool, optional): Perform piece-wise rigid motion correction. Defaults to MOCOpar["PW_RIGID"].
         use_cuda (bool, optional): Use CUDA for motion correction. Defaults to MOCOpar["USE_CUDA"].
-
+        gSig_filt (int, optional): Global standard deviation of the filters. Defaults to MOCOpar["GSIG_FILT"].
     Returns:
         mc (MotionCorrect): The motion-corrected movie object.
     """
@@ -81,12 +84,17 @@ def NoRMCorre(
     pw_rigid = bool(MOCOpar2use["PW_RIGID"]) if pw_rigid is None else pw_rigid
     use_cuda = bool(MOCOpar2use["USE_CUDA"]) if use_cuda is None else use_cuda
 
+    if MOCOpar2use["GSIG_FILT"] is not None:
+        gSig_filt = MOCOpar2use["GSIG_FILT"]
+
     # Setting up moco parameters than need to be arranged into tuples
     max_shifts = (max_shifts, max_shifts)  # maximum allow rigid shift
     # start new path for pw-rigid motion correction every x pxls
     strides = (strides, strides) if isinstance(strides, int) else strides
     # overlap between paths (size of path stirdes + overlaps)
     overlaps = (overlaps, overlaps) if isinstance(overlaps, int) else overlaps
+
+    gSig_filt = (gSig_filt, gSig_filt) if isinstance(gSig_filt, int) else gSig_filt
 
     # utils.print_wFrame(f"Applying motion correction to: {h5filename}")
     # utils.print_wFrame(f"loading movie for motion correction")
@@ -105,8 +113,8 @@ def NoRMCorre(
 
     if len(h5filename) <= 2:
         for idx, h5_2moco in enumerate(h5filename):
-            utils.print_wFrame("loading movie for motion correction")
-            min_mov = cm_load([h5_2moco], subindices=range(200)).min()
+            # utils.print_wFrame("loading movie for motion correction")
+            # min_mov = cm_load([h5_2moco], subindices=range(200)).min()
             if idx == 1:
                 utils.print_wFrame(
                     "Applying template from previous motion correction",
@@ -129,7 +137,7 @@ def NoRMCorre(
             ):
                 mc = MotionCorrect(
                     h5_2moco,
-                    min_mov,
+                    # min_mov,
                     dview=dview,
                     max_shifts=max_shifts,
                     niter_rig=niter_rig,
@@ -144,6 +152,7 @@ def NoRMCorre(
                     border_nan=border_nan,
                     pw_rigid=pw_rigid,
                     use_cuda=use_cuda,
+                    gSig_filt=gSig_filt,
                 )
 
                 # template will be None for the first motion correction
