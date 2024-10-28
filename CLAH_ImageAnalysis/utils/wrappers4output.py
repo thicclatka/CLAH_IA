@@ -202,6 +202,9 @@ class ProcessStatusPrinter:
             with open(elog_fname, "a") as f:
                 f.write(f"{error_message}\n")
                 f.write(err_breaker + "\n")
+                f.write(
+                    f"Time Error Occurred: {time_utils.get_current_time_string(wColons=True)}\n"
+                )
                 print()
         else:
             with open(elog_fname, "a") as f:
