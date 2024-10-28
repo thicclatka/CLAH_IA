@@ -508,4 +508,3 @@ class CNMF_Utils(BC):
         # clear for memory
         with self.StatusPrinter.garbage_collector():
             segDict = None
-            self._init_strucs_to_fill()
