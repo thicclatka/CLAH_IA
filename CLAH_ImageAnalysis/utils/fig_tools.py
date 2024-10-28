@@ -13,7 +13,7 @@ from matplotlib.patches import Patch
 from matplotlib.patches import Polygon
 import plotly.graph_objects as go
 from matplotlib.colors import Normalize
-
+from typing import Any
 # import plotly.tools as tls
 # import plotly.io as pio
 
@@ -852,7 +852,7 @@ def add_text_box(
     text: str,
     xpos: float = 0.5,
     ypos: float = 0.95,
-    transform: plt.transform = None,
+    transform: Any = None,
     color: str = None,
     ha: str = None,
     va: str = None,
