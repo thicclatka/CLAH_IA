@@ -8,8 +8,8 @@ __all__ = [
     "filter_utils",
     "geometric_tools",
     "CUDA_utils",
-    "GPU_SignalProc",
-    "GPU_Tools",
+    # "GPU_SignalProc",
+    # "GPU_Tools",
 ]
 
 # note which ones to import as is
@@ -22,8 +22,8 @@ if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from .filter_utils import *
     from .geometric_tools import *
     from .CUDA_utils import *
-    from .GPU_SignalProc import *
-    from .GPU_Tools import *
+    # from .GPU_SignalProc import *
+    # from .GPU_Tools import *
 else:
     for module in __all__:
         if module in modules_import_as_is:
