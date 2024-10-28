@@ -135,6 +135,7 @@ class TDML_extractor(BC):
         ]
         self.OPTO = self.TDMLkey["OPTO"]
         self.OPTO_VALVE = self.TDMLkey["OPTO_VALVE"]
+        self.LAPSYNC_VALVE = self.TDMLkey["LAPSYNC_VALVE"]
 
     def settings(self, data_dict: dict, treadBehDict: dict) -> dict:
         """
@@ -223,7 +224,13 @@ class TDML_extractor(BC):
             lapDict[lap_key][TYPE] = self._determine_lap_type(valves_set, locations)
 
         cue_valve_ind = list(set(valve_finder))
+        cue_valve_ind = [
+            valve for valve in cue_valve_ind if valve != self.LAPSYNC_VALVE
+        ]
+
         cue_arr = list(set(cue_finder))
+        cue_arr = [cue for cue in cue_arr if cue is not None]
+
         total_cue = len(cue_arr)
         self.print_done_small_proc(new_line=False)
         # print lapDict to terminal
