@@ -10,12 +10,12 @@ def create_exponential_decay_filter(
     Creates an exponential decay filter.
 
     Parameters:
-    tau (float): The decay constant used in the exponential function.
-    start (int): The starting point of the range for the filter. Default is 1.
-    tail_factor (int): Factor to determine the length of the filter's tail. Default is 6.
+        tau (float): The decay constant used in the exponential function.
+        start (int): The starting point of the range for the filter. Default is 1.
+        tail_factor (int): Factor to determine the length of the filter's tail. Default is 6.
 
     Returns:
-    numpy.ndarray: An exponential decay filter.
+        numpy.ndarray: An exponential decay filter.
     """
     x = np.arange(start, tail_factor * tau + start)
     yexp = np.exp(-x / tau)
@@ -43,6 +43,13 @@ def apply_morphology_tophat_filter(
 def apply_median_blur_filter(array_stack: np.ndarray, window_size: int) -> np.ndarray:
     """
     Apply median blur filter to array stack.
+
+    Parameters:
+        array_stack (numpy.ndarray): Input array stack.
+        window_size (int): Window size for the median blur filter.
+
+    Returns:
+        numpy.ndarray: Median blurred array stack.
     """
     if array_stack.dtype != np.uint8:
         array_stack = cv2.normalize(array_stack, None, 0, 255, cv2.NORM_MINMAX).astype(
