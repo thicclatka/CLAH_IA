@@ -12,6 +12,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.patches import Polygon
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from matplotlib.colors import Normalize
 from typing import Any
 # import plotly.tools as tls
@@ -908,8 +909,8 @@ def add_text_box(
 
 def save_plotly(
     plotly_fig: go.Figure,
-    figure_save_path: str,
     fig_name: str,
+    figure_save_path: str = None,
     auto_open: bool = False,
 ) -> None:
     """
@@ -922,14 +923,18 @@ def save_plotly(
         auto_open (bool, optional): Whether to open the figure after saving. Default is False.
     """
 
-    if not os.path.exists(figure_save_path):
-        os.makedirs(figure_save_path)
+    if figure_save_path is not None:
+        if not os.path.exists(figure_save_path):
+            os.makedirs(figure_save_path)
 
     if not fig_name.endswith(".html"):
         fig_name += ".html"
 
     # Construct the full file path
-    file_path = os.path.join(figure_save_path, fig_name)
+    if figure_save_path is None:
+        file_path = fig_name
+    else:
+        file_path = os.path.join(figure_save_path, fig_name)
 
     # Save the Plotly figure as an HTML file
     plotly_fig.write_html(file_path, auto_open=auto_open)
@@ -945,12 +950,44 @@ def create_plotly() -> go.Figure:
     return go.Figure()
 
 
+def create_plotly_subplots(
+    rows: int,
+    cols: int,
+    shared_xaxes: bool = False,
+    shared_yaxes: bool = False,
+    vertical_spacing: float = 0.02,
+) -> go.Figure:
+    """
+    Create a Plotly figure with subplots.
+
+    Parameters:
+        rows (int): Number of rows in the subplot grid.
+        cols (int): Number of columns in the subplot grid.
+        shared_xaxes (bool, optional): Whether to share x-axes between subplots. Default is False.
+        shared_yaxes (bool, optional): Whether to share y-axes between subplots. Default is False.
+        vertical_spacing (float, optional): Vertical spacing between subplots. Default is 0.02.
+
+    Returns:
+        plotly.graph_objects.Figure: A Plotly figure with the specified subplot layout.
+    """
+
+    return make_subplots(
+        rows=rows,
+        cols=cols,
+        shared_xaxes=shared_xaxes,
+        shared_yaxes=shared_yaxes,
+        vertical_spacing=vertical_spacing,
+    )
+
+
 def add_plotly_trace(
     fig: go.Figure,
     x: np.ndarray = None,
     y: np.ndarray = None,
     mode: str = None,
     name: str = None,
+    row: int = None,
+    col: int = None,
     **kwargs,
 ) -> None:
     """
@@ -962,10 +999,16 @@ def add_plotly_trace(
         y (np.ndarray, optional): The y-coordinates of the trace. Default is None.
         mode (str, optional): The mode of the trace. Default is None.
         name (str, optional): The name of the trace. Default is None.
-        **kwargs: Additional keyword arguments to pass to the trace.
+        row (int, optional): Row number for subplot. Default is None.
+        col (int, optional): Column number for subplot. Default is None.
+        **kwargs: Additional keyword arguments for the trace.
                     See https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html for more details.
     """
-    fig.add_trace(go.Scatter(x=x, y=y, mode=mode, name=name, **kwargs))
+    fig.add_trace(
+        go.Scatter(x=x, y=y, mode=mode, name=name, **kwargs),
+        row=row,
+        col=col,
+    )
 
 
 def label_cellNum_overDSImage(

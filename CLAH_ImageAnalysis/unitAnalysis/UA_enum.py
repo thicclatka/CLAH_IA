@@ -397,11 +397,11 @@ class Parser4QT(Enum):
             "DEFAULT": False,
             "HELP": text_lib["parser"]["forPres"],
         },
-        ("concatCheck", "cat"): {
-            "TYPE": "bool",
-            "DEFAULT": False,
-            "HELP": "Set this to True if you are working with sessions that were motion corrected in a concatenated manner. Default is False",
-        },
+        # ("concatCheck", "cat"): {
+        #     "TYPE": "bool",
+        #     "DEFAULT": False,
+        #     "HELP": "Set this to True if you are working with sessions that were motion corrected in a concatenated manner. Default is False",
+        # },
     }
 
 

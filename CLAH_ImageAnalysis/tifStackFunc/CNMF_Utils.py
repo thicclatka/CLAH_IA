@@ -462,6 +462,8 @@ class CNMF_Utils(BC):
             filetype_to_save=filetype_to_save,
         )
 
+        self._plot_CTemp(CTemp=segDict[SDkey["C_TEMPORAL"]])
+
         if concatCheck:
             print(
                 "Splitting concatenated data into pre and post segments & saving into respective session folders:"
@@ -508,3 +510,38 @@ class CNMF_Utils(BC):
         # clear for memory
         with self.StatusPrinter.garbage_collector():
             segDict = None
+
+    def _plot_CTemp(self, CTemp: np.ndarray) -> None:
+        numCells = CTemp.shape[0]
+        fig = self.fig_tools.create_plotly_subplots(
+            rows=numCells, cols=1, shared_xaxes=True, vertical_spacing=0.002
+        )
+
+        for i in range(numCells):
+            self.fig_tools.add_plotly_trace(
+                fig=fig,
+                x=np.arange(CTemp.shape[1]),
+                y=CTemp[i, :],
+                name=f"Cell {i + 1}",
+                mode="lines",
+                row=i + 1,
+                col=1,
+            )
+            # Update both x and y axes for each subplot
+            fig.update_yaxes(
+                title_text=f"Cell {i + 1} (a.u.)",  # Add cell number to y-axis title
+                row=i + 1,
+                col=1,
+            )
+            fig.update_xaxes(
+                title_text="Time (frames)",
+                row=i + 1,
+                col=1,
+            )
+
+        fig.update_layout(
+            title=f"Temporal Components for {self.basename}",
+            height=100 * numCells,
+            showlegend=False,
+        )
+        self.fig_tools.save_plotly(plotly_fig=fig, fig_name=f"{self.basename}_CTemp")

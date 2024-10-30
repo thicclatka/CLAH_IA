@@ -163,11 +163,14 @@ class tBD_lD_manager(BC):
         """
         for key in self.key_list:
             self.treadBehDict[key] = self.FRdict[key]
+
         adjFrTimes = [
             rel_time + self.treadBehDict[self.TDMLkey["SYNC"]][self.TDMLkey["ONTIME"]]
             for rel_time in self.FRdict[self.X2Fkey["REL_KEY"]]
         ]
+
         self.treadBehDict[self.TDMLkey["ADJ_FRAME"]] = adjFrTimes
+
         y = np.array(
             self.treadBehDict[self.TDMLkey["POSITION"]][self.TDMLkey["POSITION_KEY"]]
         )

@@ -993,6 +993,7 @@ class M2SD_manager(BC):
                     array_to_trim=array, store=False
                 )
             else:
+                print("---Skipping trimming step for 1Photon data---")
                 trimmed_array = array
                 trimYX = None
 
