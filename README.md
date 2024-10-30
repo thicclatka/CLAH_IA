@@ -195,10 +195,6 @@ options:
   -4p FORPRES, --forPres FORPRES
                         Whether to export .svg for figures in addition to the usual .png output.
                         Default is False.
-  -cat CONCATCHECK, --concatCheck CONCATCHECK
-                        Set this to True if you are working with sessions that were
-                        motion corrected in a concatenated manner.
-                        Default is False.
 ```
 
 #### [WrapMultSessStruc](./CLAH_ImageAnalysis/unitAnalysis/wrapMultSessStruc.py)
