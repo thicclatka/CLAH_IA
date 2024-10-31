@@ -154,6 +154,8 @@ pyrightconfig.json
 ### VisualStudioCode ###
 .vscode/*
 .dist/
+launch.json
+settings.json
 
 # Local History for Visual Studio Code
 .history/
