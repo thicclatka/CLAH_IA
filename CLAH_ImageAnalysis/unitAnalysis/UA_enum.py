@@ -1,7 +1,7 @@
 from enum import Enum
 
 from CLAH_ImageAnalysis import utils
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
 
 text_lib = utils.text_dict()

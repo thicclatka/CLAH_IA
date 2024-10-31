@@ -96,6 +96,7 @@ def xml2FRtimes(root) -> dict:
     """
     x2F_str = utils.enum_utils.enum2dict(xml2FRtimes_Txt)
     FRdict = {
+        "TYPE": "XML",
         x2F_str["ABS_KEY"]: [],
         x2F_str["REL_KEY"]: [],
         x2F_str["FRIDX_KEY"]: [],

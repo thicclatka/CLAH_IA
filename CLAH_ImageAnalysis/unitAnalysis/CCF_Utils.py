@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 import numpy as np
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
 from CLAH_ImageAnalysis.unitAnalysis import CCF_Dep

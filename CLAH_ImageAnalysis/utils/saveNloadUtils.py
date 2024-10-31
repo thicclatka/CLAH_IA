@@ -34,7 +34,7 @@ def savedict2file(
     dict_to_save: dict,
     dict_name: str,
     filename: str,
-    file_tag_to_remove: list = [],
+    file_tag_to_remove: list | str = [],
     file_suffix: list = [],
     date: bool = False,
     filetype_to_save: list = [

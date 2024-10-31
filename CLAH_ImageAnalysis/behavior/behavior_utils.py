@@ -1,7 +1,7 @@
 import re
 
 from CLAH_ImageAnalysis import utils
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
 
 text_lib = utils.text_dict()
 lean_str = text_lib["breaker"]["lean"]

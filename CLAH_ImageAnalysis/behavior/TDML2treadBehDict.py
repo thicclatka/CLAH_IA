@@ -1,5 +1,5 @@
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_utils as TDML_utils
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import TDML2tBD_utils as TDML_utils
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 #############################################################

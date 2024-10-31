@@ -36,7 +36,7 @@ Dependencies:
     - numpy: For numerical operations on arrays.
     - rich: For printing formatted messages.
     - CLAH_ImageAnalysis.utils: Utility functions for image analysis.
-    - CLAH_ImageAnalysis.behav2p.TDML2tBD_enum: Enums for behavioral to 2-photon data processing.
+    - CLAH_ImageAnalysis.behavior.TDML2tBD_enum: Enums for behavioral to 2-photon data processing.
     - CLAH_ImageAnalysis.unitAnalysis.LapFinder4lapCueDict: Class for finding laps and cues in the data.
     - CLAH_ImageAnalysis.unitAnalysis.UA_enum: Enums for unit analysis.
 
@@ -61,7 +61,7 @@ import numpy as np
 from rich import print as rprint
 
 from CLAH_ImageAnalysis import utils
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
 from CLAH_ImageAnalysis.unitAnalysis import LapFinder4lapCueDict
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
 

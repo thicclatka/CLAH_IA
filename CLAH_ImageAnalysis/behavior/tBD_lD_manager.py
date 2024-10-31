@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
-from CLAH_ImageAnalysis.behav2p import TDML2tBD_enum as TDMLE
-from CLAH_ImageAnalysis.behav2p import XML2frTimes2P
-from CLAH_ImageAnalysis.behav2p import TDML2treadBehDict
-from CLAH_ImageAnalysis.behav2p import b2p_utils
+from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
+from CLAH_ImageAnalysis.behavior import XML2frTimes2P
+from CLAH_ImageAnalysis.behavior import TDML2treadBehDict
+from CLAH_ImageAnalysis.behavior import behavior_utils
+from CLAH_ImageAnalysis.behavior import GPIOfrTimes
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 # TODO: REMOVE THESE GLOBAL VARS AND MOVE TO CLASS & ADJUST IMPORT STATEMENTS
@@ -46,6 +47,7 @@ class tBD_lD_manager(BC):
 
         self.TDMLkey = self.enum2dict(TDMLE.TXT)
         self.X2Fkey = self.enum2dict(XML2frTimes2P.xml2FRtimes_Txt)
+        self.GPIOkey = self.enum2dict(GPIOfrTimes.GPIOfrTimes_Txt)
 
         # loads tBD & lD if exists (pkl file)
         self._tBD_lD_checker()
@@ -104,19 +106,8 @@ class tBD_lD_manager(BC):
         # find total_cue & create cue_arr accordingly
         self.total_cue = len(unique_cues)
         self.cue_arr = [cue for cue in unique_cues]
-        # if self.total_cue == 1:
-        #     self.cue_arr = [self.TDMLkey["CUE1"]]
-        # elif self.total_cue == 2 and self.TDMLkey["OPTO"] not in unique_cues:
-        #     self.cue_arr = [self.TDMLkey["CUE1"], self.TDMLkey["CUE2"]]
-        # elif self.total_cue == 2 and self.TDMLkey["OPTO"] in unique_cues:
-        #     self.cue_arr = [self.TDMLkey["CUE1"], self.TDMLkey["OPTO"]]
-        # elif self.total_cue == 3:
-        #     self.cue_arr = [
-        #         self.TDMLkey["CUE1"],
-        #         self.TDMLkey["LED"],
-        #         self.TDMLkey["TONE"],
-        #     ]
-        b2p_utils.print_lapDict_results(self.lapDict, unique_cues)
+
+        behavior_utils.print_lapDict_results(self.lapDict, unique_cues)
 
     def _tBD_lD_creator(self):
         """
@@ -132,20 +123,34 @@ class tBD_lD_manager(BC):
         self.treadBehDict, self.lapDict, self.cue_arr = TDML2treadBehDict(
             self.folder_path
         )
-        self.FRdict, xml_file = XML2frTimes2P.get2pFRTimes(self.folder_path)
-        self.key_list = [
-            self.X2Fkey["ABS_KEY"],
-            self.X2Fkey["REL_KEY"],
-            self.X2Fkey["FRIDX_KEY"],
-        ]
+        if self.findLatest(self.file_tag["XML"]):
+            self.FRdict, data_fname = XML2frTimes2P.get2pFRTimes(self.folder_path)
+            self.key_list = [
+                self.X2Fkey["ABS_KEY"],
+                self.X2Fkey["REL_KEY"],
+                self.X2Fkey["FRIDX_KEY"],
+            ]
+            ftag2remove = self.file_tag["XML"]
+        elif self.findLatest([self.file_tag["GPIO"], self.file_tag["CSV"]]):
+            self.FRdict, data_fname = GPIOfrTimes.getGPIOfrTimes(self.folder_path)
+            self.key_list = [
+                self.GPIOkey["FR_KEY"],
+                self.GPIOkey["SYNC_KEY"],
+                self.GPIOkey["CUE_KEY"],
+                self.GPIOkey["EXLED_KEY"],
+            ]
+            ftag2remove = self.file_tag["GPIO"]
+
+        # fill tBD with FRD data
         self._fill_tBDwFRD()
+
         # save treadBehDict after processing done in fill_tBDwFRD
-        # using xml file as basis for mat_fname, so removing
+        # using data_fname as basis for mat_fname, so removing
         self.saveNloadUtils.savedict2file(
             dict_to_save=self.treadBehDict,
             dict_name=self.dict_name["TREADBEHDICT"],
-            filename=xml_file,
-            file_tag_to_remove=self.file_tag["XML"],
+            filename=data_fname,
+            file_tag_to_remove=ftag2remove,
             file_suffix=self.dict_name["TREADBEHDICT"],
             date=True,
             filetype_to_save=[self.file_tag["MAT"], self.file_tag["PKL"]],
@@ -161,13 +166,21 @@ class tBD_lD_manager(BC):
         Returns:
             None
         """
+
+        def _add_by_rel_time(FRtype: str) -> np.ndarray:
+            syncTime = self.treadBehDict[self.TDMLkey["SYNC"]][self.TDMLkey["ONTIME"]]
+            if FRtype == "XML":
+                return [
+                    rel_time + syncTime
+                    for rel_time in self.FRdict[self.X2Fkey["REL_KEY"]]
+                ]
+            elif FRtype == "GPIO":
+                return self.FRdict[self.GPIOkey["FR_KEY"]] + syncTime
+
         for key in self.key_list:
             self.treadBehDict[key] = self.FRdict[key]
 
-        adjFrTimes = [
-            rel_time + self.treadBehDict[self.TDMLkey["SYNC"]][self.TDMLkey["ONTIME"]]
-            for rel_time in self.FRdict[self.X2Fkey["REL_KEY"]]
-        ]
+        adjFrTimes = _add_by_rel_time(self.FRdict["TYPE"])
 
         self.treadBehDict[self.TDMLkey["ADJ_FRAME"]] = adjFrTimes
 
@@ -212,11 +225,11 @@ def fix_resampY(resampY: np.ndarray, diff_threshold: int = 100) -> np.ndarray:
     Fix the resampled Y values by applying a correction to the elements that have a negative difference greater than the specified threshold.
 
     Parameters:
-    resampY (numpy.ndarray): The resampled Y values.
-    diff_threshold (int): The threshold for the negative difference between consecutive elements. Defaults to 100.
+        resampY (numpy.ndarray): The resampled Y values.
+        diff_threshold (int): The threshold for the negative difference between consecutive elements. Defaults to 100.
 
     Returns:
-    numpy.ndarray: The corrected resampled Y values.
+        numpy.ndarray: The corrected resampled Y values.
     """
     # Calculate the difference between consecutive elements
     dy = np.diff(resampY, prepend=0)

@@ -15,7 +15,7 @@ Dependencies:
     - numpy: For numerical operations on arrays.
     - rich: For printing formatted messages.
     - CLAH_ImageAnalysis.utils: Utility functions for image analysis.
-    - CLAH_ImageAnalysis.behav2p: Behavioral to 2-photon data processing functions.
+    - CLAH_ImageAnalysis.behavior: Behavioral processing functions.
     - CLAH_ImageAnalysis.PlaceFieldLappedAnalysis: Functions for computing place cells.
     - CLAH_ImageAnalysis.unitAnalysis: Enums and functions for unit analysis.
     - CLAH_ImageAnalysis.unitAnalysis.sepCueShiftLapSpkTimes: Function for separating spike times by lap type.
@@ -35,7 +35,7 @@ import numpy as np
 from rich import print
 
 from CLAH_ImageAnalysis import utils
-from CLAH_ImageAnalysis import behav2p as b2p
+from CLAH_ImageAnalysis import behavior as beh
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import computePlaceCells
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
 from CLAH_ImageAnalysis.unitAnalysis import sepCueShiftLapSpkTimes
@@ -65,12 +65,12 @@ def wrapCueShiftTuning(
 
     folder_path = utils.path_selector(path)
     print("Creating/Loading treadBehDict & lapDict:")
-    tBD_lD_importer = b2p.tBD_lD_manager(folder_path)
+    tBD_lD_importer = beh.tBD_lD_manager(folder_path)
     treadBehDict = tBD_lD_importer.treadBehDict
     lapDict = tBD_lD_importer.lapDict
     cue_arr = tBD_lD_importer.cue_arr
 
-    ADJ_FR_TIMES = treadBehDict[b2p.TDML2tBD_enum.TXT.ADJ_FRAME.value]
+    ADJ_FR_TIMES = treadBehDict[beh.TDML2tBD_enum.TXT.ADJ_FRAME.value]
     maxFR_Thresh_Reached = maxFR_checker(pksDict, ADJ_FR_TIMES)
 
     posLapDict, pksByLTDict, lapCueDict = sepCueShiftLapSpkTimes(

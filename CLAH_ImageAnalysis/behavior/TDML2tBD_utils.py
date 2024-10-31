@@ -14,7 +14,7 @@ Functions:
 
 import numpy as np
 
-from CLAH_ImageAnalysis.behav2p import b2p_utils
+from CLAH_ImageAnalysis.behavior import behavior_utils
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.dependencies import runmean
 
@@ -234,7 +234,7 @@ class TDML_extractor(BC):
         total_cue = len(cue_arr)
         self.print_done_small_proc(new_line=False)
         # print lapDict to terminal
-        b2p_utils.print_lapDict_results(lapDict, cue_arr)
+        behavior_utils.print_lapDict_results(lapDict, cue_arr)
         # save lapDict to file
         self.saveNloadUtils.savedict2file(
             lapDict,
@@ -388,21 +388,23 @@ class setup_vars:
         treadBehDict = {
             TIME: [],
             SESSINFO: [],
-            POS: b2p_utils.init_empty_keys(y_keys),
-            LAP: b2p_utils.init_empty_keys(lap_keys),
-            REWZONE: b2p_utils.create_event_structure(),
-            REW: b2p_utils.init_empty_keys(cue_event_keys),
-            LICK: b2p_utils.init_empty_keys(cue_event_keys),
-            RFID_VNAME: b2p_utils.init_empty_keys(rfid_ctxt_keys),
-            CONTEXT_VNAME: b2p_utils.init_empty_keys(rfid_ctxt_keys),
+            POS: behavior_utils.init_empty_keys(y_keys),
+            LAP: behavior_utils.init_empty_keys(lap_keys),
+            REWZONE: behavior_utils.create_event_structure(),
+            REW: behavior_utils.init_empty_keys(cue_event_keys),
+            LICK: behavior_utils.init_empty_keys(cue_event_keys),
+            RFID_VNAME: behavior_utils.init_empty_keys(rfid_ctxt_keys),
+            CONTEXT_VNAME: behavior_utils.init_empty_keys(rfid_ctxt_keys),
             # self.TDMLkey["FRAME"]: init_empty_keys(frames_keys),
             self.TDMLkey["CUE_EVENTS"]: {
-                cue: b2p_utils.create_event_structure([LAP_NUM]) for cue in cue_arr
+                cue: behavior_utils.create_event_structure([LAP_NUM]) for cue in cue_arr
             },
-            SYNC: b2p_utils.init_empty_keys(
+            SYNC: behavior_utils.init_empty_keys(
                 [self.TDMLkey["ONTIME"], self.TDMLkey["OFFTIME"]]
             ),
-            TRIG: b2p_utils.init_empty_keys([self.TDMLkey["ON"], self.TDMLkey["OFF"]]),
+            TRIG: behavior_utils.init_empty_keys(
+                [self.TDMLkey["ON"], self.TDMLkey["OFF"]]
+            ),
             self.TDMLkey["SYNCPIN"]: [],
             self.TDMLkey["LEDPIN"]: [],
         }
