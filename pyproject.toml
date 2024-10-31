@@ -6,9 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "CLAH_ImageAnalysis"
 version = "1.0"
 description = "Suite of Python programs used for 2-photon calcium imaging analysis"
-authors = [
-    { name = "Alex Hurowitz" }
-]
+authors = [{ name = "Alex Hurowitz" }]
 requires-python = "==3.11.8"
 
 dependencies = [
@@ -17,6 +15,7 @@ dependencies = [
     "easygui",
     "h5py",
     "inquirer",
+    "isx",
     "libsvm",
     "lxml",
     "pandas",
@@ -29,7 +28,7 @@ dependencies = [
     "scipy",
     "seaborn",
     "tqdm",
-    "ttkthemes"
+    "ttkthemes",
 ]
 
 [tool.setuptools.packages.find]
