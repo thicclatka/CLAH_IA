@@ -147,6 +147,11 @@ class PCR_CCF_Plotter(BC):
                 "posK14",
                 "posK20",
             ]
+        elif "MINISCOPE" in self.groups:
+            self.colors4barGroup = {
+                "MINISCOPE": self.color_dict["blue"],
+            }
+            self.groups4sig = ["MINISCOPE"]
 
         self.cmap = "hot"
 
@@ -633,7 +638,10 @@ class PCR_CCF_Plotter(BC):
                     numCols = int(np.ceil(np.sqrt(self.numSess2use4means * 1.5)))
                     numRows = int(np.ceil(self.numSess2use4means / numCols))
 
-                    if numCols + numRows == 4:
+                    if numCols + numRows == 3:
+                        numCols = 2
+                        numRows = 2
+                    elif numCols + numRows == 4:
                         numCols = 3
                     elif self.numSess2use4means == 3:
                         numCols = 3

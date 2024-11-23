@@ -51,8 +51,41 @@ def apply_median_blur_filter(array_stack: np.ndarray, window_size: int) -> np.nd
     Returns:
         numpy.ndarray: Median blurred array stack.
     """
-    if array_stack.dtype != np.uint8:
-        array_stack = cv2.normalize(array_stack, None, 0, 255, cv2.NORM_MINMAX).astype(
-            np.uint8
-        )
     return cv2.medianBlur(array_stack, window_size)
+
+
+def apply_high_pass_filter(img: np.ndarray, gSig_filt: tuple = (2, 2)) -> np.ndarray:
+    """
+    Apply high-pass filter using Gaussian kernel subtraction.
+
+    Parameters:
+        img: np.ndarray
+            Input image (2D array)
+        gSig_filt: tuple
+            Standard deviation for Gaussian kernel in (y, x)
+
+    Returns:
+        np.ndarray: Filtered image
+    """
+    # Create kernel size (3 times sigma, rounded to next odd number)
+    ksize = tuple([(3 * i) // 2 * 2 + 1 for i in gSig_filt])
+
+    # Create 2D Gaussian kernel
+    kernel_x = cv2.getGaussianKernel(ksize[0], gSig_filt[0])
+    kernel_y = cv2.getGaussianKernel(ksize[1], gSig_filt[1])
+    kernel_2d = kernel_x.dot(kernel_y.T)
+
+    nonzero = np.nonzero(kernel_2d >= kernel_2d[:, 0].max())
+    zero = np.nonzero(kernel_2d < kernel_2d[:, 0].max())
+    kernel_2d[nonzero] -= kernel_2d[nonzero].mean()
+    kernel_2d[zero] = 0
+
+    # # Normalize kernel to act as high-pass
+    # kernel_2d = kernel_2d - kernel_2d.mean()
+
+    # Apply filter
+    filtered = cv2.filter2D(
+        np.array(img, dtype=np.float32), -1, kernel_2d, borderType=cv2.BORDER_REFLECT
+    )
+
+    return filtered

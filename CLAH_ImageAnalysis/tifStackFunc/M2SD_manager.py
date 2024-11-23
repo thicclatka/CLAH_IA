@@ -1,13 +1,15 @@
 import os
+
 import numpy as np
-from tqdm import tqdm
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.tifStackFunc import CNMF_Utils
 from CLAH_ImageAnalysis.tifStackFunc import H5_Utils
 from CLAH_ImageAnalysis.tifStackFunc import ImageStack_Utils
+from CLAH_ImageAnalysis.tifStackFunc import ISX_Utils
 from CLAH_ImageAnalysis.tifStackFunc import Movie_Utils as movie_utils
 from CLAH_ImageAnalysis.tifStackFunc import NoRMCorre
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
+from tqdm import tqdm
 
 
 class M2SD_manager(BC):
@@ -55,7 +57,6 @@ class M2SD_manager(BC):
         dims (tuple): The dimensions.
         moco (NoRMCorre): An instance of the NoRMCorre class.
         fname_mmap_postproc (str): The filename of the post-processed mmap.
-
     """
 
     ######################################################
@@ -72,12 +73,10 @@ class M2SD_manager(BC):
         n_proc4CNMF: int | None = None,
         concatCheck: bool = False,
         prev_sd_varnames: bool = False,
-        kernel_window_size: int | None = None,
-        # method_init=None,
-        # meth_deconv=None,
+        mc_iter: int = 1,
+        overwrite: bool = False,
     ):
         self.program_name = program_name
-        self.__version__ = "0.1.0"
         self.class_type = "manager"
 
         BC.__init__(
@@ -91,6 +90,9 @@ class M2SD_manager(BC):
         # initiate H5 Utils
         self.H5U = H5_Utils()
 
+        # initiate ISXD Utils
+        self.ISXU = ISX_Utils()
+
         # init global vars
         self.static_class_var_init(
             folder_path=path,
@@ -101,9 +103,8 @@ class M2SD_manager(BC):
             n_proc4CNMF=n_proc4CNMF,
             concatCheck=concatCheck,
             prev_sd_varnames=prev_sd_varnames,
-            kernel_window_size=kernel_window_size,
-            # method_init,
-            # meth_deconv,
+            mc_iter=mc_iter,
+            overwrite=overwrite,
         )
 
     def static_class_var_init(
@@ -116,9 +117,8 @@ class M2SD_manager(BC):
         n_proc4CNMF: int | None,
         concatCheck: bool,
         prev_sd_varnames: bool,
-        kernel_window_size: int | None,
-        # method_init,
-        # meth_deconv,
+        mc_iter: int,
+        overwrite: bool,
     ) -> None:
         """
         Initializes the static class variables.
@@ -132,7 +132,8 @@ class M2SD_manager(BC):
             n_proc4CNMF (int | None): The number of processes to use for CNMF.
             concatCheck (bool): Whether to check for concatenation.
             prev_sd_varnames (bool): Whether to use previous SD variable names.
-            kernel_window_size (int | None): The kernel window size.
+            mc_iter (int): Number of iterations for motion correction.
+            overwrite (bool): Flag indicating whether to overwrite existing files.
         """
         BC.static_class_var_init(
             self,
@@ -149,9 +150,8 @@ class M2SD_manager(BC):
         self.n_proc4CNMF = n_proc4CNMF
         self.concatCheck = concatCheck
         self.prev_sd_varnames = prev_sd_varnames
-        self.kernel_window_size = kernel_window_size
-        # self.method_init = method_init
-        # self.meth_deconv = meth_deconv
+        self.mc_iter = mc_iter
+        self.overwrite = overwrite
 
         # change sess2process to a tuple of session numbers grouped by ID
         # for when sessions need/were concatenated
@@ -195,6 +195,11 @@ class M2SD_manager(BC):
         self.h5filename_postproc_ch2 = None
         self.dimension_labels = ["t", "y", "x"]
 
+        # isxd (1photon data)
+        self.isxd_fname = None
+        self.latest_isxd = None
+        self.latest_tiff = None
+
         # latest files
         self.latest_eMC = None
         self.latest_h5 = None
@@ -214,6 +219,9 @@ class M2SD_manager(BC):
         # onePhotonCheck
         self.onePhotonCheck = False
 
+        # high-pass filter applied
+        self.high_pass_applied = False
+
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
         """
         Initializes the variables for the for loop.
@@ -232,8 +240,11 @@ class M2SD_manager(BC):
         # find eMC file, h5 file, and h5 sqz file
         # init ImageStack Utils after procuring basename from h5 file
         self._find_related_eMC_filesNinit_vars()
-        # # print analysis header to denote which folder is being analyzed
-        # self._print_analysis_header()
+
+        # if overwrite is True, delete existing files and find related eMC files again
+        if self.overwrite:
+            self._overwrite_files()
+            self._find_related_eMC_filesNinit_vars()
 
     def _find_related_eMC_filesNinit_vars(self) -> None:
         """
@@ -253,6 +264,8 @@ class M2SD_manager(BC):
                 ],
                 full_path=full_path,
             )
+            isxd_file = self.findLatest(self.file_tag["ISXD"], full_path=full_path)
+            tiff_file = self.findLatest(self.file_tag["TIFF"], full_path=full_path)
 
             # find latest h5 sqz file
             # latest_h5sqz will be present for non 2Ch files
@@ -289,6 +302,8 @@ class M2SD_manager(BC):
             return (
                 eMC_file,
                 h5_file,
+                isxd_file,
+                tiff_file,
                 h5sqz_file,
                 h5sqz_ch1,
                 h5sqz_ch2,
@@ -303,16 +318,20 @@ class M2SD_manager(BC):
             self.latest_h5concat = []
             for directory in self.folder_path:
                 os.chdir(directory)
-                latest_eMC, latest_h5, _, _, _, _, _, _ = _findFiles(
-                    full_path=self.concatCheck
+                latest_eMC, latest_h5, latest_isxd, latest_tiff, _, _, _, _, _, _ = (
+                    _findFiles(full_path=self.concatCheck)
                 )
 
                 self.latest_eMC.append(latest_eMC)
                 self.latest_h5.append(latest_h5)
+                self.latest_isxd.append(latest_isxd)
+                self.latest_tiff.append(latest_tiff)
             os.chdir(self.output_pathByID)
             (
                 self.latest_eMC,
                 self.latest_h5concat,
+                self.latest_isxd,
+                self.latest_tiff,
                 self.latest_h5sqz,
                 self.latest_h5sqz_ch1,
                 self.latest_h5sqz_ch2,
@@ -328,6 +347,8 @@ class M2SD_manager(BC):
             (
                 self.latest_eMC,
                 self.latest_h5,
+                self.latest_isxd,
+                self.latest_tiff,
                 self.latest_h5sqz,
                 self.latest_h5sqz_ch1,
                 self.latest_h5sqz_ch2,
@@ -359,8 +380,58 @@ class M2SD_manager(BC):
                 h52use, self.file_tag["H5"]
             )
 
+        if self.latest_isxd:
+            self.basename = os.path.basename(os.path.dirname(self.latest_isxd))
+        elif self.latest_tiff:
+            self.basename = os.path.basename(os.path.dirname(self.latest_tiff))
+
         if self.concatCheck:
             self.basename = self.basename.replace("pre", "")
+
+    def _overwrite_files(self) -> None:
+        """
+        Deletes existing files.
+        """
+
+        def _find_files(ftag):
+            return [os.path.abspath(f) for f in os.listdir() if ftag in f]
+
+        file_patterns = [
+            self.file_tag["SQZ"],
+            self.file_tag["EMC"],
+            self.file_tag["MMAP"],
+            self.file_tag["SD"],
+            self.file_tag["HTML"],
+            "Parameters",
+            "CompEval",
+            "PostSeg",
+        ]
+
+        # find files
+        files2remove = []
+        for pattern in file_patterns:
+            files2remove.extend(_find_files(pattern))
+
+        files2remove.sort()
+        if files2remove:
+            print(
+                "--overwrite was set to True & eligible M2SD output files were found that can be removed:"
+            )
+            if len(files2remove) > 5:
+                for file in tqdm(files2remove, desc="Removing files"):
+                    self.folder_tools.remove_file(file)
+            else:
+                for file in files2remove:
+                    self.print_wFrm(f"Removing: {file}")
+                    self.folder_tools.remove_file(file)
+            self.print_done_small_proc()
+        else:
+            print(
+                "--overwrite was set to True but no eligible M2SD output files were found... skipping"
+            )
+
+        # reset variables
+        self._init_vars4Iter()
 
     def init_vars_from_unproc_h5(self) -> None:
         """
@@ -409,8 +480,8 @@ class M2SD_manager(BC):
             #     for f in sess_folders_base
             # ]
             basename4ISU += sess_folders_base
-        if self.segCh is None:
-            self.onePhotonCheck = True
+        # if self.segCh is None:
+        #     self.onePhotonCheck = True
 
         # init ImageStack Utils
         self.ISUtils = ImageStack_Utils(
@@ -445,19 +516,40 @@ class M2SD_manager(BC):
                 )
             self.print_done_small_proc()
         else:
-            h52use = self.latest_h5
+            if self.latest_isxd:
+                file2use = self.latest_isxd
+            elif self.latest_tiff:
+                file2use = self.latest_tiff
+            else:
+                file2use = self.latest_h5
 
-        (
-            self.h5filename,
-            self.hfsiz,
-            self.info,
-            self.segCh,
-            self.chan_idx,
-            self.element_size_um,
-        ) = self.H5U.read_file4MOCO(h52use)
+        if file2use.endswith(self.file_tag["ISXD"]) or file2use.endswith(
+            self.file_tag["TIFF"]
+        ):
+            self.onePhotonCheck = True
+            self.segCh = None
+            self.chan_idx = [1]
+            self.isxd_fname = file2use
+            self.total_frames, self.isxsiz = self.ISXU.get_movie_data(file2use)
 
-        # set total frames
-        self.total_frames = self.info[0]
+            print(f"Reading isxd file: {file2use}")
+            self.print_wFrm(f"Total frames: {self.total_frames}")
+            self.print_wFrm(f"Dimensions: {self.isxsiz}")
+            print()
+
+        elif file2use.endswith(self.file_tag["H5"]):
+            self.onePhotonCheck = False
+            (
+                self.h5filename,
+                self.hfsiz,
+                self.info,
+                self.segCh,
+                self.chan_idx,
+                self.element_size_um,
+            ) = self.H5U.read_file4MOCO(h52use)
+
+            # set total frames
+            self.total_frames = self.info[0]
 
     def write_procImageStack2H5(self, twoChan: bool = False) -> None:
         """
@@ -495,20 +587,19 @@ class M2SD_manager(BC):
         """
         Squeezes the H5 file and writes it to a file.
         """
-        print(f"Loading {self.h5filename}")
         if not self.onePhotonCheck:
+            print(f"Loading {self.h5filename}")
             self.print_wFrm(
                 "squeezing array from 5 to 3 dimensions (for Motion Correction)"
             )
-            # self.dimension_labels = ["t", "y", "x"]
 
             twoChan = False
             if self.twoCh:
+                twoChan = True
                 self.print_wFrm(
                     "With 2 channels, will squeeze each channel separately:"
                 )
             print()
-            twoChan = True
 
             for chan in self.chan_idx:
                 # for 1Ch, will only have 1 entry in chan_idx
@@ -531,65 +622,30 @@ class M2SD_manager(BC):
                     elif chan == 1:
                         self.h5fname_sqz_ch1 = h5fname_sqz
         else:
-            # import necessary libraries for miniscope h5 file preprocessing
-            from skimage import img_as_uint
-
-            self.print_wFrm(
-                "Miniscope h5 file detected, squeezing + additional preprocessing will be done"
+            print(
+                f"Loading: {self.latest_isxd if self.latest_isxd else self.latest_tiff}"
             )
-            hf_arr, _ = self.H5U.read_file(self.h5filename)
-            filtered_arr = []
-            if self.kernel_window_size is None:
-                default_kws = 20
-                self.kernel_window_size = input(
-                    f"Please enter a kernel window size necessary for background subtraction, in pixels (By default, will set it to {default_kws}): "
-                )
-                if self.kernel_window_size == "":
-                    self.kernel_window_size = default_kws
-                else:
-                    self.kernel_window_size = int(self.kernel_window_size)
             self.print_wFrm(
-                f"Using window size of {self.kernel_window_size} pixels for background subtraction"
+                "Squeezing + additional preprocessing required before exporting to h5 necessary for motion correction"
             )
+            if self.latest_isxd:
+                file2use = self.latest_isxd
+            elif self.latest_tiff:
+                file2use = self.latest_tiff
 
-            # apply morphology tophat filter to each frame
-            for frame in tqdm(hf_arr["imaging"], desc="Preprocessing 1-photon data"):
-                # # subtract min value to remove glow/vignette effect
-                frame2use = frame - frame.min()
-                # denoise frame
-                frame2use = self.dep.filter_utils.apply_median_blur_filter(
-                    array_stack=frame2use, window_size=3
-                )
-                # frame2use = self.dep.filter_utils.apply_morphology_tophat_filter(
-                #     array_stack=frame2use, window_size=self.kernel_window_size
-                # )
-
-                # use high-pass filter to remove low-frequency signal
-                # via caiman funcs
-                frame2use = self.utils.caiman_utils.apply_high_pass_filter_space(
-                    frame2use, gSig_filt=(2, 2)
-                )
-                frame2use = (frame2use - frame2use.min()) / (
-                    frame2use.max() - frame2use.min()
-                )
-                frame2use = img_as_uint(frame2use)
-                frame2use = self.utils.image_utils.resize_to_square(frame2use)
-                filtered_arr.append(frame2use)
-
-            filtered_arr = np.array(filtered_arr)
-            # give artifact in the beginning of the array
-            # make first 5 frames the same as the 5th frame
-            filtered_arr[:5] = filtered_arr[5]
+            filtered_arr, self.high_pass_applied = self.ISXU.preprocessing_movie(
+                file2use, output_fname=self.basename
+            )
 
             self.h5fname_sqz = self.H5U.squeeze_fileNwrite(
-                file2read=self.h5filename,
+                file2read=self.basename,
                 array2use=filtered_arr,
                 chan_idx=self.chan_idx,
                 element_size_um=self.element_size_um,
                 dimension_labels=self.dimension_labels,
                 remove_Cycle=True,
-                window_size=self.kernel_window_size,
                 export_sample=True,
+                high_pass_applied=self.high_pass_applied,
             )
 
     def pre_moco_h5_tools(self) -> None:
@@ -722,6 +778,9 @@ class M2SD_manager(BC):
             # store to self
             if store4Trim:
                 self.array_to_trim.append(array)
+                self.dx = dx
+                self.dy = dy
+                self.dims = dims
             if store4CNMF:
                 self.array_for_cnmf.append(array)
                 if idx == 0:
@@ -837,6 +896,7 @@ class M2SD_manager(BC):
                 h5filename=file_to_correct,
                 dview=dview_to_use,
                 onePhotonCheck=self.onePhotonCheck,
+                mc_iter=self.mc_iter,
             )
             # order of list entries in moco
             # - 1) Ch2 (green)
@@ -992,9 +1052,14 @@ class M2SD_manager(BC):
                 trimmed_array, trimYX = self.ISUtils.trim2pStack(
                     array_to_trim=array, store=False
                 )
-            else:
-                print("---Skipping trimming step for 1Photon data---")
+            elif self.onePhotonCheck and self.high_pass_applied:
+                print(
+                    "---Skipping trimming & min-z projection removal step for 1Photon data given high-pass filter was applied---"
+                )
                 trimmed_array = array
+                trimYX = None
+            elif self.onePhotonCheck and not self.high_pass_applied:
+                trimmed_array = self.ISUtils.min_zProj_removal(array_to_use=array)
                 trimYX = None
 
             self.trimmed_array.append(trimmed_array)
@@ -1054,11 +1119,10 @@ class M2SD_manager(BC):
             # set chan2use & print 2Ch str if so
             chan2use = self._ISU_chan2use_utils(idx, "Downsampling")
 
-            if not self.onePhotonCheck:
-                # downsample stack
-                DSD = self.ISUtils.downsampleStack(array_to_ds=array, DS_factor=2)
-            else:
-                DSD = array
+            # downsample stack
+            DSD = self.ISUtils.downsampleStack(
+                array_to_ds=array,
+            )
 
             DS_array.append(DSD)
 
@@ -1156,6 +1220,9 @@ class M2SD_manager(BC):
         """
         Initializes the CNMF_Utils object.
         """
+        if not self.onePhotonCheck:
+            self._onePhotonCheck_utils()
+
         self.CNMFU = CNMF_Utils(
             basename=self.basename,
             Ca_Array=self.array_for_cnmf[0],
@@ -1164,9 +1231,18 @@ class M2SD_manager(BC):
             dy=self.dy,
             dims=self.dims,
             n_processes=self.n_proc4CNMF,
+            onePhotonCheck=self.onePhotonCheck,
             # method_init=self.method_init,
             # meth_deconv=self.meth_deconv,
         )
+
+    def _onePhotonCheck_utils(self) -> None:
+        """
+        Sets the onePhotonCheck attribute to True. If MotionCorr parameters file contains onePhoton in title. This is a failsafe mechanism.
+        """
+        paramsFile = self.findLatest("onePhoton")
+        if paramsFile:
+            self.onePhotonCheck = True
 
     def find_init_patches_viaCNMF(self) -> None:
         """
@@ -1258,13 +1334,15 @@ class M2SD_manager(BC):
         TKEEPER = self.time_utils.TimeKeeper()
         # extract element size if not already done
         # esp if segment is only done
-        if self.element_size_um is None:
+        if self.element_size_um is None and not self.latest_isxd:
             if self.concatCheck:
                 h52use = self.latest_h5[0]
             else:
                 h52use = self.latest_h5
-
             self.element_size_um = self.H5U.extract_element_size(h52use)
+        else:
+            self.element_size_um = None
+
         print("Finding Residuals of Post-Segmentation")
         self.print_wFrm(
             "Finding difference between original & denoised movie (reconstructed from CNMF)"

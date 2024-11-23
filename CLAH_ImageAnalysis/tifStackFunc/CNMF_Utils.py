@@ -1,7 +1,9 @@
+import os
 import caiman as cm
 import matplotlib.pyplot as plt
 import numpy as np
 from caiman.source_extraction.cnmf import cnmf as cnmf
+from enum import Enum
 
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
@@ -65,6 +67,7 @@ class CNMF_Utils(BC):
         dy: int,
         dims: tuple,
         n_processes: int,
+        onePhotonCheck: bool = False,
         method_init: str | None = None,
         meth_deconv: str | None = None,
         extract_OR_detrend: str = "extract",
@@ -89,9 +92,9 @@ class CNMF_Utils(BC):
         BC.__init__(self, program_name=self.program_name, mode=self.class_type)
 
         self.CNMFpar = self.enum2dict(TSF_enum.CNMF_Params)
+        self.CNMFpar_1p = self.enum2dict(TSF_enum.CNMF_Params_1p)
         # printing initiat of CNMF
         print("Initializing CNMF funcs for cell segmentation")
-        TSF_enum.export_settings2file(TSF_enum.CNMF_Params, "CNMF")
 
         # non-default parameters
         self.basename = basename
@@ -114,7 +117,6 @@ class CNMF_Utils(BC):
         self.memory_fact = int(self.CNMFpar["MEMORY_FACT"])
         self.frames = self.CNMFpar["FPS"]
         self.decay_time = self.CNMFpar["DECAY"]
-        self.min_SNR = self.CNMFpar["MIN_SNR"]
         self.r_values_min = self.CNMFpar["RVAL_THR"]
         self.use_cnn = bool(self.CNMFpar["USE_CNN"])
         self.thresh_cnn_min = self.CNMFpar["CNN_THR"]
@@ -125,6 +127,13 @@ class CNMF_Utils(BC):
         self.quantileMin = self.CNMFpar["QUANTILE_MIN"]
         self.frames_window = self.CNMFpar["FRAME_WINDOW"]
 
+        if onePhotonCheck:
+            self.min_SNR = self.CNMFpar_1p["MIN_SNR"]
+            self.thresh_cnn_min = self.CNMFpar_1p["CNN_THR"]
+        else:
+            self.min_SNR = self.CNMFpar["MIN_SNR"]
+            self.thresh_cnn_min = self.CNMFpar["CNN_THR"]
+
         # CNMF params that can be input via parser
         # see TSF_enum.CNMF_Params for defaults
         self.method_init = (
@@ -133,6 +142,33 @@ class CNMF_Utils(BC):
         self.method_deconvolution = (
             self.CNMFpar["METH_DECONV"] if meth_deconv is None else meth_deconv
         )
+
+        paramsDict = {
+            "K": self.k,
+            "MERGE_THRESH": self.merge_thresh,
+            "P": self.p,
+            "GNB": self.gnb,
+            "GSIG": self.gSig,
+            "ALPHA_SNMF": self.alpha_snmf,
+            "ONLY_INIT_PATCH": self.only_init_patch,
+            "MEMORY_FACT": self.memory_fact,
+            "METH_DECONV": self.method_deconvolution,
+            "CHECK_NAN": self.check_nan,
+            "QUANTILE_MIN": self.quantileMin,
+            "FRAME_WINDOW": self.frames_window,
+            "DECAY": self.decay_time,
+            "MIN_SNR": self.min_SNR,
+            "RVAL_THR": self.r_values_min,
+            "USE_CNN": self.use_cnn,
+            "CNN_THR": self.thresh_cnn_min,
+            "CE_THRESH": self.threshold,
+            "CE_VMAX": self.vmax,
+        }
+
+        CNMF_enum = Enum("CNMF_Params", paramsDict)
+        parFile = "CNMF" + "_onePhoton" if onePhotonCheck else ""
+
+        TSF_enum.export_settings2file(CNMF_enum, parFile)
 
         # strucs to fill
         self._init_strucs_to_fill()
@@ -241,6 +277,74 @@ class CNMF_Utils(BC):
             self.NonNegMatrix_post_refining = NonNegMatrix_post_refining.fit(
                 self.Ca_Array
             )
+
+        log_file = "ASpat/ASpat_log.txt"
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
+        for i in range(self.NonNegMatrix_post_refining.estimates.A.shape[1]):
+            import tifffile as tif
+            from skimage.util import img_as_uint
+
+            comp = self.NonNegMatrix_post_refining.estimates.A[:, i]
+            comp = comp.toarray()
+            comp = np.transpose(comp.reshape(self.dims))
+            comp = comp / np.max(comp)
+            comp = img_as_uint(comp)
+
+            os.makedirs("ASpat", exist_ok=True)
+
+            tif.imwrite(
+                f"ASpat/Component_{i:02}.tif",
+                comp,
+            )
+
+            non_zero = np.where(comp > 0)
+            if len(non_zero[0]) == 0:
+                continue
+
+            # Calculate bounding box
+            min_y, max_y = np.min(non_zero[0]), np.max(non_zero[0])
+            min_x, max_x = np.min(non_zero[1]), np.max(non_zero[1])
+
+            region = comp[min_y:max_y, min_x:max_x]
+            # Check corners
+            corners = [(0, 0), (0, -1), (-1, 0), (-1, -1)]
+            for y, x in corners:
+                if region[y, x] == 0:
+                    # Check if surrounded by non-zeros
+                    if y == 0:  # top row
+                        below = region[1, x] > 0
+                    else:  # bottom row
+                        below = region[-2, x] > 0
+
+                    if x == 0:  # left column
+                        right = region[y, 1] > 0
+                    else:  # right column
+                        right = region[y, -2] > 0
+
+                    if below and right:
+                        region[y, x] = np.max(region)
+
+            height = max_y - min_y + 1
+            width = max_x - min_x + 1
+
+            region = comp[min_y:max_y, min_x:max_x]
+            is_perfect = np.all(region > 0)
+
+            aspect_ratio = max(height / width, width / height)
+            msg = f"Component {i:02}: Aspect ratio: {aspect_ratio}"
+            print(msg)
+            with open(log_file, "a") as f:
+                f.write(msg + "\n")
+            if is_perfect:
+                msg = f"|-- Perfect Component {i:02}: {is_perfect}"
+                print(msg)
+                with open(log_file, "a") as f:
+                    f.write(msg + "\n")
+
+        print()
+
         # clear NonNegMatrix for memory
         with self.StatusPrinter.garbage_collector():
             self.NonNegMatrix = None
@@ -529,15 +633,15 @@ class CNMF_Utils(BC):
             )
             # Update both x and y axes for each subplot
             fig.update_yaxes(
-                title_text=f"Cell {i + 1} (a.u.)",  # Add cell number to y-axis title
+                title_text=f"C{i + 1}",
                 row=i + 1,
                 col=1,
             )
-            fig.update_xaxes(
-                title_text="Time (frames)",
-                row=i + 1,
-                col=1,
-            )
+            # fig.update_xaxes(
+            #     title_text="Time (frames)",
+            #     row=i + 1,
+            #     col=1,
+            # )
 
         fig.update_layout(
             title=f"Temporal Components for {self.basename}",

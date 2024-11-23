@@ -41,11 +41,13 @@ Note: Ensure that the necessary input data structures and dependencies are corre
 """
 
 import os
+import tomli
 import numpy as np
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis import dependencies
 from typing import Any
 from rich import print as rprint
+from pathlib import Path
 import functools
 # from contextlib import contextmanager
 
@@ -53,6 +55,23 @@ import functools
 
 
 # TODO: ADD SELF.CONFIG DICT?
+
+
+def get_project_version() -> str:
+    """
+    Read version from pyproject.toml file.
+
+    Returns:
+        str: Version string from pyproject.toml
+    """
+    try:
+        pyproject_path = Path(__file__).parents[2] / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            pyproject = tomli.load(f)
+        return pyproject["project"]["version"]
+    except Exception as e:
+        print(f"Warning: Could not read version from pyproject.toml: {e}")
+        return "0.0.0"
 
 
 def run_CLAH_script(script_class: Any, parser_enum: Any, alt_run: bool = False) -> None:
@@ -136,6 +155,7 @@ class BaseClass:
         """
         self.mode = mode
         self.manager_OR_utils = ["manager", "utils"]
+        self.__version__ = get_project_version()
 
         if self.mode == self.manager_OR_utils[0]:
             self.program_name = program_name

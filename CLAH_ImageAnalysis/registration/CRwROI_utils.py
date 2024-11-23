@@ -226,7 +226,7 @@ class CRwROI_utils(BC):
     @staticmethod
     def reshape_spatial4ROICaT(
         array: np.ndarray | scipy.sparse.coo_matrix,
-        out_height_width: List[int],
+        out_height_width: tuple[int, int],
         transpose: bool = False,
         threeD: bool = False,
         order: str = "C",
@@ -237,7 +237,7 @@ class CRwROI_utils(BC):
 
         Parameters:
             array (np.ndarray or sparse matrix): The array to reshape.
-            out_height_width (List[int]): The output height and width as a list [height, width].
+            out_height_width (tuple[int, int]): The output height and width as a tuple (height, width).
             transpose (bool, optional): Whether to transpose the array. Defaults to False.
             threeD (bool, optional): Whether the array is 3D. Defaults to False.
             order (str, optional): The order of the elements in the reshaped array. Defaults to "C".
@@ -275,7 +275,7 @@ class CRwROI_utils(BC):
     def create_FOV_images(
         MSS_struct: np.ndarray,
         subj_sessions: list,
-        out_height_width: List[int],
+        out_height_width: tuple[int, int],
     ) -> np.ndarray:
         """
         Create a field of view (FOV) image from the MSS_struct. This is derived from the IMG key within the MSS_struct. This should be the averaged CaCh image of temporally filtered, downsampled image.
@@ -298,7 +298,7 @@ class CRwROI_utils(BC):
                         order="F",
                     ).astype(np.float32)
                 )
-                for session in subj_sessions
+                for session_idx, session in enumerate(subj_sessions)
             ]
         )
         FOV_images = FOV_images - FOV_images.min(axis=(1, 2), keepdims=True)

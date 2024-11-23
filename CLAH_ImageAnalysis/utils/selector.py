@@ -73,7 +73,7 @@ class subj_selector_utils:
         self.multiSess = self.text_lib["selector"]["multiSess"]
         self.ChoiceBank = self.text_lib["selector"]["choices"]
         self.conditionsAll = {}
-        tags = ["EMC", "TDML", "SD", "CI", "H5", "MSS"]
+        tags = ["EMC", "TDML", "SD", "CI", "H5", "MSS", "ISXD"]
 
         if not self.select_by_ID:
             tags.extend(["CSS"])
@@ -320,14 +320,24 @@ class subj_selector_utils:
         Returns:
             condkeys2use (list): A list of condition keys to be used for further processing.
         """
-        condkeys2use = self._create_condkeys2use(["EMC", "H5"])
 
-        Y_H5_set = set(self.bool_dict[f"Y_{self.sel_tag['H5']}"])
-        Y_eMC_set = set(self.bool_dict[f"Y_{self.sel_tag['EMC']}"])
+        if self.bool_dict[f"Y_{self.sel_tag['H5']}"]:
+            # if H5 is present, use H5 (2 photon)
+            boolDict2use = self.bool_dict[f"Y_{self.sel_tag['H5']}"]
+            key2use = "H5"
+        else:
+            # if H5 is not present, use ISXD (1 photon)
+            boolDict2use = self.bool_dict[f"Y_{self.sel_tag['ISXD']}"]
+            key2use = "ISXD"
 
-        self.eligible_folders = list(Y_eMC_set.union(Y_H5_set))
-        self.processAll_noemc = list(Y_H5_set - Y_eMC_set)
-        self.processAll_just_emc = list(Y_eMC_set)
+        condkeys2use = self._create_condkeys2use([key2use, "EMC"])
+
+        Y_b2u_set = set(boolDict2use)
+        Y_EMC_set = set(self.bool_dict[f"Y_{self.sel_tag['EMC']}"])
+
+        self.eligible_folders = list(Y_EMC_set.union(Y_b2u_set))
+        self.processAll_noemc = list(Y_b2u_set - Y_EMC_set)
+        self.processAll_just_emc = list(Y_EMC_set)
 
         return condkeys2use
 

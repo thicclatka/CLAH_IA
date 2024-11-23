@@ -193,6 +193,19 @@ def basename_finder(filename: str, file_tag: str) -> str:
     return filename.split(file_tag)[0]
 
 
+def get_basename(file_path: str) -> str:
+    """
+    Get the basename of a file path.
+
+    Parameters:
+        file_path (str): The file path to get the basename of.
+
+    Returns:
+        str: The basename of the file path.
+    """
+    return os.path.basename(file_path)
+
+
 def get_parent_dir(file_path: str) -> str:
     """
     Get the parent directory of a file path.

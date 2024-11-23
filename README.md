@@ -115,9 +115,10 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
   -mc MOTION_CORRECT, --motion_correct MOTION_CORRECT
                         Whether to perform motion correction.
@@ -132,16 +133,12 @@ options:
                         How many processors to use for CNMF segmentation.
                         Default is using all available processes.
   -cat CONCATENATE, --concatenate CONCATENATE
-                        Concatenate H5s into a single H5 before motion correction, but create 2 segDicts.
-                        ONLY USE THIS TO COMBINE THE RESULTS FOR THE SAME SUBJECT ID ACROSS 2 SESSIONS.
+                        Concatenate H5s into a single H5 before motion correction,
+                        but create 2 segDicts. ONLY USE THIS TO COMBINE THE RESULTS
+                        FOR THE SAME SUBJECT ID ACROSS 2 SESSIONS.
   -psv PREV_SD_VARNAMES, --prev_sd_varnames PREV_SD_VARNAMES
                         Use the old variable names for the segDict (i.e. A, C, S, etc).
                         Default is False, in which names will be A_Spatial, C_Temporal, etc.
-  -kws KERNEL_WINDOW_SIZE, --kernel_window_size KERNEL_WINDOW_SIZE
-                        Window size in pixels for the morphological filter that enables
-                        background subtraction (preprocessing for miniscope data).
-                        Default is None. If None, but 1-photon data is detected,
-                        will prompt user to enter a kernel window size, with a default of 20. [***STILL TESTING***]
 ```
 
 ### [Unit Analysis](./CLAH_ImageAnalysis/unitAnalysis/__init__.py)
@@ -174,12 +171,13 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
-  -f FPS, --fps FPS     Window size (in frames) used for smoothing for the event/peak detection.
-                        Default is 15.
+  -f FPS, --fps FPS     Window size (in frames) used for smoothing for the event/peak
+                        detection. Default is 15.
   -sdt SDTHRESH, --sdThresh SDTHRESH
                         Threshold multiplier for event/peak detection based on the standard
                         deviation of the signal's derivative.
@@ -193,8 +191,8 @@ options:
   -pp TOPLOTPKS, --toPlotPks TOPLOTPKS
                         Whether to plot results from pks_utils. Default is False.
   -4p FORPRES, --forPres FORPRES
-                        Whether to export .svg for figures in addition to the usual .png output.
-                        Default is False.
+                        Whether to export .svg for figures in addition to the usual
+                        png output. Default is False.
 ```
 
 #### [WrapMultSessStruc](./CLAH_ImageAnalysis/unitAnalysis/wrapMultSessStruc.py)
@@ -218,9 +216,10 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
   -out OUTPUT_FOLDER, --output_folder OUTPUT_FOLDER
                         Path for the output of pkl & mat files for multSessSegStruct.
@@ -253,19 +252,21 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
   -ots OUTLIER_TS, --outlier_ts OUTLIER_TS
                         Outlier threshold to filter out meanTrigSig by group where
                         mean value exceeds threshold set here.
                         Default is 10^2.
   -sf SESSFOCUS, --sessFocus SESSFOCUS
-                        Select number of sessions to plot. Default is None, which plots all sessions
+                        Select number of sessions to plot. Default is None, which plots
+                        all sessions
   -4p FORPRES, --forPres FORPRES
-                        Whether to export .svg for figures in addition to the usual .png output.
-                        Default is False.
+                        Whether to export .svg for figures in addition to the usual
+                        png output. Default is False.
   -pit PLOTINDTRIGSIG, --plotIndTrigSig PLOTINDTRIGSIG
                         Whether to plot individual TrigSig by subjected ID. Default is True.
 ```
@@ -298,17 +299,20 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
   -sf SESSFOCUS, --sessFocus SESSFOCUS
                         Set number of sessions to analyze.
-                        Default is None, which will analyze all sessions found within multSessSegStruc.
+                        Default is None, which will analyze all sessions found within
+                        multSessSegStruc.
   -G USEGPU, --useGPU USEGPU
                         Whether to use GPU for ROICaT functions. Default is True
   -v VERBOSE, --verbose VERBOSE
-                        Whether to print verbose output for ROICaT functions. Default is True
+                        Whether to print verbose output for ROICaT functions.
+                        Default is True
 ```
 
 #### [Cell Registrar Cluster Info Collater (CR_CI_collater)](./CLAH_ImageAnalysis/registration/CR_CI_collater.py)
@@ -333,13 +337,14 @@ options:
                         NOTE: Pick directory which holds session folders.
                               Do not pick/set a session folder.
   -s2p SESS2PROCESS, --sess2process SESS2PROCESS
-                        List of sessions to process. Write in format '1,2,3', '1-3', or '1,2-5'
-                        to select by specific session number. Input all or ALL to process
-                        all eligible sessions that are available within the set path.
+                        List of sessions to process. Write in format '1,2,3', '1-3',
+                        or '1,2-5' to select by specific session number.
+                        Input all or ALL to process all eligible sessions that are
+                        available within the set path.
                         Default will prompt user to choose.
   -4p FORPRES, --forPres FORPRES
-                        Whether to export .svg for figures in addition to the usual .png output.
-                        Default is False.
+                        Whether to export .svg for figures in addition to the usual
+                        png output. Default is False.
 ```
 
 ## [GUI](./CLAH_ImageAnalysis/GUI)

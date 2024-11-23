@@ -168,10 +168,13 @@ class wrapMultSessStruc(BC):
         # check if output_folder is given,
         # if not, result to default which is _MultSessComb
         if output_folder:
-            if not output_folder.startswith("_MS_"):
-                output_folder = f"_MS_{output_folder}"
-            if self.text_lib["brain_regions"] not in output_folder:
-                output_folder = _choose_brain_region(output_folder)
+            output_folder_base = self.folder_tools.get_basename(output_folder)
+            output_folder_parent = self.folder_tools.get_parent_dir(output_folder)
+            if not output_folder_base.startswith("_MS_"):
+                output_folder_base = f"_MS_{output_folder_base}"
+            if "DG" not in output_folder_base and "CA3" not in output_folder_base:
+                output_folder_base = _choose_brain_region(output_folder_base)
+            output_folder = f"{output_folder_parent}/{output_folder_base}"
             self.COMB_FOLDER = output_folder
         else:
             output_folder = "_MS"
@@ -316,6 +319,10 @@ class wrapMultSessStruc(BC):
         self.rprint("segDict:")
         self._fill_mSSD_segDict(numSess)
 
+        if self.findLatest([self.file_tag["SD"], "prevName", self.file_tag["MAT"]]):
+            self.rprint("segDict_prevNameVar:")
+            self._fill_mSSD_segDict(numSess, prevNameVar=True)
+
         # CueCellFinder Struct
         self.rprint("CCFStruct:")
         self.multSessSegStruc[numSess][self.dict_name["CCF"]] = self._fill_mSSD_other(
@@ -363,16 +370,21 @@ class wrapMultSessStruc(BC):
             self.rprint(f"Problem with loading {ftag}: {e}")
         return loaded_pkl
 
-    def _fill_mSSD_segDict(self, numSess: str) -> None:
+    def _fill_mSSD_segDict(self, numSess: str, prevNameVar: bool = False) -> None:
         """
         Fills the multiple session segmentation structure with the segDict.
 
         Parameters:
             numSess (str): The session number.
-
+            prevNameVar (bool, optional): Whether to use the previous name variable (C instead of C_Temporal). Defaults to False.
         """
+        if prevNameVar:
+            fileTags2Find = [self.file_tag["SD"], "prevName", self.file_tag["MAT"]]
+        else:
+            fileTags2Find = [self.file_tag["SD"], self.file_tag["PKL"]]
+
         try:
-            latest_file = self.findLatest([self.file_tag["SD"], self.file_tag["PKL"]])
+            latest_file = self.findLatest(fileTags2Find)
         except Exception as e:
             self.rprint(f"Problem with finding latest segDict: {e}")
             self.rprint("Will try to find latest h5")
@@ -388,16 +400,25 @@ class wrapMultSessStruc(BC):
                 A_Spatial=True,
                 dx=True,
                 dy=True,
+                prevNameVar=prevNameVar,
             )
         except Exception as e:
             print(f"Problem with loading segDict: {e}")
-        self.multSessSegStruc[numSess][f"{self.dict_name['SD']}Name"] = latest_file
-        self.multSessSegStruc[numSess][self.SDkey["C_TEMPORAL"]] = C_Temporal
-        self.multSessSegStruc[numSess][self.SDkey["A_SPATIAL"]] = A_Spatial
-        # self.multSessSegStruc[numSess][self.SDkey["B_BACK_SPAT"]] = B_Back_Spat
-        # self.multSessSegStruc[numSess][self.SDkey["F_BACK_TEMP"]] = F_Back_Temp
-        self.multSessSegStruc[numSess][self.SDkey["DX"]] = dx
-        self.multSessSegStruc[numSess][self.SDkey["DY"]] = dy
+
+        if not prevNameVar:
+            self.multSessSegStruc[numSess][f"{self.dict_name['SD']}Name"] = latest_file
+            self.multSessSegStruc[numSess][self.SDkey["C_TEMPORAL"]] = C_Temporal
+            self.multSessSegStruc[numSess][self.SDkey["A_SPATIAL"]] = A_Spatial
+            self.multSessSegStruc[numSess][self.SDkey["DX"]] = dx
+            self.multSessSegStruc[numSess][self.SDkey["DY"]] = dy
+        else:
+            self.multSessSegStruc[numSess][
+                f"{self.dict_name['SD']}Name_prevNameVar"
+            ] = latest_file
+            self.multSessSegStruc[numSess]["C"] = C_Temporal
+            self.multSessSegStruc[numSess]["A"] = A_Spatial
+            self.multSessSegStruc[numSess]["d1"] = dx
+            self.multSessSegStruc[numSess]["d2"] = dy
 
     # !THIS ISNT BEING USED FOR NOW, KEEP JUST IN CASE
     def _fill_mSSD_H5_metadata(self, numSess: str, tolerance: float = 1e-9) -> None:

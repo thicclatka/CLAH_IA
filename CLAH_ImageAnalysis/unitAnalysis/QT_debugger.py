@@ -24,9 +24,9 @@ else:
     sys.exit()
 
 working_on = [
-    "2cues",
-    "2odor",
-    "3cue",
+    "2cues_CA3",
+    "2odor_DG",
+    "3cue_DG",
     "Alzheimers_multiWeek",
     "CA3",
     "DG-CA3-wBeh",

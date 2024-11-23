@@ -1,8 +1,9 @@
 import copy
 import tempfile
+from enum import Enum
 from typing import List
 from typing import Optional
-from enum import Enum
+
 import numpy as np
 import roicat.visualization
 from aenum import extend_enum
@@ -123,7 +124,6 @@ class CRwROI_manager(BC, Data_roicat):
         verbose: bool = True,
     ) -> None:
         self.program_name = program_name
-        self.__version__ = "0.1.0"
         self.class_type = "manager"
 
         BC.__init__(
@@ -1178,6 +1178,14 @@ class CRwROI_manager(BC, Data_roicat):
             filename=self.CRkey["RUN_DATA_SAVE"],
             date=False,
             filetype_to_save=[self.file_tag["PKL"]],
+        )
+
+        self.savedict2file(
+            dict_to_save=self.results[self.CRkey["CLUSTERS"]],
+            dict_name=self.CRkey["CLUSTERS"],
+            filename=self.CRkey["CLUSTERS"],
+            date=False,
+            filetype_to_save=[self.file_tag["MAT"]],
         )
 
     def check4prev_kwargs(self) -> None:

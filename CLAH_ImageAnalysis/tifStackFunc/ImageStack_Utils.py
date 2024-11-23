@@ -1,6 +1,5 @@
 import numpy as np
 import tifffile as tiff
-from skimage.transform import resize
 from skimage.util import img_as_uint
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
@@ -382,14 +381,14 @@ class ImageStack_Utils(BC):
             return array_to_return
 
     def downsampleStack(
-        self, array_to_ds: np.ndarray, DS_factor: float, store: bool = False
+        self, array_to_ds: np.ndarray, DS_factor: float = None, store: bool = False
     ) -> np.ndarray:
         """
         Downsamples the input array by a given factor.
 
         Parameters:
             array_to_ds (ndarray): The input array to be downsampled.
-            DS_factor (float): The downsampling factor.
+            DS_factor (float): The downsampling factor. Defaults to None, which will use the determine_DS_factor function.
             store (bool, optional): If True, the downsampled array will be stored in `self.tempfilteredDS_array`.
                                     Defaults to False.
 
@@ -397,26 +396,55 @@ class ImageStack_Utils(BC):
             ndarray: The downsampled array.
         """
 
-        print(f"Downsampling by a factor of {DS_factor}")
         frames = array_to_ds.shape[0]
-        # do 1/ds factor to get proper value
-        DS_factor = 1 / DS_factor
         dims = list(array_to_ds.shape[1:])
-        spatDs = [int(x * DS_factor) for x in dims]
 
-        array_post_ds = np.empty((frames, *spatDs))
+        DS_factor = (
+            self.image_utils.determine_DS_factor(dims)
+            if DS_factor is None
+            else DS_factor
+        )
 
-        for frNum in tqdm(range(frames), desc="Downsampling"):
-            array_post_ds[frNum, :, :] = resize(
-                array_to_ds[frNum, :, :],
-                spatDs,
-                mode="reflect",
-                anti_aliasing=True,
+        if DS_factor > 1:
+            print(f"Downsampling by a factor of {DS_factor}")
+
+            # do 1/ds factor to get proper value
+            DS_factor = 1 / DS_factor
+
+            spatDs = tuple(int(x * DS_factor) for x in dims)
+
+            array_post_ds = np.empty((frames, *spatDs))
+
+            for frNum in tqdm(range(frames), desc="Downsampling"):
+                array_post_ds[frNum, :, :] = self.image_utils.resize_to_specific_dims(
+                    array_to_ds[frNum, :, :], spatDs
+                )
+        else:
+            print(
+                "Dimensions per frame are already small enough. Skipping downsampling..."
             )
+            array_post_ds = array_to_ds
+
         if store:
             self.tempfilteredDS_array = array_post_ds
         else:
             return array_post_ds
+
+    def min_zProj_removal(self, array_to_use: np.ndarray) -> np.ndarray:
+        print("Finding min z-projection & subtracting from each frame")
+        z_min = np.zeros_like(array_to_use[0, :, :])
+
+        for frame_idx in tqdm(
+            range(array_to_use.shape[0]), desc="Finding min z-projection"
+        ):
+            z_min = np.minimum(z_min, array_to_use[frame_idx, :, :])
+
+        self.print_wFrm("Subtracting min z-projection from each frame")
+        array_post_minZ = array_to_use - z_min
+
+        self.print_done_small_proc()
+
+        return array_post_minZ
 
     def normalizeNcorrect_ImageStack(
         self, array_to_use: np.ndarray, store: bool = False

@@ -54,14 +54,15 @@ class MoCo2segDict(M2SDM):
             n_proc4PC (int): Number of processors for parallel convolution. Default is None.
             motion_correct (bool): Flag indicating whether to perform motion correction. Default is True.
             segment (bool): Flag indicating whether to perform segmentation. Default is True.
+            prev_sd_varnames (bool): Use the old variable names for the segDict (i.e. A, C, S, etc). Default is False, in which names will be A_Spatial, C_Temporal, etc.
+            overwrite (bool): Flag indicating whether to overwrite existing files. Default is False.
+            mc_iter (int): Number of iterations for motion correction. Default is 1.
         """
         self.program_name = "M2SD"
         path = kwargs.get("path", [])
         sess2process = kwargs.get("sess2process", [])
         n_proc4MOCO = kwargs.get("n_proc4MOCO", 1)
         n_proc4CNMF = kwargs.get("n_proc4CNMF", 1)
-        # method_init = kwargs.get("cnmf_meth_init", None)
-        # meth_deconv = kwargs.get("cnmf_meth_deconv", None)
 
         concatCheck = kwargs.get("concatenate", False)
 
@@ -70,7 +71,9 @@ class MoCo2segDict(M2SDM):
 
         prev_sd_varnames = kwargs.get("prev_sd_varnames", False)
 
-        kernel_window_size = kwargs.get("kernel_window_size", None)
+        overwrite = kwargs.get("overwrite", False)
+
+        mc_iter = kwargs.get("mc_iter", 1)
 
         M2SDM.__init__(
             self,
@@ -83,9 +86,8 @@ class MoCo2segDict(M2SDM):
             n_proc4CNMF=n_proc4CNMF,
             concatCheck=concatCheck,
             prev_sd_varnames=prev_sd_varnames,
-            kernel_window_size=kernel_window_size,
-            # method_init=method_init,
-            # meth_deconv=meth_deconv,
+            mc_iter=mc_iter,
+            overwrite=overwrite,
         )
 
         self.step_headers = self.text_lib["steps"][self.program_name]["header"]

@@ -128,6 +128,11 @@ class PostCR_CueCellFinder(BC):
             self.KETCheck = True
             self.groups = ["KETA"]
 
+        self.miniscopeCheck = False
+        if "miniscope" in self.dayPath:
+            self.miniscopeCheck = True
+            self.groups = ["MINISCOPE"]
+
         self.ATC_keys = ["ALL", "TC", "CC"]
 
         self.numSessByID = []
@@ -168,7 +173,12 @@ class PostCR_CueCellFinder(BC):
         self.subj_sessions = None
         self.numSess = None
 
-        if not self.optoCheck and not self.ADCheck and not self.KETCheck:
+        if (
+            not self.optoCheck
+            and not self.ADCheck
+            and not self.KETCheck
+            and not self.miniscopeCheck
+        ):
             if self.ID.startswith("aDk"):
                 self.group = "AGED"
             elif "WT" in self.ID.upper():

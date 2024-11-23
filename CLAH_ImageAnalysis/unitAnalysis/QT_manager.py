@@ -1,5 +1,6 @@
-import numpy as np
 import os
+
+import numpy as np
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
 from CLAH_ImageAnalysis.unitAnalysis import CueCellFinder
@@ -104,7 +105,6 @@ class QT_manager(BC):
         """
 
         self.program_name = program_name
-        self.__version__ = "0.1.0"
         self.class_type = "manager"
 
         #! SINCE CONCATCHECK IS STILL A WORK IN PROGRESS, IT IS NOT YET IMPLEMENTED
@@ -441,6 +441,14 @@ class QT_manager(BC):
         self._print_css_details()
 
         if not self.loaded_css:
+            # find latest file to use for filename for cueShiftStruc
+            if self.findLatest(self.file_tag["XML"]):
+                ftag2remove = self.file_tag["XML"]
+                fname = self.findLatest(self.file_tag["XML"])
+            elif self.findLatest(self.file_tag["GPIO"]):
+                ftag2remove = self.file_tag["GPIO"]
+                fname = self.findLatest(self.file_tag["GPIO"])
+
             # fill in css with refLapType & laptypename
             # if css wasn't loaded from prev file
             self.cueShiftStruc[self.CSSkey["LAP_CUE"]][self.LCDkey["LAP_KEY"]][
@@ -454,8 +462,8 @@ class QT_manager(BC):
             self.savedict2file(
                 dict_to_save=self.cueShiftStruc,
                 dict_name=self.dict_name["CSS"],
-                filename=self.findLatest(self.file_tag["XML"]),
-                file_tag_to_remove=self.file_tag["XML"],
+                filename=fname,
+                file_tag_to_remove=ftag2remove,
                 file_suffix=self.dict_name["CSS"],
                 date=True,
                 filetype_to_save=[self.file_tag["MAT"], self.file_tag["PKL"]],

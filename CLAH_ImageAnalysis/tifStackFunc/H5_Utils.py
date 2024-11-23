@@ -301,8 +301,8 @@ class H5_Utils(BC):
         hf_key="imaging",
         remove_Cycle: bool = False,
         twoChan: bool = False,
-        window_size: int | None = None,
         export_sample: bool = False,
+        high_pass_applied: bool = False,
     ):
         """Squeeze an HDF5 file and write the squeezed data to a new HDF5 file.
 
@@ -311,13 +311,16 @@ class H5_Utils(BC):
             chan_idx (int): List of the selected channel to use.
             element_size_um (tuple): The element size in micrometers (um).
             dimension_labels (str): The dimension labels.
+            array2use (numpy.ndarray, optional): The array to write to the HDF5 file. Defaults to None.
+            hf_key (str, optional): The key to access the imaging data in the HDF5 file. Defaults to "imaging".
             remove_Cycle (bool, optional): Whether to remove the cycle tag from the filename. Defaults to False.
+            twoChan (bool, optional): Whether to add the channel index to the filename. Defaults to False.
             export_sample (bool, optional): Whether to export sample of the squeezed data. Defaults to False.
-
+            high_pass_applied (bool, optional): Whether high-pass filter was applied to the data. Defaults to False.
         Returns:
             str: The path to the squeezed HDF5 file.
-
         """
+
         h5filename = file2read
         fname_split = h5filename.split(".")[0]
         if remove_Cycle:
@@ -344,9 +347,7 @@ class H5_Utils(BC):
             # add _FILTERED to end of filename to denote background subtraction
             hf_squeeze = hf_loaded
             filtered_fname_append = (
-                "_FILTERED" + f"_WINSIZ_{window_size}"
-                if window_size is not None
-                else ""
+                "_PREPROC_FILTERED_HPFS" if high_pass_applied else "_PREPROC"
             )
             h5fname_sqz = fname_split + filtered_fname_append + self.file_tag["SQZ"]
 
@@ -360,6 +361,7 @@ class H5_Utils(BC):
             return_fname=True,
             twoChan=twoChan,
         )
+
         if export_sample:
             shortened_h5fname_sqz = (
                 fname_split

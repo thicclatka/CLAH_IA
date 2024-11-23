@@ -130,6 +130,7 @@ def _create_metadata_dict(dayPath: str, dayDir: list) -> dict:
                 current_sess, [file_tag["COMP_EMCFNAME"], file_tag["H5"]]
             )
             _, h5_bool = file_finder(current_sess, file_tag["PRE_EMC_H5"])
+            _, isxd_bool = file_finder(current_sess, file_tag["ISXD"])
             _, sD_bool = file_finder(current_sess, file_tag["COMP_SDFNAME"])
             _, tdml_bool = file_finder(current_sess, file_tag["TDML"])
             _, CSS_bool = file_finder(current_sess, file_tag["CSS"])
@@ -138,6 +139,7 @@ def _create_metadata_dict(dayPath: str, dayDir: list) -> dict:
 
             MSS_cond = MSS_bool == "Yes"
             h5_cond = h5_bool == "Yes"
+            isxd_cond = isxd_bool == "Yes"
 
             metadata_dict[f"M{sess_idx}"] = {}
             metadata_dict[f"M{sess_idx}"] = {
@@ -148,7 +150,12 @@ def _create_metadata_dict(dayPath: str, dayDir: list) -> dict:
                 "Test Type": test_type,
                 "Ch": ch,
                 "Sessions": int(numSess.split("Sess")[0]) if numSess else [],
-                "H5 present?": color_bool(h5_bool) if not MSS_cond else [],
+                "H5 present?": color_bool(h5_bool)
+                if not MSS_cond and not isxd_cond
+                else [],
+                "ISXD present?": color_bool(isxd_bool)
+                if not MSS_cond and not h5_cond
+                else [],
                 "Motion Corrected?": color_bool(emc_bool) if not MSS_cond else [],
                 "segDict?": color_bool(sD_bool) if not MSS_cond else [],
                 "TDML?": color_bool(tdml_bool) if not MSS_cond else [],

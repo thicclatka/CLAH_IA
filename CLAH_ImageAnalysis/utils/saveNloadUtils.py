@@ -34,7 +34,7 @@ def savedict2file(
     dict_to_save: dict,
     dict_name: str,
     filename: str,
-    file_tag_to_remove: list = [],
+    file_tag_to_remove: list | str = [],
     file_suffix: list = [],
     date: bool = False,
     filetype_to_save: list = [
@@ -80,6 +80,8 @@ def savedict2file(
             # replace None values with NaN values for non-pickle files
             dict_to_save = replace_noneWnan(dict_to_save)
             # dict_to_save = flatten_dict(dict_to_save)
+        if ftag == file_tag["MAT"]:
+            dict_to_save = convert_types4mat(dict_to_save)
         # in case there is any file extension in the filename
         # remove it & replace with the new file extension to be saved for current iteration
         fname_save = fname_save.split(".")[0] + ftag
@@ -90,7 +92,6 @@ def savedict2file(
             filename=fname_save,
             file_end=ftag,
         )
-    return
 
 
 def flatten_dict(d: dict, parent_key: str = "", sep: str = "_") -> dict:
@@ -270,6 +271,34 @@ def replace_noneWnan(obj: object) -> object:
     return obj
 
 
+def convert_types4mat(obj: object) -> object:
+    """
+    Convert types within an object to a format compatible with MATLAB.
+    Converts simple lists (containing numbers) to numpy arrays, while preserving
+    lists of lists or lists of arrays.
+
+    Parameters:
+        obj (object): The object to be converted.
+
+    Returns:
+        object: The converted object with simple lists transformed to numpy arrays.
+    """
+    if isinstance(obj, list):
+        # Check if it's a list of lists or list of arrays
+        if any(isinstance(x, (list, np.ndarray)) for x in obj):
+            return [convert_types4mat(item) for item in obj]
+        # If it's a simple list, convert to array
+        return np.array(obj)
+    elif isinstance(obj, dict):
+        return {
+            f"K{k}"
+            if isinstance(k, str) and k.replace(".", "").isdigit()
+            else k: convert_types4mat(v)
+            for k, v in obj.items()
+        }
+    return obj
+
+
 def load_pkl_file(fname: str) -> dict:
     """
     Load a pickle file and return the loaded dictionary.
@@ -433,24 +462,42 @@ def load_segDict(
     # load segDict
     unloaded_dict = load_file(filename, previous=True)
 
-    output_dict = {
-        sD_str["C_TEMPORAL"]: unloaded_dict[sD_str["C_TEMPORAL"]],
-        sD_str["A_SPATIAL"]: (
-            unloaded_dict[sD_str["A_SPATIAL"]]
-            if keep_A_sparse
-            else unloaded_dict[sD_str["A_SPATIAL"]].toarray()
-        ),
-        sD_str["DFF"]: unloaded_dict[sD_str["DFF"]],
-        sD_str["S_DECONV"]: unloaded_dict["S_Deconvolution"],
-        sD_str["DX"]: unloaded_dict[sD_str["DX"]],
-        sD_str["DY"]: unloaded_dict[sD_str["DY"]],
-    }
+    prevNameVar = kwargs.get("prevNameVar", False)
+
+    if not prevNameVar:
+        output_dict = {
+            sD_str["C_TEMPORAL"]: unloaded_dict[sD_str["C_TEMPORAL"]],
+            sD_str["A_SPATIAL"]: (
+                unloaded_dict[sD_str["A_SPATIAL"]]
+                if keep_A_sparse
+                else unloaded_dict[sD_str["A_SPATIAL"]].toarray()
+            ),
+            sD_str["DFF"]: unloaded_dict[sD_str["DFF"]],
+            sD_str["S_DECONV"]: unloaded_dict["S_Deconvolution"],
+            sD_str["DX"]: unloaded_dict[sD_str["DX"]],
+            sD_str["DY"]: unloaded_dict[sD_str["DY"]],
+        }
+    else:
+        output_dict = {
+            sD_str["C_TEMPORAL"]: unloaded_dict["C"],
+            sD_str["A_SPATIAL"]: unloaded_dict["A"],
+            sD_str["DFF"]: unloaded_dict["dff"],
+            sD_str["S_DECONV"]: unloaded_dict["S"],
+            sD_str["DX"]: unloaded_dict["d1"],
+            sD_str["DY"]: unloaded_dict["d2"],
+        }
 
     if sD_str["B_BACK_SPAT"] in unloaded_dict:
         output_dict[sD_str["B_BACK_SPAT"]] = unloaded_dict[sD_str["B_BACK_SPAT"]]
 
     if sD_str["F_BACK_TEMP"] in unloaded_dict:
         output_dict[sD_str["F_BACK_TEMP"]] = unloaded_dict[sD_str["F_BACK_TEMP"]]
+
+    if "b" in unloaded_dict:
+        output_dict[sD_str["B_BACK_SPAT"]] = unloaded_dict["b"]
+
+    if "f" in unloaded_dict:
+        output_dict[sD_str["F_BACK_TEMP"]] = unloaded_dict["f"]
 
     if all:
         # Return all data in the order they are defined in output_dict

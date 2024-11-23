@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from skimage.transform import resize
 from CLAH_ImageAnalysis.utils import fig_tools
 from CLAH_ImageAnalysis.utils import text_dict
 
@@ -152,6 +153,9 @@ def create_combined_arr_wOverlap(
 def get_DSImage_filename() -> str:
     """
     Get the filename for a downsampled image.
+
+    Returns:
+        str: The filename for a downsampled image.
     """
 
     file_tag = text_dict()["file_tag"]
@@ -163,16 +167,70 @@ def get_DSImage_filename() -> str:
     )
 
 
-def resize_to_square(image: np.ndarray) -> np.ndarray:
+def resize_to_square(image: np.ndarray, round_to: int = None) -> np.ndarray:
     """
     Resize an image to a square shape based on smallest dimension via cv2 interpolation.
+    The size is rounded down to the nearest multiple of round_to.
 
     Parameters:
         image (np.ndarray): Input image array.
+        round_to (int): Round to nearest multiple of this number (e.g., 50 or 100).
+        Default is None, which does not round.
 
     Returns:
         np.ndarray: Resized image array.
     """
-
+    # Get the minimum dimension
     size = min(image.shape)
-    return cv2.resize(image, (size, size), interpolation=cv2.INTER_AREA)
+    # Round down to nearest multiple of round_to
+    if round_to is not None:
+        size = (size // round_to) * round_to
+
+    dims = [size, size]
+
+    # determine downsampling factor
+    ds_factor = determine_DS_factor(dims)
+    dims = tuple(sz // ds_factor for sz in dims)
+
+    return resize_to_specific_dims(image, dims, interpolation=cv2.INTER_AREA)
+
+
+def resize_to_specific_dims(
+    image: np.ndarray, dims: tuple[int, int], interpolation=cv2.INTER_AREA
+) -> np.ndarray:
+    """
+    Resize an image to specific dimensions using cv2 interpolation.
+
+    Parameters:
+        image (np.ndarray): Input image array.
+        dims (tuple[int, int]): Desired dimensions (height, width).
+        interpolation (cv2.InterpolationFlags): Interpolation method.
+            Default is cv2.INTER_AREA.
+
+    Returns:
+        np.ndarray: Resized image array.
+    """
+    return cv2.resize(image, dims, interpolation=interpolation)
+
+
+def determine_DS_factor(dims: tuple[int, int]) -> int:
+    """
+    Determine the downsampling factor based on the dimensions.
+    Based on the bounds of the dimensions of the image. The bounds are as follows:
+    a dimension of 400-650 will be downsampled by a factor of 2, 651-900 by 3,
+    901-1200 by 4, and 1201-1500 by 5.
+
+    Parameters:
+        dims (tuple[int, int]): Dimensions of the image (height, width).
+
+    Returns:
+        int: The downsampling factor.
+    """
+    bounds = [(400, 650, 2), (651, 900, 3), (901, 1200, 4), (1201, 1500, 5)]
+
+    for min_dim, max_dim, DS_factor in bounds:
+        if any(min_dim <= d <= max_dim for d in dims):
+            return DS_factor
+
+    # if no bounds are met, return 1
+    return 1

@@ -1,10 +1,17 @@
 # from caiman import load as cm_load
+import os
 from caiman.motion_correction import MotionCorrect
+from enum import Enum
 # from caiman.motion_correction import high_pass_filter_space
 
 # from caiman.motion_correction import motion_correct_oneP_nonrigid
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
+
+
+def _brk():
+    breaker = utils.text_dict()["breaker"]["hash"]
+    print(breaker)
 
 
 def NoRMCorre(
@@ -25,6 +32,7 @@ def NoRMCorre(
     use_cuda: bool | None = None,
     border_nan: bool | None = None,
     onePhotonCheck: bool = False,
+    mc_iter: int = 1,
 ) -> list[MotionCorrect]:
     """
     Perform motion correction on a given movie file using NoRMCorre algorithm.
@@ -45,18 +53,24 @@ def NoRMCorre(
         pw_rigid (bool, optional): Perform piece-wise rigid motion correction. Defaults to MOCOpar["PW_RIGID"].
         use_cuda (bool, optional): Use CUDA for motion correction. Defaults to MOCOpar["USE_CUDA"].
         gSig_filt (int, optional): Global standard deviation of the filters. Defaults to MOCOpar["GSIG_FILT"].
+        mc_iter (int): Number of iterations for motion correction. Defaults to 1.
+
     Returns:
         mc (MotionCorrect): The motion-corrected movie object.
     """
+
+    def _rename_mmap(old_map_fname: str, new_mmap_name: str) -> str:
+        os.rename(old_map_fname, new_mmap_name)
+        return new_mmap_name
 
     MOCOpar = utils.enum_utils.enum2dict(TSF_enum.MOCO_Params)
     MOCOpar4OnePhoton = utils.enum_utils.enum2dict(TSF_enum.MOCO_Params4OnePhoton)
     # MOCOpar4OnePhoton = utils.enum_utils.enum2dict(TSF_enum.MOCO_Params)
 
     MOCOpar2use = MOCOpar4OnePhoton if onePhotonCheck else MOCOpar
-    MOCOparEnum2use = (
-        TSF_enum.MOCO_Params4OnePhoton if onePhotonCheck else TSF_enum.MOCO_Params
-    )
+    # MOCOparEnum2use = (
+    #     TSF_enum.MOCO_Params4OnePhoton if onePhotonCheck else TSF_enum.MOCO_Params
+    # )
     # MOCOparEnum2use = TSF_enum.MOCO_Params
 
     # get the default values from the enum class
@@ -102,7 +116,29 @@ def NoRMCorre(
 
     # print what the parameters are and export to file
     parFile = "MotionCorr" + "_onePhoton" if onePhotonCheck else ""
-    TSF_enum.export_settings2file(MOCOparEnum2use, parFile)
+
+    dictParams = {
+        "MC_ITER": mc_iter,
+        "NITER_RIG": niter_rig,
+        "MAX_SHIFTS": max_shifts,
+        "SPLITS_RIG": splits_rig,
+        "STRIDES": strides,
+        "OVERLAPS": overlaps,
+        "SPLITS_ELS": splits_els,
+        "UPSAMPLE_FACTOR": upsample_factor_grid,
+        "MAX_DEV_RIG": max_deviation_rigid,
+        "SHIFTS_OPENCV": shifts_opencv,
+        "NONNEG": nonneg_movie,
+        "BORDER_NAN": border_nan,
+        "PW_RIGID": pw_rigid,
+        "USE_CUDA": use_cuda,
+        "GSIG_FILT": gSig_filt,
+    }
+    enumParams = Enum("MotionCorrParams", dictParams)
+
+    # export the parameters to a file
+    # also prints parameters to console for current motion correction run
+    TSF_enum.export_settings2file(enumParams, parFile)
 
     # utils.print_wFrame(f"Motion correcting...(this should take some time)")
 
@@ -135,9 +171,9 @@ def NoRMCorre(
                 timekeep_msg="Motion Correction",
                 timekeep_seconds=False,
             ):
+                # perform motion correction
                 mc = MotionCorrect(
                     h5_2moco,
-                    # min_mov,
                     dview=dview,
                     max_shifts=max_shifts,
                     niter_rig=niter_rig,
@@ -155,9 +191,55 @@ def NoRMCorre(
                     gSig_filt=gSig_filt,
                 )
 
-                # template will be None for the first motion correction
-                # after, template will be the first element of mc.templates_els
                 mc.motion_correct(save_movie=True, template=template)
+
+                # perform additional motion correction iterations
+                # if mc_iter > 1
+                if mc_iter > 1:
+                    _brk()
+                    print(
+                        f"!!!Performing {mc_iter - 1} more iteration(s) of motion correction!!!"
+                    )
+                    print()
+                    for it in range(mc_iter - 1):
+                        mmap2use = mc.fname_tot_els[0]
+
+                        print(f"Iteration {it + 1} of {mc_iter - 1}")
+                        utils.print_wFrame(
+                            f"Motion correcting: {os.path.basename(mmap2use)}"
+                        )
+
+                        # perform motion correction
+                        mc = MotionCorrect(
+                            mmap2use,
+                            dview=dview,
+                            max_shifts=max_shifts,
+                            niter_rig=niter_rig,
+                            splits_rig=splits_rig,
+                            strides=strides,
+                            overlaps=overlaps,
+                            splits_els=splits_els,
+                            upsample_factor_grid=upsample_factor_grid,
+                            max_deviation_rigid=max_deviation_rigid,
+                            shifts_opencv=shifts_opencv,
+                            nonneg_movie=nonneg_movie,
+                            border_nan=border_nan,
+                            pw_rigid=pw_rigid,
+                            use_cuda=use_cuda,
+                            gSig_filt=gSig_filt,
+                        )
+
+                        mc.motion_correct(save_movie=True, template=template)
+
+                        # remove old mmap
+                        os.remove(mmap2use)
+
+                        # rename new mmap
+                        mc.fname_tot_els[0] = _rename_mmap(
+                            mc.fname_tot_els[0], mmap2use
+                        )
+                        _brk()
+                        print()
 
                 # append the motion corrected movie to the output list
                 mc_output.append(mc)
@@ -168,9 +250,7 @@ def NoRMCorre(
                     template = mc.total_template_els
     else:
         raise ValueError(
-            "Session with more than 2 channels was found. Please provide at most a session with 2 channels"
+            "Session with more than 2 channels was found. Please provide  a session with at most 2 channels"
         )
 
-    # set end time & print note duration
-    # TKEEPER.setEndNprintDuration(seconds=False)
     return mc_output

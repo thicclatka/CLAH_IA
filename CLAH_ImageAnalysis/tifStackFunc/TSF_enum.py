@@ -122,6 +122,15 @@ class CNMF_Params(Enum):
     FRAME_WINDOW = 250  # number of frames to consider in a sliding window
 
 
+class CNMF_Params_1p(Enum):
+    """
+    Constants for CNMF for one-photon data:
+    """
+
+    MIN_SNR = 4
+    CNN_THR = 0.7
+
+
 class segDict_Txt(Enum):
     """
     Constants for segmentation dictionary:
@@ -193,10 +202,15 @@ class Parser4M2SD(Enum):
             "DEFAULT": False,
             "HELP": "Use the old variable names for the segDict (i.e. A, C, S, etc). Default is False, in which names will be A_Spatial, C_Temporal, etc.",
         },
-        ("kernel_window_size", "kws"): {
+        ("mc_iter", "mci"): {
             "TYPE": "int",
-            "DEFAULT": None,
-            "HELP": "Window size in pixels for the morphological filter that enables background subtraction (preprocessing for miniscope data). Default is None. If None, but 1-photon data is detected, will prompt user to enter a kernel window size, with a default of 20.",
+            "DEFAULT": 1,
+            "HELP": "Number of iterations for motion correction. Default is 1. WARNING: this is not the same as the number of iterations for rigid motion correction (niter_rig) within caiman and it can add to the total processing time.",
+        },
+        ("overwrite", "ow"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Overwrite existing files (segDicts, sqz_H5s, tifs, mmaps, etc). Default is False.",
         },
     }
 
