@@ -139,6 +139,11 @@ options:
   -psv PREV_SD_VARNAMES, --prev_sd_varnames PREV_SD_VARNAMES
                         Use the old variable names for the segDict (i.e. A, C, S, etc).
                         Default is False, in which names will be A_Spatial, C_Temporal, etc.
+  -mci MC_ITER, --mc_iter MC_ITER
+                        Number of iterations for motion correction. Default is 1.
+                        WARNING: this is not the same as the number of iterations
+                        for rigid motion correction (niter_rig) within caiman and
+                        it can add to the total processing time.
 ```
 
 ### [Unit Analysis](./CLAH_ImageAnalysis/unitAnalysis/__init__.py)
