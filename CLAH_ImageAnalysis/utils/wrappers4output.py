@@ -1,19 +1,18 @@
-import os
-from CLAH_ImageAnalysis.utils import (
-    time_utils,
-    text_dict,
-    section_breaker,
-    print_header,
-    print_wFrame,
-)
 import gc
-from rich import print
+import os
+import traceback
+from contextlib import contextmanager
+from functools import wraps
 from typing import Any
 from typing import Callable
 from typing import Generator
-from contextlib import contextmanager
-from functools import wraps
-import traceback
+
+from CLAH_ImageAnalysis.utils import print_header
+from CLAH_ImageAnalysis.utils import print_wFrame
+from CLAH_ImageAnalysis.utils import section_breaker
+from CLAH_ImageAnalysis.utils import text_dict
+from CLAH_ImageAnalysis.utils import time_utils
+from rich import print
 
 text_lib = text_dict()
 
@@ -29,10 +28,10 @@ class ProcessStatusPrinter:
             mini: bool = True,
             done_msg: bool = False,
             timekeep: bool = False,
-            timekeep_msg: str = None,
+            timekeep_msg: str | None = None,
             timekeep_seconds: bool = True,
             wFrame: bool = False,
-        ):
+        ) -> None:
             """
             Parameters:
                 pre_msg (str): The message to be printed before the dots.

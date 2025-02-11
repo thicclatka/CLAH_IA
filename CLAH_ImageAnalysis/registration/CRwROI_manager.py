@@ -312,7 +312,7 @@ class CRwROI_manager(BC, Data_roicat):
         self.isCell = {"CC": [], "TC": []}
         for sess, refLap in zip(self.subj_sessions, self.refLapType):
             isTC = self.multSessSegStruc[sess]["cueShiftStruc"]["PCLappedSess"][
-                f"lapType{refLap+1}"
+                f"lapType{refLap + 1}"
             ]["Shuff"]["isPC"]
             self.isCell["TC"].append(isTC)
 
@@ -1003,14 +1003,15 @@ class CRwROI_manager(BC, Data_roicat):
 
         # find day 2 day or week 2 week tracked cells
         # apply QC as well
-        count_dict = self.CRTOOLS.d2dNw2w_incQC_counter(
-            cid_bySess=cluster_id_bySess,
-            count_dict=count_dict,
-            alpha_labels=alpha_labels,
-            rejected_label=rejected_label,
-            isCell=self.isCell,
-            labelBySess=self.results[self.CRkey["CLUSTERS"]]["labels_bySession"],
-        )
+        # TODO: FIX THIS GIVEN ARRAY MISMATCH THAT OCCURS
+        # count_dict = self.CRTOOLS.d2dNw2w_incQC_counter(
+        #     cid_bySess=cluster_id_bySess,
+        #     count_dict=count_dict,
+        #     alpha_labels=alpha_labels,
+        #     rejected_label=rejected_label,
+        #     isCell=self.isCell,
+        #     labelBySess=self.results[self.CRkey["CLUSTERS"]]["labels_bySession"],
+        # )
 
         # create isTC post cluster post QC
         isCell_post_cluster = self.CRTOOLS.isTC_incQC_counter(

@@ -131,7 +131,7 @@ def _create_metadata_dict(dayPath: str, dayDir: list) -> dict:
             )
             _, h5_bool = file_finder(current_sess, file_tag["PRE_EMC_H5"])
             _, isxd_bool = file_finder(current_sess, file_tag["ISXD"])
-            _, sD_bool = file_finder(current_sess, file_tag["COMP_SDFNAME"])
+            _, sD_bool = file_finder(current_sess, file_tag["SD"])
             _, tdml_bool = file_finder(current_sess, file_tag["TDML"])
             _, CSS_bool = file_finder(current_sess, file_tag["CSS"])
             _, MSS_bool = file_finder(current_sess, file_tag["MSS"])

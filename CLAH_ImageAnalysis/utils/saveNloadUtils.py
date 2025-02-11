@@ -172,6 +172,10 @@ def saver_func(
                     grp = h5file.create_group(key)
                     for attr in ["data", "indices", "indptr", "shape"]:
                         grp.create_dataset(attr, data=np.array(getattr(value, attr)))
+                elif isinstance(value, dict):
+                    grp = h5file.create_group(key)
+                    for k, v in value.items():
+                        grp.create_dataset(k, data=v)
                 else:
                     h5file.create_dataset(key, data=value)
     elif file_end == file_tag["JSON"]:
@@ -179,7 +183,6 @@ def saver_func(
         with open(filename, "w") as json_file:
             json.dump(dict_to_save, json_file, indent=2, sort_keys=True)
     text_formatting.print_done_small_proc()
-    return
 
 
 def convert_types4json(obj: object) -> object:

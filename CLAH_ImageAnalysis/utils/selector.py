@@ -23,6 +23,7 @@ class subj_selector_utils:
         file_of_interest: str,
         pre_sel: list,
         select_by_ID: bool,
+        **kwargs,
     ):
         """Initialize the utility class for subject selection.
 
@@ -93,6 +94,8 @@ class subj_selector_utils:
         self.processAll = []
         self.processAll_noemc = []
         self.processAll_just_emc = []
+
+        self.noTDML4SD = kwargs.get("noTDML4SD", False)
 
         if pre_sel:
             self._preSelection(pre_sel)
@@ -176,7 +179,7 @@ class subj_selector_utils:
                 self.IDDict[id]["TYPE"] = self.sess_dict["TYPE"][subj_idx]
                 self.IDDict[id]["IDX"] = subj_idx + 1
                 self.IDDict[id][f"ALL_{FOI}"] = (
-                    subj_idx + 1 in self.bool_dict["Y_{FOI}"]
+                    subj_idx + 1 in self.bool_dict[f"Y_{FOI}"]
                 )
 
     def _fill_bool_dict(self) -> None:
@@ -348,12 +351,18 @@ class subj_selector_utils:
         Returns:
             list: The list of condition keys to use for SD analysis.
         """
-        condkeys2use = self._create_condkeys2use(["SD", "TDML", "EMC"])
+        if not self.noTDML4SD:
+            condkeys2use = self._create_condkeys2use(["SD", "TDML", "EMC"])
+        else:
+            condkeys2use = self._create_condkeys2use(["SD"])
 
         Y_SD_set = set(self.bool_dict[f"Y_{self.sel_tag['SD']}"])
-        Y_TDML_set = set(self.bool_dict[f"Y_{self.sel_tag['TDML']}"])
 
-        self.eligible_folders = list(Y_SD_set & Y_TDML_set)
+        if not self.noTDML4SD:
+            Y_TDML_set = set(self.bool_dict[f"Y_{self.sel_tag['TDML']}"])
+            self.eligible_folders = list(Y_SD_set & Y_TDML_set)
+        else:
+            self.eligible_folders = list(Y_SD_set)
 
         return condkeys2use
 
@@ -446,6 +455,9 @@ class subj_selector_utils:
 
         check_dict = {}
         emc_check = bool(self.processAll_just_emc)
+
+        SD2use = "SD" if not self.noTDML4SD else "SD_NO_TDML"
+
         choiceKey_conditon = [
             (
                 "EMC_ABS",
@@ -456,7 +468,7 @@ class subj_selector_utils:
                 lambda tag: tag == self.sel_tag["EMC"] and emc_check,
             ),
             ("MULTI", lambda tag: tag in self.multiSess),
-            ("SD", lambda tag: tag == self.sel_tag["SD"]),
+            (SD2use, lambda tag: tag == self.sel_tag["SD"]),
             ("CSSbyID", lambda tag: tag == self.sel_tag["CSS"] and self.select_by_ID),
             ("CSS", lambda tag: tag == self.sel_tag["CSS"] and not self.select_by_ID),
         ]
@@ -530,7 +542,11 @@ class subj_selector_utils:
         if FOI == self.sel_tag["EMC"]:
             print(self.subj_sel_str["all_selected_noemc"])
         else:
-            print(self.subj_sel_str[f"all_selected_{FOI.lower()}"])
+            if not self.noTDML4SD:
+                FOI2use = FOI.lower()
+            elif FOI == self.sel_tag["SD"] and self.noTDML4SD:
+                FOI2use = f"{FOI.lower()}_no_tdml"
+            print(self.subj_sel_str[f"all_selected_{FOI2use}"])
         self.selected_folders = self.processAll
 
     def _handle_user_selection(self) -> None:
@@ -792,7 +808,7 @@ class subj_selector_utils:
 #  main function
 ######################################################
 def subj_selector(
-    path: str, dir: list, file_of_interest: str, **kwargs
+    dayPath: str, dayDir: list, file_of_interest: str, **kwargs
 ) -> tuple[list, dict]:
     """Main function for subject selection.
 
@@ -809,9 +825,15 @@ def subj_selector(
     """
     selection_made = kwargs.get("selection_made", False)
     select_by_ID = kwargs.get("select_by_ID", False)
+    noTDML4SD = kwargs.get("noTDML4SD", False)
 
     SSU = subj_selector_utils(
-        path, dir, file_of_interest, pre_sel=selection_made, select_by_ID=select_by_ID
+        dayPath=dayPath,
+        dayDir=dayDir,
+        file_of_interest=file_of_interest,
+        pre_sel=selection_made,
+        select_by_ID=select_by_ID,
+        noTDML4SD=noTDML4SD,
     )
 
     if not selection_made:

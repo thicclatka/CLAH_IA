@@ -2,7 +2,8 @@ import os
 import shutil
 import easygui
 from typing import Literal
-from CLAH_ImageAnalysis import utils
+from CLAH_ImageAnalysis.utils import text_dict
+from CLAH_ImageAnalysis.utils import print_wFrame
 
 
 def move_back_dir(levels: int = 1) -> None:
@@ -14,6 +15,68 @@ def move_back_dir(levels: int = 1) -> None:
     """
 
     os.chdir("../" * levels)
+
+
+def find_eligible_folders_w_ftag(ftag: str, dir_of_session_folders: str) -> list[str]:
+    """
+    Find all folders with a given file tag in the current directory.
+    """
+    if os.path.exists(dir_of_session_folders):
+        os.chdir(dir_of_session_folders)
+    else:
+        print(f"Directory {dir_of_session_folders} does not exist.")
+        raise FileNotFoundError(f"Directory {dir_of_session_folders} does not exist.")
+
+    folder_contents = os.listdir(dir_of_session_folders)
+    foldersWftag = []
+    for folder in folder_contents:
+        if os.path.isdir(os.path.join(dir_of_session_folders, folder)):
+            if _find_ftag(ftag, folder):
+                foldersWftag.append(os.path.abspath(folder))
+
+    foldersWftag.sort()
+    return foldersWftag
+
+
+def _find_ftag(ftag: str, folder: str = None) -> str:
+    """Find the most recent file with the specified file tag in the specified folder.
+
+    Args:
+        folder (str, optional): Path to folder to search. If None, searches current directory.
+
+    Returns:
+        str: Path to most recent matching CSV file.
+    """
+    if folder is not None:
+        folder = os.path.abspath(folder)
+        os.chdir(folder)
+
+    ftag_file = findLatest(ftag)
+
+    if folder is not None:
+        os.chdir("..")
+
+    return ftag_file
+
+
+def check_folder_path(
+    fpath: str | None | list, msg: str | None = None
+) -> str | list[str]:
+    """
+    Check if the folder path is valid and if not, open a dialog to select a folder.
+
+    Parameters:
+        fpath (str | None | list): The folder path to check. Fpath can be a single string, a list with no elements, or None.
+        msg (str, optional): The message to display in the dialog. Default is "Select folder".
+        multiple_folders (bool, optional): If True, allow multiple folders to be selected. Default is False.
+    Returns:
+        str: The folder path.
+    """
+    if msg is None:
+        msg = "Select folder"
+    if fpath is None or fpath == []:
+        fpath = easygui.diropenbox(msg=msg)
+    return fpath
 
 
 def os_splitterNcheck(
@@ -67,7 +130,7 @@ def delete_folder(folder_path: str) -> None:
 
     if check_folder(folder_path):
         shutil.rmtree(folder_path)
-        utils.print_wFrame(f"Deleted {folder_path} folder")
+        print_wFrame(f"Deleted {folder_path} folder")
 
 
 def check_folder(folder_path: str) -> bool:
@@ -105,7 +168,10 @@ def chdir_check_folder(
 
 
 def findLatest(
-    filetags: str | list[str], notInclude: list[str] = [], full_path: bool = False
+    filetags: str | list[str],
+    notInclude: list[str] = [],
+    path2check: str | None = None,
+    full_path: bool = False,
 ) -> str | None:
     """
     Find the latest file in the current directory that matches any of the given filetags.
@@ -128,13 +194,21 @@ def findLatest(
     if isinstance(notInclude, str):
         notInclude = [notInclude]
 
-    currDir = os.listdir()
+    if path2check is None:
+        path2use = os.getcwd()
+    else:
+        path2use = path2check
+
+    currDir = os.listdir(path2use)
     filetagFinder = [
         match
         for match in currDir
         if all(filetag in match for filetag in filetags)
         and all(exclude not in match for exclude in notInclude)
     ]
+
+    if path2check is not None:
+        filetagFinder = [os.path.join(path2check, file) for file in filetagFinder]
 
     if filetagFinder:
         latest_file = max(filetagFinder, key=os.path.getctime)
@@ -255,7 +329,7 @@ def delete_pkl_then_mat(pkl_fname: str | list[str]) -> None:
         pkl_fname (str | list[str]): The PKL file name or a list of PKL file names.
     """
 
-    file_tag = utils.text_dict()["file_tag"]
+    file_tag = text_dict()["file_tag"]
     if isinstance(pkl_fname, str):
         pkl_fname = [pkl_fname]
 
@@ -263,14 +337,14 @@ def delete_pkl_then_mat(pkl_fname: str | list[str]) -> None:
         if check_folder(pkl2delete):
             # remove pkl first
             os.remove(pkl2delete)
-            utils.print_wFrame(f"Deleted {pkl2delete}")
+            print_wFrame(f"Deleted {pkl2delete}")
 
             mat = pkl2delete.replace(file_tag["PKL"], file_tag["MAT"])
             if os.path.exists(mat):
                 os.remove(mat)
 
         else:
-            utils.print_wFrame(f"{pkl2delete} does not exist.")
+            print_wFrame(f"{pkl2delete} does not exist.")
 
 
 def print_folder_contents(
@@ -292,7 +366,7 @@ def print_folder_contents(
             msg2print = (
                 file2print if pre_file_msg is None else f"{pre_file_msg} {file2print}"
             )
-            utils.print_wFrame(f"{msg2print}")
+            print_wFrame(f"{msg2print}")
     if new_line:
         print()
 
@@ -309,5 +383,36 @@ def remove_file(file: str) -> None:
     """
     Remove a file if it exists and is a folder.
     """
+    if fileNfolderChecker(file):
+        if os.path.isdir(file):
+            shutil.rmtree(file)
+        else:
+            os.remove(file)
 
-    return os.remove(file) if fileNfolderChecker(file) else None
+
+def create_symlink(src: str, link_name: str) -> None:
+    """
+    Create a symbolic link to a file.
+    """
+    try:
+        # Remove existing symlink if it exists
+        if os.path.islink(link_name):
+            os.unlink(link_name)
+
+        # Create the symlink
+        os.symlink(src, link_name)
+
+    except FileExistsError:
+        print(f"Link already exists: {link_name}")
+    except OSError as e:
+        print(f"Error creating symlink: {e}")
+
+
+def get_dirname(file_path: str) -> str | None:
+    """
+    Get the directory name of a file path.
+    """
+    if "/" in file_path:
+        return os.path.dirname(file_path)
+    else:
+        return None

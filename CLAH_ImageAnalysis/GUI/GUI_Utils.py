@@ -2,22 +2,24 @@ import numpy as np
 import re
 import sys
 import tkinter as tk
-import easygui
-import os
+import matplotlib
+from scipy.sparse import csr_matrix, spmatrix
 import matplotlib.pyplot as plt
 from rich import print
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from CLAH_ImageAnalysis.utils import color_dict, text_dict, print_wFrame
+from CLAH_ImageAnalysis import utils
 from matplotlib.colors import rgb2hex
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 
-text_lib = text_dict()
-color_dict = color_dict()
+matplotlib.use("TkAgg")
+plt.ioff()
+
+text_lib = utils.text_dict()
+color_dict = utils.color_dict()
 GUI_ELE = text_lib["GUI_ELEMENTS"]
 GUICLASS = text_lib["GUICLASSUTILS"]
 GUI_str = text_lib["GUI_ELEMENTS"]
 breaker = text_lib["breaker"]["hash_half"]
-done_str = text_lib["completion"]["small_proc"]
 
 ######################################################
 #  Widgets
@@ -52,6 +54,7 @@ class WidgetFactory:
         self.entries = {}
         self.frames = {}
         self.scales = {}
+        self.listboxes = {}
         self.grid_configs = {}
 
     def _init_default_values(self) -> None:
@@ -120,6 +123,8 @@ class WidgetFactory:
             tk_widget = tk.Frame(parent_to_use)
         elif widget_type == "SCALE":
             tk_widget = tk.Scale(parent_to_use)
+        elif widget_type == "LISTBOX":
+            tk_widget = tk.Listbox(parent_to_use)
         else:
             raise ValueError(f"Invalid widget_type: {widget_type}")
 
@@ -136,6 +141,8 @@ class WidgetFactory:
             self.frames[name] = tk_widget
         elif widget_type == "SCALE":
             self.scales[name] = tk_widget
+        elif widget_type == "LISTBOX":
+            self.listboxes[name] = tk_widget
 
         return tk_widget
 
@@ -157,6 +164,15 @@ class WidgetFactory:
                 bg=config.get("bg"),
                 fg=config.get("fg"),
                 state=config.get("state", self.default_state),
+            )
+
+        # Add Listbox-specific configuration
+        if isinstance(tk_object, tk.Listbox):
+            tk_object.config(
+                height=config.get("height"),
+                width=config.get("width"),
+                selectmode=config.get("selectmode", tk.SINGLE),
+                exportselection=config.get("exportselection", False),
             )
 
         # Handling for 'text' attribute, typically for Labels
@@ -224,6 +240,8 @@ class WidgetFactory:
             tk_object = self.buttons[name]
         elif name in self.entries:
             tk_object = self.entries[name]
+        elif name in self.listboxes:
+            tk_object = self.listboxes[name]
 
         if tk_object:
             # Get current configuration
@@ -467,6 +485,10 @@ class GUI_Utils:
             "orient": kwargs.get("orient"),
             "variable": kwargs.get("variable"),
             "justify": kwargs.get("justify"),
+            "height": kwargs.get("height"),
+            "width": kwargs.get("width"),
+            "selectmode": kwargs.get("selectmode"),
+            "exportselection": kwargs.get("exportselection"),
             "grid": {
                 "row": kwargs.get("row"),
                 "column": kwargs.get("column"),
@@ -498,11 +520,14 @@ class GUI_Utils:
         - canvas: The tkinter canvas widget containing the figure.
 
         """
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(1, 1, 1)
         canvas = FigureCanvasTkAgg(fig, master=master)
         canvas.get_tk_widget().grid(
             row=row, column=column, columnspan=columnspan, sticky="nsew"
         )
+
+        plt.close(fig)
         return fig, ax, canvas
 
     @staticmethod
@@ -522,39 +547,6 @@ class GUI_Utils:
         """
         toolbar = NavigationToolbar2Tk(canvas_to_use, fig_frame)
         return toolbar
-
-    @staticmethod
-    def get_pkl_fnameNfileID(
-        dict_name: str, file_tag: str, date_first: bool = False
-    ) -> tuple[str, str, str | None, str | None]:
-        """
-        Function to get the pickle file name and file ID.
-
-        Parameters:
-            dict_name (str): The name of the dictionary.
-            file_tag (str): The file tag to filter the file selection.
-            date_first (bool, optional): Whether the date is the first part of the file name. Defaults to False.
-
-        Returns:
-            tuple: A tuple containing the pickle file name and file ID. If `date_first` is True, the tuple also contains
-            the date and session type.
-
-        """
-        print("Loading file...", end="", flush=True)
-        egu_msg = GUI_str["EGU_MSG"].format(dict_name)
-        pkl_fname = easygui.fileopenbox(msg=egu_msg, default=f"*{file_tag}")
-        # change directory
-        os.chdir(os.path.dirname(pkl_fname))
-
-        # get file id
-        if date_first:
-            fileID = os.path.basename(pkl_fname).split("_")[1]
-            date = os.path.basename(pkl_fname).split("_")[0]
-            session_type = os.path.basename(pkl_fname).split("_")[2]
-            return pkl_fname, fileID, date, session_type
-        else:
-            fileID = os.path.basename(pkl_fname).split("_")[0]
-            return pkl_fname, fileID
 
     @staticmethod
     def get_selected_cells(input_str: str, max_col: int) -> list[int]:
@@ -628,11 +620,10 @@ class GUI_Utils:
 
     @staticmethod
     def plot_select_cell_ASpat(
-        A_Spatial: np.ndarray,
+        A_Spatial: csr_matrix | np.ndarray,
         cell_num: int,
         ax: plt.Axes,
         cmap: str,
-        nlen: int = 256,
         alpha: float = 0.5,
     ) -> None:
         """
@@ -647,12 +638,20 @@ class GUI_Utils:
         - alpha: The transparency of the plotted image (default: 0.5)
         """
         # convert from sparse matrix to dense to list
-        spatial_data = A_Spatial[:, cell_num].tolist()
+        if isinstance(A_Spatial, (csr_matrix, spmatrix)):
+            spatial_data = A_Spatial[:, cell_num].toarray()
+        elif isinstance(A_Spatial, np.ndarray):
+            spatial_data = A_Spatial[:, cell_num]
+        else:
+            raise ValueError(
+                "A_Spatial must be a scipy.sparse.csr_matrix or np.ndarray"
+            )
         # spatial_data = A_Spatial[:, cell_num].toarray().tolist()
         # remove any empty dict entries
-        spatial_data = [0 if x == {} else x for x in spatial_data]
+        spatial_data = np.array([0 if x == {} else x for x in spatial_data])
+        nlen = int(np.sqrt(len(spatial_data)))
         # convert back to array & reshape
-        spatial_data = np.array(spatial_data).reshape(nlen, nlen)
+        spatial_data = spatial_data.reshape(nlen, nlen)
         ax.imshow(spatial_data.T, cmap=cmap, alpha=alpha)
 
     @staticmethod
@@ -700,7 +699,7 @@ class GUI_Utils:
         # normalize to max
         temporal_data /= max_CTP_val
         # find pks for selected cell
-        selected_pks = pks[f"seg{cell_num}"]["pks"].astype(int)
+        selected_pks = pks[f"seg{cell_num}"].astype(int)
         # set color for CTP plot
         color = rgb2hex(color_from_cmap)
 
@@ -763,4 +762,4 @@ class GUI_Utils:
         if session_num:
             sess_to_print = f"Session {session_num}: "
 
-        print_wFrame(f"{sess_to_print}{cells_to_print}")
+        utils.print_wFrame(f"{sess_to_print}{cells_to_print}")

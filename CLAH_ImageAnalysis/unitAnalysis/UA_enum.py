@@ -470,4 +470,9 @@ class Parser4PCRCFF(Enum):
             "DEFAULT": True,
             "HELP": "Whether to plot individual TrigSig by subjected ID. Default is True.",
         },
+        ("concatCheck", "cat"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Set this to True if you are working with sessions that were motion corrected in a concatenated manner. THIS ONLY WORKS IF MS CONTAINS ONLY 2 SESSIONS AKA THE SPLIT OUTPUT OF 1 CONCATENATED SESSION. Default is False",
+        },
     }

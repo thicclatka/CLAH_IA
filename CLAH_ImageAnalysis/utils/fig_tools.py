@@ -11,6 +11,7 @@ import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.patches import Polygon
+from matplotlib.font_manager import FontProperties
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from matplotlib.colors import Normalize
@@ -20,6 +21,7 @@ from typing import Any
 
 from CLAH_ImageAnalysis.utils import create_multiline_string
 from CLAH_ImageAnalysis.utils import text_dict
+from CLAH_ImageAnalysis.utils import color_dict
 from CLAH_ImageAnalysis.utils import saveNloadUtils
 
 
@@ -55,10 +57,35 @@ def check_color_format(color: str | tuple) -> str:
         return "unknown"
 
 
+def determine_font2use(font_family: str) -> str:
+    """
+    Determine the font family to use. If the font family is not found, it will fall back to Arial. If Arial is not found, it will use the default sans-serif font.
+
+    Parameters:
+        font_family (str): The font family to use.
+
+    Returns:
+        str: The font family to use.
+    """
+    try:
+        FontProperties(font_family)
+        font2use = font_family
+    except ValueError:
+        # warnings.warn(f"Font {font_family} not found. Falling back to Arial.")
+        try:
+            FontProperties("Arial")
+            font2use = "Arial"
+        except ValueError:
+            # warnings.warn("Arial not found. Using default sans-serif font.")
+            font2use = "sans-serif"
+
+    return font2use
+
+
 def save_figure(
     plt_figure,
     fig_name: str,
-    figure_save_path: str,
+    figure_save_path: str | None = None,
     dpi: int = 300,
     tight_layout: bool = True,
     close_fig: bool = True,
@@ -66,6 +93,8 @@ def save_figure(
     NOPNG: bool = False,
     pValDict: dict = None,
     mean_semDict: dict = None,
+    # font_family: str = "sans-serif",
+    font_family: str = "Lato",
 ) -> None:
     """
     Save a matplotlib figure to a file.
@@ -77,6 +106,11 @@ def save_figure(
         dpi (int, optional): The resolution of the saved figure in dots per inch. Default is 300.
         tight_layout (bool, optional): Whether to apply tight layout to the figure before saving. Default is True.
         close_fig (bool, optional): Whether to close the figure after saving. Default is True.
+        forPres (bool, optional): Whether to save the figure in presentation format. Default is False.
+        NOPNG (bool, optional): If set to True, the figure will not be saved as a PNG file. Default is False.
+        pValDict (dict, optional): The dictionary to be saved as a JSON file. Default is None.
+        mean_semDict (dict, optional): The dictionary to be saved as a JSON file. Default is None.
+        font_family (str, optional): The font family to be used for the figure. Default is "Lato".
     """
 
     def saveDictVals2json(
@@ -100,6 +134,10 @@ def save_figure(
             filetype_to_save=JSON_end,
         )
 
+    font2use = determine_font2use(font_family)
+    for text_obj in plt_figure.findobj(match=lambda x: hasattr(x, "set_fontfamily")):
+        text_obj.set_fontfamily(font2use)
+
     PNG_end = text_dict()["file_tag"]["PNG"]
     JSON_end = text_dict()["file_tag"]["JSON"]
 
@@ -107,11 +145,15 @@ def save_figure(
     if not fig_name.endswith(PNG_end):
         fig_name += PNG_end
     # Ensure the directory exists
-    if not os.path.exists(figure_save_path):
+    if figure_save_path is not None and not os.path.exists(figure_save_path):
         os.makedirs(figure_save_path)
 
     # Construct the full file path
-    file_path = os.path.join(figure_save_path, fig_name)
+    if figure_save_path is not None:
+        file_path = os.path.join(figure_save_path, fig_name)
+    else:
+        # if figure_save_path is None, save the figure in the current working directory
+        file_path = fig_name
 
     if tight_layout:
         plt.tight_layout()
@@ -263,6 +305,8 @@ def create_legend_patch(
     label: str,
     edgecolor: str = None,
     hatch: str = None,
+    alpha: float = 1.0,
+    marker: str | None = None,
 ) -> list:
     """
     Create a legend patch with the given face color and label.
@@ -273,6 +317,7 @@ def create_legend_patch(
         label (str): The label of the legend patch.
         edgecolor (str): The edge color of the legend patch.
         hatch (str): The hatch pattern of the legend patch.
+        marker (str): The marker of the legend patch.
 
     Returns:
         list: The updated list of legend patches.
@@ -280,9 +325,32 @@ def create_legend_patch(
 
     facecolor = facecolor if isinstance(facecolor, tuple) else hex_to_rgba(facecolor)
 
-    legend2patch.append(
-        Patch(facecolor=facecolor, label=label, edgecolor=edgecolor, hatch=hatch)
-    )
+    if marker is not None:
+        facecolor = color_dict()["black"]
+        edgecolor = color_dict()["black"]
+        legend2patch.append(
+            Line2D(
+                [0],
+                [0],
+                color="none",
+                marker=marker,
+                markerfacecolor=facecolor,
+                markeredgecolor=edgecolor if edgecolor else "none",
+                markersize=10,
+                label=label,
+            ),
+        )
+    else:
+        legend2patch.append(
+            Patch(
+                facecolor=facecolor,
+                label=label,
+                edgecolor=edgecolor,
+                hatch=hatch,
+                alpha=alpha,
+            )
+        )
+
     return legend2patch
 
 
@@ -291,6 +359,8 @@ def create_legend_patch_fLoop(
     label: list,
     edgecolor: list = None,
     hatch: list = None,
+    alpha: list | None = None,
+    marker: list | None = None,
 ) -> list:
     """
     Create a legend patch for each facecolor, label, edgecolor, and hatch combination.
@@ -304,19 +374,38 @@ def create_legend_patch_fLoop(
     Returns:
         list: The list of legend patches.
     """
+    if alpha is None:
+        alpha = [1.0] * len(facecolor)
+
+    if marker is None:
+        marker = [None] * len(facecolor)
 
     legend2patch = []
     edgecolor = [None] * len(facecolor) if edgecolor is None else edgecolor
     hatch = [None] * len(facecolor) if hatch is None else hatch
 
-    for fc, lb, ec, ht in zip(facecolor, label, edgecolor, hatch):
-        legend2patch = create_legend_patch(legend2patch, fc, lb, ec, ht)
+    for fc, lb, ec, ht, al, mk in zip(
+        facecolor, label, edgecolor, hatch, alpha, marker
+    ):
+        legend2patch = create_legend_patch(
+            legend2patch=legend2patch,
+            facecolor=fc,
+            label=lb,
+            edgecolor=ec,
+            hatch=ht,
+            alpha=al,
+            marker=mk,
+        )
 
     return legend2patch
 
 
 def create_plt_subplots(
-    nrows: int = 1, ncols: int = 1, figsize: tuple = (10, 10), flatten: bool = False
+    nrows: int = 1,
+    ncols: int = 1,
+    figsize: tuple = (10, 10),
+    flatten: bool = False,
+    plt_on: bool = False,
 ) -> tuple:
     """
     Create a matplotlib figure and axes with the specified figsize.
@@ -326,14 +415,20 @@ def create_plt_subplots(
         ncols (int): The number of columns in the subplot grid.
         figsize (tuple): The size of the figure in inches.
         flatten (bool): Whether to flatten the axes.
+        plt_on (bool): Whether to turn on interactive plotting.
 
     Returns:
         fig (matplotlib.figure.Figure): The created figure.
         ax (matplotlib.axes.Axes): The created axes.
     """
 
+    if plt_on:
+        plt.ion()
+    else:
+        plt.ioff()
+
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
-    if flatten:
+    if flatten and nrows * ncols > 1:
         ax = ax.flatten()
     return fig, ax
 
@@ -345,7 +440,7 @@ def plot_imshow(
     suptitle: str = "",
     title: str = None,
     cmap: str = None,
-    norm: mcolors.Normalize = None,
+    norm: mcolors.Normalize | None = None,
     xlim: tuple = None,
     ylim: tuple = None,
     xlabel: str = None,
@@ -356,8 +451,8 @@ def plot_imshow(
     aspect: str = None,
     interpolation: str = None,
     alpha: float = None,
-    vmin: float = None,
-    vmax: float = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
     origin: str = None,
     extent: tuple = None,
     **kwargs,
@@ -389,6 +484,16 @@ def plot_imshow(
         None
     """
     if norm is None:
+        if vmin is None:
+            try:
+                vmin = data2plot.min()
+            except (AttributeError, TypeError):
+                vmin = np.min(data2plot)
+        if vmax is None:
+            try:
+                vmax = data2plot.max()
+            except (AttributeError, TypeError):
+                vmax = np.max(data2plot)
         norm = Normalize(vmin=vmin, vmax=vmax)
 
     if isinstance(axis, np.ndarray):
@@ -778,6 +883,7 @@ def bar_plot(
     yerr: np.ndarray = None,
     hatch: str = None,
     width: float = 0.5,
+    alpha: float = 1.0,
 ) -> None:
     """
     Create a bar plot.
@@ -803,10 +909,75 @@ def bar_plot(
         label=label,
         yerr=yerr,
         width=width,
+        alpha=alpha,
         hatch=hatch,
     )
     ax.set_title(title) if title is not None else None
     ax.set_ylim(ylim) if ylim is not None else None
+
+
+def line_plot(
+    ax: plt.Axes,
+    X: np.ndarray,
+    Y: np.ndarray,
+    color: str = None,
+    label: str = None,
+    linestyle: str = None,
+    linewidth: float = 2.5,
+) -> None:
+    ax.plot(X, Y, color=color, label=label, linestyle=linestyle, linewidth=linewidth)
+
+
+def scatter_plot(
+    ax: plt.Axes,
+    X: np.ndarray,
+    Y: np.ndarray,
+    color: str = None,
+    edgecolor: str = None,
+    title: str = None,
+    ylim: tuple = None,
+    marker: str = "o",
+    label: str = None,
+    alpha: float = 1.0,
+    s: float = 50,
+    jitter: float = 0.03,
+) -> None:
+    """
+    Create a scatter plot.
+
+    Parameters:
+        ax (plt.Axes): The axes to plot on
+        X (np.ndarray): X coordinates
+        Y (np.ndarray): Y coordinates
+        color (str, optional): Color of the markers
+        edgecolor (str, optional): Edge color of the markers
+        title (str, optional): Plot title
+        ylim (tuple, optional): Y-axis limits
+        marker (str, optional): Marker style
+        label (str, optional): Label for legend
+        alpha (float, optional): Transparency of markers
+        s (float, optional): Size of markers
+    """
+    if isinstance(X, float) or isinstance(X, int):
+        X = np.repeat(X, Y.shape[0])
+
+    if jitter is not None:
+        X = X + np.random.normal(0, jitter, size=X.shape)
+
+    ax.scatter(
+        X,
+        Y,
+        color=color,
+        edgecolor=edgecolor,
+        marker=marker,
+        label=label,
+        alpha=alpha,
+        s=s,
+    )
+    if title is not None:
+        ax.set_title(title)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
 
 def create_index4grouped_barplot(
@@ -859,7 +1030,7 @@ def add_text_box(
     va: str = None,
     rotation: float = None,
     fontsize: int = 14,
-    bbox: dict = None,
+    bbox: dict | None = None,
 ) -> None:
     """
     Add a text box to the plot.
@@ -1061,7 +1232,7 @@ def create_sig_2samp_annotate(
     arr0: np.ndarray,
     arr1: np.ndarray,
     coords: tuple,
-    parametric=True,
+    parametric: bool = True,
     xytext: tuple = (0, 0),
     textcoords: str = "offset points",
     ha: str = "center",

@@ -9,19 +9,47 @@ def color_dict() -> dict:
         dict: A dictionary with color names as keys and hex values as values.
     """
     color_dict = {
-        "red": "#CF202E",
-        "white": "#E6E6E6",
-        "orange": "#F78822",
-        "yellow": "#F6DB35",
-        "violet": "#8F499C",
-        "blue": "#4185BE",
-        "green": "#6DC067",
+        ## base colors (RGB)
+        "red_base_rgb": (1, 0, 0),
+        "blue_base_rgb": (0, 0, 1),
+        "green_base_rgb": (0, 1, 0),
+        ## light colors
         "black": "#000000",
-        "cyan": "#55B3E9",
-        "turquoise": "#34B7AA",
-        "pink": "#CB78A7",
+        "blue": "#4185BE",
         "brown": "#B6835E",
+        "coral": "#FF7F50",
+        "cyan": "#2BC4C9",
+        "gold": "#DFB851",
         "gray": "#808080",
+        "green": "#6DC067",
+        "indigo": "#4B0082",
+        "magenta": "#FF00FF",
+        "navy": "#000080",
+        "olive": "#808000",
+        "orange": "#F78822",
+        "pink": "#CB78A7",
+        "red": "#CF202E",
+        "turquoise": "#34B7AA",
+        "violet": "#8F499C",
+        "white": "#E6E6E6",
+        "yellow": "#F6DB35",
+        ## dark colors
+        "darkblue": "#050194",
+        "darkbrown": "#7E593E",
+        "darkcoral": "#CD5B45",
+        "darkcyan": "#008B8B",
+        "darkgold": "#9B813D",
+        "darkgray": "#3B3B3B",
+        "darkgreen": "#006400",
+        "darkindigo": "#310062",
+        "darkmagenta": "#8B008B",
+        "darkolive": "#4E4E0A",
+        "darkorange": "#B76519",
+        "darkpink": "#77144C",
+        "darkred": "#8B0000",
+        "darkturquoise": "#1B8177",
+        "darkviolet": "#5D2168",
+        "darkyellow": "#B8860B",
     }
     return color_dict
 
@@ -33,21 +61,22 @@ def color_dict_4cueTrigSigplots() -> dict:
     Returns:
         dict: A dictionary mapping cue names to color codes.
     """
+    colors = color_dict()
     color_dict_4cueTrigSigplots = {
-        "CUE1": "#1b9e77",
-        "OMITCUE1": "#d95f02",
-        "CUE2": "#e2284c",
-        "OMITCUE2": "#8f499c",
-        "CUE1_SWITCH": "#46a8e0",
-        "CUE2_SWITCH": "#e6ab02",
-        "OMITCUE1_SWITCH": "#e6bc08",
-        "TONE": "#40E0D0",
-        "OMITTONE": "#ADFF2F",
-        "LED": "#EE82EE",
-        "OMITLED": "#FFD700",
-        "OMITBOTH": "#46b1e3",
-        "OPTO": "#f39853",
-        "CUEwOPTO": "#ba9070",
+        "CUE1": colors["green"],
+        "OMITCUE1": colors["orange"],
+        "CUE2": colors["red"],
+        "OMITCUE2": colors["violet"],
+        "CUE1_SWITCH": colors["cyan"],
+        "CUE2_SWITCH": colors["yellow"],
+        "OMITCUE1_SWITCH": colors["pink"],
+        "TONE": colors["turquoise"],
+        "OMITTONE": colors["darkturquoise"],
+        "LED": colors["darkblue"],
+        "OMITLED": colors["darkgreen"],
+        "OMITBOTH": colors["darkred"],
+        "OPTO": colors["darkorange"],
+        "CUEWOPTO": colors["darkyellow"],
     }
     return color_dict_4cueTrigSigplots
 
@@ -91,7 +120,7 @@ def section_breaker(
     """
     text_to_use = text_dict()
     colors = color_dict()
-    c_breaker = colors["blue"] if not alt_color_break else colors["green"]
+    c_breaker = colors["darkturquoise"] if not alt_color_break else colors["green"]
 
     breaker = text_to_use["breaker"][btype]
     print(f"[{c_breaker}]{breaker}[/{c_breaker}]")
@@ -117,7 +146,7 @@ def print_header(
         alt_color_txt (bool, optional): Indicates whether to use an alternative color for the text. Defaults to False.
     """
     colors = color_dict()
-    c_head = colors["red"] if not alt_color_txt else colors["orange"]
+    c_head = colors["darkcoral"] if not alt_color_txt else colors["orange"]
 
     btype = "hash"
     if subhead:
@@ -186,6 +215,7 @@ def text_dict(
     POSTCR_CFF = "PCR_CFF"
     WRAPMSS = "WMSS"
     TWOODOR = "TOD"
+    ISX_ANLZR = "ISX_ANLZR"
 
     main_titles = {
         MOCO2SD: "h5 image stack motion corrector & segmentation operator",
@@ -195,6 +225,7 @@ def text_dict(
         POSTCR_CFF: "Post CR Cue Cell Finder",
         WRAPMSS: "wrapMultSessStruct",
         TWOODOR: "Two Odor Decoder",
+        ISX_ANLZR: "ISX Analysis",
     }
 
     text_dict = {
@@ -291,15 +322,21 @@ def text_dict(
         },
         "file_tag": {
             "8BIT": "_8bit",
+            "ABBR_DS": "_ABBREVDATASET",
             "AVGCA": "_avCaCh",
             "AVI": ".avi",
+            "BORIS": "Boris",
             "CA": "_CaCh",
             "CCF": "CueCellFinderDict",
             "CDA_MOV": "PostSeg_Residual_Movie_CdotA",
             "CLUSTER_INFO": "_cluster_info",
+            "CNMFE": "CNMFE",
             "CODE": "00001",
+            "C_EVAL": "CompEval",
+            "CMAP": "_CMAP",
             "CONV": "convolved_data",
-            "CON_RES_MOV": "PostSeg_Residual_Movie_Concatenated",
+            "CON_RES_MOV": "PostSeg_Residual_Movie_Concat_CdotA_W_NonSegNoise",
+            "CROP_DIMS": "crop_dims.json",
             "CSS": "_cueShiftStruc",
             "CSV": ".csv",
             "CYCLE": "_Cycle",
@@ -309,7 +346,7 @@ def text_dict(
             "EMC": "_eMC",
             "EPS": ".eps",
             "GPIO": ".gpio",
-            "GPIO_SUFFIX": "gpio",
+            "GPIO_SUFFIX": "_gpio",
             "H5": ".h5",
             "HTML": ".html",
             "IMG": ".tif",
@@ -320,13 +357,18 @@ def text_dict(
             "MAT": ".mat",
             "MMAP": ".mmap",
             "MMAP_BASE": "memmap_",
+            "MMAP_MC_PROC": "memmap_eMC_caChExpDS_",
+            "MP4": ".mp4",
             "MOSSY": "MossyCellList",
             "MSS": "_multSessSegStruc",
-            "NOISE_MOV": "PostSeg_Residual_Movie_NonSeg_Noise",
+            "NOISE_MOV": "PostSeg_Residual_Movie_NonSegNoise",
+            "NPZ": ".npz",
+            "PARAMS": "Parameters",
             "PDF": ".pdf",
             "PKL": ".pkl",
             "PKS": "_pksDict",
             "PNG": ".png",
+            "POST_SG": "PostSeg",
             "ROICAT": "_ROICaT",
             "SD": "_segDict",
             "SQZ": "_sqz",
@@ -336,8 +378,16 @@ def text_dict(
             "TIFF": ".tiff",
             "TEMPFILT": "Exp",
             "TXT": ".txt",
+            "XLSX": ".xlsx",
             "XML": ".xml",
             "ZIP": ".zip",
+        },
+        "Folders": {
+            "MC_METRICS": "motion_correction_metrics",
+            "ASPAT_CHECK": "ASpatCheck",
+            "PARAMS": "Parameters_Used",
+            "QL": ".quickLinks",
+            "GENFIG": "Figures",
         },
         "GPU": {
             "CUPY": "cupy",
@@ -365,6 +415,9 @@ def text_dict(
                 ],
                 "SD": [
                     "1| All session(s) with segDict present w/required .tdml: {}",
+                ],
+                "SD_NO_TDML": [
+                    "1| All session(s) with segDict present: {}",
                 ],
                 "CSSbyID": [
                     "1| All subject(s) with multiple sessions w/respective cueShiftStrucs per session: {}",
@@ -400,6 +453,7 @@ def text_dict(
                 "all_selected_noemc": "All available sessions with no previous eMC processing were selected to be processed",
                 "all_selected_yesemc": "All available sessions including those with previous eMC processing were selected to be processed",
                 "all_selected_sd": "All sessions with a present segDict AND .tdml were selected to be processed",
+                "all_selected_sd_no_tdml": "All sessions with a present segDict were selected to be processed",
                 "all_selected_css": "All subjects w/multiple sessions that contain appropriate cueShiftStrucs were selected to be processed",
                 "all_selected_mss": "All combined session folders with multSessSegStruc were selected to be processed",
                 "all_selected_ci": "All combined session folders with cluster_info were selected to be processed",
@@ -433,10 +487,12 @@ def text_dict(
         "IMP_FILE_KW": ["OPTO", "eOPN3", "AD", "Ag"],
         "GUI_ELEMENTS": {
             "GUI_TITLE_START": "Starting up {}:",
-            "UNUSABLE": "[UNUSABLE TILL FILE LOAD]",
+            "UNUSABLE": "[UNUSABLE NO FOLDER LOADED]",
             "MMENU": "File",
             "EDIT": "Edit",
             "LOAD": "Load File",
+            "LOAD_SESS": "Load Sessions",
+            "LOAD_SESS_SELECTED": "Load Selected Session",
             "RESET": "RESET",
             "UPDATE": "Update Plot",
             "QUIT": "Quit",
@@ -444,8 +500,12 @@ def text_dict(
             "SD_TITLE": "SegDict GUI Check",
             "SAV_FIG": "Save Figure",
             "EGU_MSG": "Select a compatible {} .pkl file",
-            "LOAD_ID": " Loaded ID: {}",
-            "LOAD_ID_EMPTY": " Loaded ID: Please go to Menu > Load File to get started",
+            "EGU_MSG_SESS": "Select a session folder that contains the {} .pkl file",
+            "EGU_MSG_PAR": "Select a directory that contains session folders",
+            "LOAD_ID": " Loaded ID: {} | Date: {} | Session Type: {}",
+            "LOAD_ID_EMPTY": "{:^100}".format(
+                "Loaded ID: Please go to File > Load File to get started"
+            ),
             "PLT_TITLE_CSS": "Date: {}\nSession: {}",
             "PLT_TITLE": "Spatial Profile for ID {}",
             "PLT_CELL": "Session {}: Cell {}",
@@ -453,6 +513,7 @@ def text_dict(
             "VIEW": "View",
             "CONSOLE": "Console",
             "CELL_SEL": " Select cells to plots per session:\n Type 'a/all' to plot all cells",
+            "ASPAT_ENTRY_LABEL": "",
         },
         "GUICLASSUTILS": {
             "BU_LOAD": "LoadLabel",
@@ -507,7 +568,7 @@ def text_dict(
     text_dict["selector"]["file_types"] = {
         stags["EMC"]: [ftags["COMP_EMCFNAME"], ftags["H5"]],
         stags["H5"]: ftags["PRE_EMC_H5"],
-        stags["SD"]: ftags["COMP_SDFNAME"],
+        stags["SD"]: ftags["SD"],
         stags["CSS"]: ftags["CSS"],
         stags["TDML"]: ftags["TDML"],
         stags["MSS"]: ftags["MSS"],
@@ -524,6 +585,20 @@ def text_dict(
     ]
 
     text_dict["selector"]["multiSess"] = [stags["MSS"], stags["CI"]]
+
+    text_dict["QL_LNAMES"] = {
+        "RAW_H5": "00_RAW_H5",
+        "RAW_ISXD": "00_RAW_ISXD",
+        "RAW_TIFF": "00_RAW_TIFF",
+        "SQZ_H5": "01A_SQZ_H5",
+        "SMP_SQZ_H5": "01B_SMP_SQZ_H5",
+        "NORM_MMAP": "02_NORMCORRE_MMAP_OUTPUT",
+        "NORM_TFDS_MMAP": "03A_NORMCORRE_TFDS_MMAP",
+        "NORM_TFDS_H5": "03B_NORMCORRE_TFDS_H5",
+        "NORM_TFDS_AVI": "03C_NORMCORRE_TFDS_CMAP_AVI",
+        **{f"SD_{key}": f"04A_SEGDICT_{key}" for key in ["H5", "MAT", "PKL"]},
+        "RES_MOV_CCAT_AVI": "04B_RESIDUAL_MOVIE_CDOTA_CONCAT_W_NONCAP_NOISE_AVI",
+    }
 
     return text_dict
 

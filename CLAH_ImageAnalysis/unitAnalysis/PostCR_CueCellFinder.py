@@ -15,6 +15,7 @@ class PostCR_CueCellFinder(BC):
         sessFocus: int,
         forPres: bool,
         plotIndTrigSig: bool,
+        concatCheck: bool,
     ) -> None:
         """
         Initializes the PostCR_CueCellFinder class.
@@ -26,15 +27,21 @@ class PostCR_CueCellFinder(BC):
             sessFocus (int): The session to focus on.
             forPres (bool): Whether to process for presentation.
             plotIndTrigSig (bool): Whether to plot individual trigger signals.
+            concatCheck (bool): Set this to True if you are working with sessions that were motion corrected in a concatenated manner. THIS ONLY WORKS IF MS CONTAINS ONLY 2 SESSIONS AKA THE SPLIT OUTPUT OF 1 CONCATENATED SESSION. Default is False
         """
 
         self.program_name = "PCR_CFF"
         self.class_type = "manager"
-        self.version = "0.1.0"
         BC.__init__(self, self.program_name, mode=self.class_type)
 
         self.static_class_var_init(
-            path, sess2process, outlier_ts, sessFocus, forPres, plotIndTrigSig
+            path,
+            sess2process,
+            outlier_ts,
+            sessFocus,
+            forPres,
+            plotIndTrigSig,
+            concatCheck,
         )
 
     def process_order(self) -> None:
@@ -68,6 +75,7 @@ class PostCR_CueCellFinder(BC):
         sessFocus: int,
         forPres: bool,
         plotIndTrigSig: bool,
+        concatCheck: bool,
     ) -> None:
         """
         Initializes the static class variables for the PostCR_CueCellFinder class.
@@ -79,20 +87,21 @@ class PostCR_CueCellFinder(BC):
             sessFocus (int): The session to focus on.
             forPres (bool): Whether to process for presentation.
             plotIndTrigSig (bool): Whether to plot individual trigger signals.
-
+            concatCheck (bool): Set this to True if you are working with sessions that were motion corrected in a concatenated manner. THIS ONLY WORKS IF MS CONTAINS ONLY 2 SESSIONS AKA THE SPLIT OUTPUT OF 1 CONCATENATED SESSION. Default is False
         Returns:
             None
         """
         BC.static_class_var_init(
             self,
             folder_path=path,
-            file_of_interest=self.text_lib["selector"]["tags"]["CI"],
+            file_of_interest=self.text_lib["selector"]["tags"]["MSS"],
             selection_made=sess2process,
         )
         self.outlier_ts = outlier_ts
         self.sessFocus = sessFocus
         self.forPres = forPres
         self.plotIndTrigSig = plotIndTrigSig
+        self.concatCheck = concatCheck
         self.CRRkey = self.enum2dict(CRwROI_enum.Txt)
         self.CCFkey = self.enum2dict(UA_enum.CCF)
         self.PCRkey = self.enum2dict(UA_enum.PCR_CFF)
@@ -119,7 +128,7 @@ class PostCR_CueCellFinder(BC):
             self.groups = ["CTL", "AD"]
 
         self.AGEDCheck = False
-        if "Ag_vs_nonAg" in self.dayPath:
+        if "Ag_vs_nonAg" in self.dayPath and "NIAMossy" not in self.dayPath:
             self.AGEDCheck = True
             self.groups = ["WT", "DK", "AGED"]
 
@@ -132,6 +141,11 @@ class PostCR_CueCellFinder(BC):
         if "miniscope" in self.dayPath:
             self.miniscopeCheck = True
             self.groups = ["MINISCOPE"]
+
+        self.AGEDMossyCheck = False
+        if "Ag_vs_nonAg" in self.dayPath and "NIAMossy" in self.dayPath:
+            self.AGEDMossyCheck = True
+            self.groups = ["AGED", "NONAGED"]
 
         self.ATC_keys = ["ALL", "TC", "CC"]
 
@@ -178,6 +192,7 @@ class PostCR_CueCellFinder(BC):
             and not self.ADCheck
             and not self.KETCheck
             and not self.miniscopeCheck
+            and not self.AGEDMossyCheck
         ):
             if self.ID.startswith("aDk"):
                 self.group = "AGED"
@@ -190,6 +205,11 @@ class PostCR_CueCellFinder(BC):
                 self.group = "AD"
             elif any(substring in self.ID for substring in ["25", "26"]):
                 self.group = "CTL"
+        elif self.AGEDMossyCheck:
+            if any(substring in self.ID for substring in ["C"]):
+                self.group = "NONAGED"
+            else:
+                self.group = "AGED"
         else:
             self.group = self.groups[0]
 
@@ -213,8 +233,9 @@ class PostCR_CueCellFinder(BC):
         self.multSessSegStruc = self.load_file(lastest_MSS)
         self.print_wFrm(f"Loaded: {lastest_MSS}")
 
-        self.RC_results = self.load_file(latest_RRC)
-        self.print_wFrm(f"Loaded: {latest_RRC}\n")
+        if not self.concatCheck:
+            self.RC_results = self.load_file(latest_RRC)
+            self.print_wFrm(f"Loaded: {latest_RRC}\n")
 
         # get the sessions for the subject
         self.subj_sessions = list(self.multSessSegStruc.keys())
@@ -274,7 +295,7 @@ class PostCR_CueCellFinder(BC):
             self.C_Temporal.append(curr_MSS["C_Temporal"])
 
             # Cue Cell index
-            self.CC_IDX.append(curr_CCF["CueCellTable"]["CUE_IDX"])
+            self.CC_IDX.append(curr_CCF["CueCellTable"]["CUE_IDX"].astype(int))
             self.TOTAL_CELLS.append(curr_CCF["CueCellTable"]["TOTAL"])
 
             # Opto
@@ -340,8 +361,13 @@ class PostCR_CueCellFinder(BC):
                 self.posRates_bySess_CC[lt].append(curr_lt_posRate[self.CC_IDX[idx]])
 
         self.labelBySess = []
-        for labels in self.RC_results["clusters"]["labels_bySession"]:
-            self.labelBySess.append(labels)
+        if self.RC_results is not None:
+            for labels in self.RC_results["clusters"]["labels_bySession"]:
+                self.labelBySess.append(labels)
+        else:
+            self.labelBySess = [
+                list(range(self.TOTAL_CELLS[idx])) for idx in range(self.numSess)
+            ]
 
         # find untracked cells that are Cue Cells and assign them a unique cluster ID
         for sess, label in enumerate(self.labelBySess):
@@ -644,11 +670,11 @@ class PostCR_CueCellFinder(BC):
             sessFocus=self.sessFocus,
             numSessByID=self.numSessByID,
         )
-        print("Plotting 1PDF:")
-        self.PCRCFFplotter.plot_cueTrigSig_1PDF(
-            self.TrigSig_byCluster, self.CueCell_byTrigSig_byCluster, self.numSess
-        )
-        self.print_done_small_proc()
+        # print("Plotting 1PDF:")
+        # self.PCRCFFplotter.plot_cueTrigSig_1PDF(
+        #     self.TrigSig_byCluster, self.CueCell_byTrigSig_byCluster, self.numSess
+        # )
+        # self.print_done_small_proc()
 
         print("Plotting Mean Trig Sig:")
         self.PCRCFFplotter.plot_meanTrigSig(self.meanTS_byCC_byCueType)

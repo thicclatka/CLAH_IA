@@ -1,23 +1,72 @@
+import os
 from enum import Enum
-
 from CLAH_ImageAnalysis import utils
 
 
 class MOCO_Params(Enum):
     """
     Constants for motion correction:
-    - MAX_SHIFTS: Maximum allowed rigid shift in pixels.
-    - NITER_RIG: Number of iterations for rigid motion correction.
-    - SPLITS_RIG: Number of chunks to split the movie into for parallel processing during rigid motion correction.
-    - STRIDES: Distance in pixels to start a new path for patch-wise rigid motion correction.
-    - OVERLAPS: Overlap in pixels between paths (total path size is STRIDES + OVERLAPS).
-    - SPLITS_ELS: Number of chunks to split the movie into for parallel processing during elastic non-rigid motion correction.
-    - UPSAMPLE_FACTOR: Factor to upsample by to avoid smearing when merging patches.
-    - MAX_DEV_RIG: Maximum deviation in pixels allowed for a patch with respect to rigid shifts.
-    - SHIFTS_OPENCV: Whether to apply shifts using OpenCV (faster but may result in smoother results).
-    - NONNEG: Whether to make the saved movie and template mostly nonnegative by subtracting the minimum movie value.
-    - PW_RIGID: Whether to use patch-wise rigid registration.
-    - USE_CUDA: Whether to use CUDA for registration.
+
+    - MAX_SHIFTS:
+        Maximum allowed rigid shift in pixels during motion correction.
+        This determines the range of the search space for alignment between frames
+        and restricts how far the algorithm can move the entire image in x- and y-directions.
+
+    - NITER_RIG:
+        Number of iterations to perform during rigid motion correction.
+        More iterations may improve alignment but increase computation time.
+
+    - SPLITS_RIG:
+        Number of chunks to split the movie into for parallel processing during rigid motion correction.
+        Splitting the movie allows efficient processing on multi-core systems
+        by dividing the workload into manageable segments.
+
+    - STRIDES:
+        Distance in pixels to start a new path for patch-wise rigid motion correction.
+        This defines the spacing between patches where motion correction is computed.
+
+    - OVERLAPS:
+        Overlap in pixels between adjacent patches during patch-wise motion correction.
+        The total path size for a patch is the sum of STRIDES and OVERLAPS.
+        Higher overlaps can improve accuracy at the cost of increased computation time.
+
+    - SPLITS_ELS:
+        Number of chunks to split the movie into for parallel processing during elastic non-rigid motion correction.
+        Similar to SPLITS_RIG, this enables efficient handling of non-rigid correction by dividing the movie.
+
+    - UPSAMPLE_FACTOR:
+        Factor to upsample frames by during motion correction to improve alignment precision.
+        A higher value reduces the chance of smearing when merging corrected patches.
+
+    - MAX_DEV_RIG:
+        Maximum deviation in pixels allowed for a patch with respect to rigid shifts.
+        This acts as a constraint to prevent patches from moving unrealistically
+        far during patch-wise rigid correction.
+
+    - SHIFTS_OPENCV:
+        Whether to apply shifts using OpenCV instead of traditional methods.
+        OpenCV implementations are typically faster but may result in smoother
+        (and potentially less accurate) motion correction results.
+
+    - NONNEG:
+        Whether to ensure the saved movie and template remain mostly nonnegative.
+        This is achieved by subtracting the minimum value in the movie,
+        which is useful for avoiding negative pixel values that can arise
+        during filtering or preprocessing.
+
+    - PW_RIGID:
+        Whether to use patch-wise rigid registration for motion correction.
+        Patch-wise correction divides the frame into smaller patches
+        and performs rigid alignment on each, allowing for more localized corrections.
+
+    - USE_CUDA:
+        Whether to leverage CUDA (GPU acceleration) for motion correction.
+        CUDA can significantly speed up the process on compatible hardware.
+
+    - GSIG_FILT:
+        Standard deviation (filter size) for the high-pass filter used in motion correction.
+        High-pass filtering helps remove low-frequency noise or background variations,
+        enhancing the ability to detect and correct motion.
     """
 
     MAX_SHIFTS = 30  # maximum allowed rigid shift
@@ -41,14 +90,14 @@ class MOCO_Params4OnePhoton(Enum):
     Constants for motion correction for one-photon data:
     """
 
-    MAX_SHIFTS = 30
+    MAX_SHIFTS = 20
     NITER_RIG = 1
-    SPLITS_RIG = 56
+    SPLITS_RIG = 50
     SPLITS_ELS = 56
-    STRIDES = 42
-    OVERLAPS = 32
+    STRIDES = 50
+    OVERLAPS = 28
     UPSAMPLE_FACTOR = 50
-    MAX_DEV_RIG = 3
+    MAX_DEV_RIG = 10
     SHIFTS_OPENCV = True
     NONNEG = True
     BORDER_NAN = True
@@ -91,7 +140,9 @@ class CNMF_Params(Enum):
 
     P = 1  # 2  # order of autoregressive system
     GNB = 2  # 3  # number of global background components
+    NB_PATCH = 1  # number of background components per patch
     GSIG = [4, 4]  # expected half size of neurons
+    GSIZ = None
     MERGE_THRESH = 0.7  # 0.5  # merging threshold / max correlation allowed
     #! initialization method; options: greedy_roi [0], sparse_nmf [1], pca_ica[2], corr_pnr[3]
     #! see CNMF_OPTS above
@@ -101,6 +152,8 @@ class CNMF_Params(Enum):
     MIN_SNR = 4  # 6  # signal to noise ratio for accepting component
     RVAL_THR = 0.8  # threshold for correlation value used in component evaluation
     CNN_THR = 0.7  # 0.8  # threshold used to determine if a component should be kept
+    CENTER_PSF = False  # whether to center the PSF
+
     FPS = 10  # imaging rate in fps
     K = 15  # 10  # 20 # number of components per patch
     RF = 25  # 15  # half size f patches in pxls (ie 25 = 50x50)
@@ -112,6 +165,10 @@ class CNMF_Params(Enum):
     METH_DECONV = CNMF_OPTS["DECONV_METHOD"][0]
     CHECK_NAN = True  # check for NaNs in the data
     USE_CNN = False  # use CNN for component evaluation
+    SPIKE_MIN = None  # minimum spike size
+    MIN_CORR = 0.85  # min peak value from correlation image
+    LOW_RANK_BACKGROUND = True  # whether to keep background of each patch intact, True performs low-rank approximation if gnb > 0
+    MIN_PNR = 20  # minimum peak to noise ratio from PNR image
 
     ONLY_INIT_PATCH = False  # only run initialization on patches
 
@@ -127,8 +184,23 @@ class CNMF_Params_1p(Enum):
     Constants for CNMF for one-photon data:
     """
 
-    MIN_SNR = 4
+    CENTER_PSF = False
     CNN_THR = 0.7
+    FPS = 10  #! NEED TO CHECK THIS
+    GNB = 0
+    GSIG = [2, 2]
+    GSIZ = None
+    K = None
+    LOW_RANK_BACKGROUND = False
+    MERGE_THRESH = 0.65
+    METHOD_INIT = CNMF_OPTS["METHOD_INIT"][0]
+    MIN_CORR = 0.95
+    MIN_PNR = 15
+    MIN_SNR = 20
+    NB_PATCH = 0
+    RF = 40
+    RVAL_THR = 0.85
+    SPIKE_MIN = -15
 
 
 class segDict_Txt(Enum):
@@ -151,6 +223,8 @@ class segDict_Txt(Enum):
     DX = "dx"
     DY = "dy"
     S_DECONV = "S_Deconvolution"
+    YRA = "YrA_TempResidual"
+    RSR = "R_SpatialResidual"
 
 
 class Parser4M2SD(Enum):
@@ -212,10 +286,25 @@ class Parser4M2SD(Enum):
             "DEFAULT": False,
             "HELP": "Overwrite existing files (segDicts, sqz_H5s, tifs, mmaps, etc). Default is False.",
         },
+        ("compute_metrics", "cm"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Calculate motion correction metrics. Default is False.",
+        },
+        ("use_cropper", "crp"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Use the cropping utility for 1photon data (.isxd files). Default is False.",
+        },
+        ("separate_channels", "sc"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Whether to motion correct channels separately. Only applicable for 2photon data with 2 channels. Default is False.",
+        },
     }
 
 
-def export_settings2file(enum_class: Enum, ptype: str) -> None:
+def export_settings2file(enum_class: Enum, ptype: str, inFolder: bool = True) -> None:
     """
     Export the parameters from the given enum class to a file.
 
@@ -227,12 +316,26 @@ def export_settings2file(enum_class: Enum, ptype: str) -> None:
     dict_from_enum = utils.enum_utils.enum2dict(enum_class)
     utils.print_wFrame(f"Parameters to be applied for {ptype}")
     file_tag = utils.text_dict()["file_tag"]
+
+    # ftags = [file_tag["JSON"], file_tag["TXT"]]
+    ftags = [file_tag["JSON"]]
+
+    if inFolder:
+        PARAMS_FOLDER = utils.text_dict()["Folders"]["PARAMS"]
+        os.makedirs(PARAMS_FOLDER, exist_ok=True)
+    else:
+        PARAMS = file_tag["PARAMS"]
+
     for key, value in dict_from_enum.items():
         utils.print_wFrame(f"{key}: {value}", frame_num=1)
 
     utils.print_wFrame("Exporting Parameters to file")
-    for ftag2save in [file_tag["JSON"], file_tag["TXT"]]:
+    for ftag2save in ftags:
+        if inFolder:
+            fname2save = f"{PARAMS_FOLDER}/{ptype}"
+        else:
+            fname2save = f"{PARAMS}_{ptype}"
         utils.enum_utils.export_param_from_enum(
-            enum_class, f"{ptype}_Parameters", file_type=ftag2save
+            enum_class, fname2save, file_type=ftag2save
         )
     print()

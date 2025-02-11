@@ -111,13 +111,19 @@ class PCR_CCF_Plotter(BC):
                 "CTL": self.color_dict["blue"],
             }
             self.groups4sig = ["CTL", "AD"]
-        elif "AGED" in self.groups:
+        elif "AGED" in self.groups and "NONAGED" not in self.groups:
             self.colors4barGroup = {
                 "WT": self.color_dict["green"],
                 "AGED": self.color_dict["red"],
                 "DK": self.color_dict["blue"],
             }
             self.groups4sig = ["DK", "AGED"]
+        elif "NONAGED" in self.groups:
+            self.colors4barGroup = {
+                "NONAGED": self.color_dict["blue"],
+                "AGED": self.color_dict["red"],
+            }
+            self.groups4sig = ["AGED", "NONAGED"]
         elif "OPTO" in self.groups:
             self.colors4barGroup = {
                 "OPTO": self.color_dict["blue"],
@@ -129,7 +135,7 @@ class PCR_CCF_Plotter(BC):
             }
             self.groups4sig = ["eOPN3"]
             self.xlabels4means = [
-                f"{prefix}S{sess+1}"
+                f"{prefix}S{sess + 1}"
                 for sess in range(int(self.numSess2use4means / 2))
                 for prefix in ["pre", "post"]
             ]
@@ -138,15 +144,19 @@ class PCR_CCF_Plotter(BC):
                 "KETA": self.color_dict["red"],
             }
             self.groups4sig = ["KETA"]
-            self.xlabels4means = [
-                "preK1",
-                "sal1",
-                "preK2",
-                "posK1",
-                "posK7",
-                "posK14",
-                "posK20",
-            ]
+            if self.numSess2use4means > 2:
+                self.xlabels4means = [
+                    "preK1",
+                    "sal1",
+                    "preK2a",
+                    "preK2b",
+                    "posK1",
+                    "posK7",
+                    "posK14",
+                    "posK20",
+                ]
+            elif self.numSess2use4means == 2:
+                self.xlabels4means = ["preK1", "preK2"]
         elif "MINISCOPE" in self.groups:
             self.colors4barGroup = {
                 "MINISCOPE": self.color_dict["blue"],
@@ -291,7 +301,8 @@ class PCR_CCF_Plotter(BC):
             sessLabels2use = self.xlabels4means
         else:
             sessLabels2use = [
-                self._printf_Session(sess) for sess in self.sess_idx4groups
+                self._printf_Session(sess, base_zero=False)
+                for sess in self.sess_idx4groups
             ]
 
         with PdfPages(
@@ -311,9 +322,20 @@ class PCR_CCF_Plotter(BC):
                             if cueType == "OMITCUE1_SWITCH":
                                 continue
                             else:
+                                curr_mean_arr = mean_arrs[idx]
+                                cell_num = curr_mean_arr.shape[-1]
+                                mean_arr2use = []
+                                for cn in range(cell_num):
+                                    cell_mean = curr_mean_arr[:, cn]
+                                    cmax, cmin = np.max(cell_mean), np.min(cell_mean)
+                                    min_check = np.abs(cmin) < self.mv_thresh
+                                    max_check = cmax < self.mv_thresh
+                                    if min_check and max_check:
+                                        mean_arr2use.append(cell_mean)
+                                mean_arr2use = np.transpose(np.array(mean_arr2use))
                                 self._plot_SEM_wCellCount(
                                     axis2plot=axes[plt_idx],
-                                    mean_arr=mean_arrs[idx],
+                                    mean_arr=mean_arr2use,
                                     cmap2use=color_map[cueType],
                                 )
                         if CC == "CUE":
@@ -347,7 +369,7 @@ class PCR_CCF_Plotter(BC):
     def plot_meanMV_byGroup(
         self,
         meanMV_byGroup: dict,
-        yLim: float = 20,
+        yLim: float = 25,
     ) -> None:
         """
         Plots the mean maximum value by group.
@@ -356,6 +378,15 @@ class PCR_CCF_Plotter(BC):
             meanMV_byGroup (dict): A dictionary containing the mean maximum value by group.
             yLim (float, optional): The y-axis limit. Defaults to 20.
         """
+
+        def _create_legend_name_axes(axes, legend_handles):
+            axes.legend(
+                handles=legend_handles,
+                loc="upper right",
+                fontsize=self.fs_tk_lbl,
+            )
+            axes.set_ylabel("Cue Triggered Peak (Z-score)", fontsize=self.axis_fs)
+            axes.set_xlabel("Session", fontsize=self.axis_fs)
 
         color_map = self.colors
 
@@ -376,6 +407,7 @@ class PCR_CCF_Plotter(BC):
                         axis2plot = axes[g_idx]
                     else:
                         axis2plot = axes
+
                     for idx in range(self.numSess2use4means):
                         for cueType, mean_arrs in cueTypes.items():
                             mean_arr = np.array(mean_arrs[idx].copy())
@@ -399,7 +431,9 @@ class PCR_CCF_Plotter(BC):
                                     width=self.group_spacing,
                                 )
                     axis2plot.set_ylim(0, yLim)
-                    self._create_bold_yLabel(ax=axis2plot, ylabel=group)
+                    axis2plot.set_title(
+                        group, fontsize=self.title_fs, fontweight="bold"
+                    )
 
                 fc = []
                 labels = []
@@ -411,12 +445,12 @@ class PCR_CCF_Plotter(BC):
                     facecolor=fc,
                     label=labels,
                 )
-                axes.legend(
-                    handles=legend_handles, loc="upper right", fontsize=self.fs_tk_lbl
-                )
+                if len(self.groups) > 1:
+                    for ax in axes:
+                        _create_legend_name_axes(ax, legend_handles)
 
-                axes.set_ylabel("Cue Triggered Peak (Z-score)", fontsize=self.axis_fs)
-                axes.set_xlabel("Session", fontsize=self.axis_fs)
+                else:
+                    _create_legend_name_axes(axes, legend_handles)
 
                 fig.suptitle(f"{CC}")
                 pdf.savefig(fig)
@@ -465,7 +499,7 @@ class PCR_CCF_Plotter(BC):
                             marr = np.nanmean(mean_arr)
                             sem2plot = sem(mean_arr, nan_policy="omit")
 
-                            mean_semVals[group][f"S{idx+1}"] = {
+                            mean_semVals[group][f"S{idx + 1}"] = {
                                 "MEAN": marr,
                                 "SEM": sem2plot,
                             }
@@ -475,7 +509,7 @@ class PCR_CCF_Plotter(BC):
                                 self.group_spacing
                                 if group in ["AD", "AGED"]
                                 else -self.group_spacing
-                                if group in ["CTL", "DK"]
+                                if group in ["CTL", "DK", "NONAGED"]
                                 else 0
                             )
                             self.fig_tools.bar_plot(
@@ -490,13 +524,17 @@ class PCR_CCF_Plotter(BC):
             title="Number of Cue Cells", numCellDict_byGroup=numCC, axis2plot=axes
         )
 
-        pVals = {f"S{i+1}": np.nan for i in range(self.numSess2use)}
+        pVals = {f"S{i + 1}": np.nan for i in range(self.numSess2use)}
         for s_idx, (g1_arr, g2_arr) in enumerate(
             zip(
                 mean_MV4CC[self.groups4sig[0]]["CUE1"],
                 mean_MV4CC[self.groups4sig[-1]]["CUE1"],
             )
         ):
+            g1_arr = np.array(g1_arr)
+            g2_arr = np.array(g2_arr)
+            g1_arr = g1_arr[np.abs(g1_arr) < self.mv_thresh]
+            g2_arr = g2_arr[np.abs(g2_arr) < self.mv_thresh]
             pVal = self.fig_tools.create_sig_2samp_annotate(
                 ax=axes,
                 arr0=g1_arr,
@@ -504,7 +542,7 @@ class PCR_CCF_Plotter(BC):
                 coords=(s_idx + 1, None),
                 return_Pval=True,
             )
-            pVals[f"S{s_idx+1}"] = pVal
+            pVals[f"S{s_idx + 1}"] = pVal
 
         legend_handles = self.fig_tools.create_legend_patch_fLoop(
             facecolor=[color_map[group] for group in self.groups4sig],
@@ -622,6 +660,7 @@ class PCR_CCF_Plotter(BC):
         else:
             sessLabels2use = [f"S{i}" for i in self.sess_idx4groups]
 
+        maxVal = 0
         for group, posRate_byLT in posRate_byGroup.items():
             mean_semVals[group] = {
                 lt: {
@@ -630,11 +669,15 @@ class PCR_CCF_Plotter(BC):
                 }
                 for lt in posRate_byLT.keys()
             }
+            for lt, posRate_bySess in posRate_byLT.items():
+                for posRate in posRate_bySess:
+                    maxVal = max(maxVal, np.percentile(posRate, 99.9))
+
             with PdfPages(
                 f"{self.fig_save_path}/posRateTuning_{group}{self.file_tag['PDF']}"
             ) as pdf:
                 for lt, posRate_bySess in posRate_byLT.items():
-                    maxVal = 0
+                    # maxVal = 0
                     numCols = int(np.ceil(np.sqrt(self.numSess2use4means * 1.5)))
                     numRows = int(np.ceil(self.numSess2use4means / numCols))
 
@@ -645,6 +688,9 @@ class PCR_CCF_Plotter(BC):
                         numCols = 3
                     elif self.numSess2use4means == 3:
                         numCols = 3
+                        numRows = 2
+                    elif self.numSess2use4means == 5:
+                        numCols = 4
                         numRows = 2
                     elif self.numSess2use4means == 7:
                         # numRows = 3
@@ -659,7 +705,7 @@ class PCR_CCF_Plotter(BC):
 
                     numCC = []
                     for posRate in posRate_bySess:
-                        maxVal = max(maxVal, np.max(posRate))
+                        # maxVal = max(maxVal, np.percentile(posRate, 99.5))
                         numCC.append(posRate.shape[0])
                     for sess, posRate in enumerate(posRate_bySess):
                         if sess >= self.numSess2use4means:
@@ -696,7 +742,7 @@ class PCR_CCF_Plotter(BC):
                         ]
                         HTCHs = [None, self.cueHatch]
                         Ys = [(mean_maxPR, sem_maxPR), (mean_maxPR_CC, sem_maxPR_CC)]
-                        mean_semVals[group][lt][f"S{sess+1}"] = {
+                        mean_semVals[group][lt][f"S{sess + 1}"] = {
                             "MEAN": mean_maxPR,
                             "SEM": sem_maxPR,
                         }
@@ -743,6 +789,7 @@ class PCR_CCF_Plotter(BC):
                         edgecolor=[self.color_dict["black"]] * len(self.cellTypes),
                         hatch=[None, self.cueHatch],
                         label=self.cellTypes,
+                        alpha=[None] * len(self.cellTypes),
                     )
                     ax4max.legend(
                         handles=cc_patch,
@@ -829,7 +876,7 @@ class PCR_CCF_Plotter(BC):
                 Yerrs = [Yerrs[0]]
 
             for group in self.groups4sig:
-                mean_semVals[group][f"S{s_idx+1}"] = {
+                mean_semVals[group][f"S{s_idx + 1}"] = {
                     "MEAN": Ys[self.groups4sig.index(group)],
                     "SEM": Yerrs[self.groups4sig.index(group)],
                 }
@@ -852,7 +899,7 @@ class PCR_CCF_Plotter(BC):
                 coords=(s_idx + 1, None),
                 return_Pval=True,
             )
-            pVals[f"S{s_idx+1}"] = pVal
+            pVals[f"S{s_idx + 1}"] = pVal
 
         self.total_Cell_bySession_textBox(
             title="Number of Cue Cells", numCellDict_byGroup=numCC, axis2plot=ax
@@ -959,7 +1006,7 @@ class PCR_CCF_Plotter(BC):
                 meanVal = np.nanmean(arr2use, axis=1)
                 semVal = sem(arr2use, nan_policy="omit", axis=1)
                 for sess in range(self.numSess2use4means):
-                    mean_semVals[rat][group][f"S{sess+1}"] = {
+                    mean_semVals[rat][group][f"S{sess + 1}"] = {
                         "MEAN": meanVal[sess],
                         "SEM": semVal[sess],
                     }
@@ -997,7 +1044,7 @@ class PCR_CCF_Plotter(BC):
                     xytext=(-width, 0),
                     return_Pval=True,
                 )
-                pVals[rat][f"S{s_idx+1}"] = pVal
+                pVals[rat][f"S{s_idx + 1}"] = pVal
 
         fc = [colors[gr] for gr in self.groups4sig] + ["none"] * len(ratios)
         legend_handles = self.fig_tools.create_legend_patch_fLoop(
@@ -1005,6 +1052,7 @@ class PCR_CCF_Plotter(BC):
             label=[group for group in self.groups4sig] + list(ratios),
             hatch=[None] * len(self.groups4sig) + [self.cueHatch, None],
             edgecolor=[self.color_dict["black"]] * len(fc),
+            alpha=[1.0] * len(self.groups4sig) + [None] * 2,
         )
         ax2plot.set_xticks(self.sess_idx4groups)
         ax2plot.set_xticklabels(sessLabels2use)
@@ -1065,14 +1113,16 @@ class PCR_CCF_Plotter(BC):
             }
             for gr in self.groups4sig
         }
+        hatch_list = []
+        for group in self.groups4sig:
+            if group in ["AD", "AGED"]:
+                hatch_list.append(self.expHatch)
+            else:
+                hatch_list.append(None)
         for c_idx, ctype in enumerate(self.cTypes_All):
             arr4sig = []
             bar_posits = []
             for g_idx, group in enumerate(self.groups4sig):
-                if group in ["AD", "AGED"]:
-                    hatch2use = self.expHatch
-                else:
-                    hatch2use = None
                 arr2use = rates_ByGroup[group][ctype]
                 for arr in arr2use:
                     numCC[group][ctype].append(len(arr))
@@ -1081,7 +1131,7 @@ class PCR_CCF_Plotter(BC):
                 meanVal = np.array([np.nanmean(arr) for arr in arr2use])
                 semVal = np.array([sem(arr, nan_policy="omit") for arr in arr2use])
                 for sess in range(self.numSess2use4means):
-                    mean_semVals[group][ctype][f"S{sess+1}"] = {
+                    mean_semVals[group][ctype][f"S{sess + 1}"] = {
                         "MEAN": meanVal[sess],
                         "SEM": semVal[sess],
                     }
@@ -1105,7 +1155,7 @@ class PCR_CCF_Plotter(BC):
                     width=width2use,
                     label=group,
                     yerr=semVal,
-                    hatch=hatch2use,
+                    hatch=hatch_list[g_idx],
                     color=colors[c_idx],
                 )
             for s_idx, (arr0, arr1, bp0, bp1) in enumerate(
@@ -1124,7 +1174,7 @@ class PCR_CCF_Plotter(BC):
                     fontsize=10,
                     return_Pval=True,
                 )
-                pVals[ctype][f"S{s_idx+1}"] = pVal
+                pVals[ctype][f"S{s_idx + 1}"] = pVal
 
         self.total_Cell_bySession_textBox(
             title="Number of Cells",
@@ -1150,16 +1200,19 @@ class PCR_CCF_Plotter(BC):
             else self.cTypes_All
         )
 
-        hatches = [None] * len(self.cTypes_All) + [None, hatch2use]
+        hatches = [None] * len(self.cTypes_All) + hatch_list
+        alpha = [1.0] * len(self.cTypes_All) + [None] * 2
         if len(self.groups4sig) == 1:
             fc = fc[:-1]
-            hatches = hatches[:-2]
+            hatches = hatches[:-1]
+            alpha = alpha[:-1]
 
         legend_handles = self.fig_tools.create_legend_patch_fLoop(
             facecolor=fc,
             label=labels,
             edgecolor=[self.color_dict["black"]] * len(fc),
             hatch=hatches,
+            alpha=alpha,
         )
         ax2plot.legend(
             handles=legend_handles, loc="upper right", fontsize=self.fs_tk_lbl
@@ -1212,7 +1265,7 @@ class PCR_CCF_Plotter(BC):
             ax2plot.set_ylabel(
                 "Post-eOPN3 mean Event Rate (events/s)", fontsize=self.axis_fs
             )
-            ax2plot.set_title(f"Session {count+1}", fontsize=self.axis_fs)
+            ax2plot.set_title(f"Session {count + 1}", fontsize=self.axis_fs)
 
             ax2plot.set_xlim(0, 0.006)
             ax2plot.set_ylim(0, 0.008)
@@ -1267,7 +1320,7 @@ class PCR_CCF_Plotter(BC):
                     color=self.session_colors[idx],
                     ecolor=self.session_colors[idx],
                     markersize=10,
-                    label=f"S{idx+1}",
+                    label=f"S{idx + 1}",
                 )
 
                 axes.annotate(
@@ -1329,12 +1382,12 @@ class PCR_CCF_Plotter(BC):
         ) in zip(OptoAmpArrAllSubj[CUE], OptoAmpArrAllSubj[CWO]):
             if cue_id in ["CA3DG44", "CA3DG45"]:
                 color2use = color44_45[sess]
-                label2use = f"S{sess+2} (44-45)"
+                label2use = f"S{sess + 2} (44-45)"
                 if sess == 1:
                     continue
             else:
                 color2use = self.session_colors[sess]
-                label2use = f"S{sess+1}"
+                label2use = f"S{sess + 1}"
 
             if cue_amp > threshold or cwo_amp > threshold:
                 outlier[-1] += 1
@@ -1361,7 +1414,10 @@ class PCR_CCF_Plotter(BC):
 
         if outlier[-1] > 0:
             outliers_str = ", ".join(
-                [f"[{cue_id}, S{sess+1}, {cell}]" for cue_id, sess, cell in outlier[0]]
+                [
+                    f"[{cue_id}, S{sess + 1}, {cell}]"
+                    for cue_id, sess, cell in outlier[0]
+                ]
             )
             outliers_test = f"Outliers: {outliers_str}"
             self.fig_tools.add_text_box(
@@ -1393,7 +1449,7 @@ class PCR_CCF_Plotter(BC):
             f"{ylabel}", fontsize=self.fontsize_ylabel, fontweight=self.fontweight
         )
 
-    def _printf_Session(self, idx: int) -> str:
+    def _printf_Session(self, idx: int, base_zero: bool = True) -> str:
         """
         Returns a formatted string representing the session number.
 
@@ -1404,7 +1460,7 @@ class PCR_CCF_Plotter(BC):
             str: A formatted string representing the session number.
         """
 
-        return f"Session {idx+1}"
+        return f"Session {idx + 1}" if base_zero else f"Session {idx}"
 
     def _create_sep_legend(self) -> None:
         """
@@ -1502,22 +1558,22 @@ class PCR_CCF_Plotter(BC):
                     text_content.append(f"{group:<4}:")
                     for ct_key, ct_val in counts.items():
                         sess_strings = [
-                            f"S{i+1:<2}: {val[0]:6.1f} ± {val[1]:6.1f}"
+                            f"S{i + 1:<2}: {val[0]:6.1f} ± {val[1]:6.1f}"
                             if isinstance(val, tuple)
-                            else f"S{i+1:<2}: {val:>2}"
+                            else f"S{i + 1:<2}: {val:>2}"
                             for i, val in enumerate(ct_val)
                         ]
                         sessions = "  |  ".join(sess_strings)
                         text_content.append(" " * 2 + f"{ct_key:<3}: {sessions}")
                 else:
                     sess_strings = [
-                        f"S{i+1:<2}: {count:>2}" for i, count in enumerate(counts)
+                        f"S{i + 1:<2}: {count:>2}" for i, count in enumerate(counts)
                     ]
                     sessions = " | ".join(sess_strings)
                     text_content.append(f"{group:<4}: {sessions}")
         else:
             for i, count in enumerate(numCellDict_byGroup):
-                text_content.append(f"S{i+1:<2}: {count:>2}")
+                text_content.append(f"S{i + 1:<2}: {count:>2}")
         text_content = self.utils.create_multiline_string(text_content)
         self.fig_tools.add_text_box(
             ax=axis2plot,

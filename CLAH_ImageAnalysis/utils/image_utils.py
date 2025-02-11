@@ -150,7 +150,7 @@ def create_combined_arr_wOverlap(
     return combined
 
 
-def get_DSImage_filename() -> str:
+def get_DSImage_filename(wCMAP: bool = False, wCH: str | None = None) -> str:
     """
     Get the filename for a downsampled image.
 
@@ -159,12 +159,17 @@ def get_DSImage_filename() -> str:
     """
 
     file_tag = text_dict()["file_tag"]
-    return (
-        file_tag["AVGCA"]
-        + file_tag["TEMPFILT"]
-        + file_tag["DOWNSAMPLE"]
-        + file_tag["IMG"]
-    )
+
+    determine_wCH = f"_{wCH}" if wCH is not None else ""
+
+    main_tag = file_tag["AVGCA"] + file_tag["TEMPFILT"] + file_tag["DOWNSAMPLE"]
+    if wCMAP:
+        cmap_tag = file_tag["CMAP"] + file_tag["8BIT"]
+    else:
+        cmap_tag = ""
+    img_tag = file_tag["IMG"]
+
+    return main_tag + cmap_tag + determine_wCH + img_tag
 
 
 def resize_to_square(image: np.ndarray, round_to: int = None) -> np.ndarray:
@@ -234,3 +239,22 @@ def determine_DS_factor(dims: tuple[int, int]) -> int:
 
     # if no bounds are met, return 1
     return 1
+
+
+def extract_LRTB_from_crop_coords(crop_coords: list) -> tuple[int, int, int, int]:
+    """
+    Extract the left, right, top, bottom from the crop coordinates.
+
+    Parameters:
+        crop_coords (list): The crop coordinates [[x1, y1], [x2, y2]].
+
+    Returns:
+        tuple[int, int, int, int]: The left, right, top, bottom.
+    """
+    x1, y1 = crop_coords[0]
+    x2, y2 = crop_coords[1]
+    left = min(x1, x2)
+    right = max(x1, x2)
+    top = min(y1, y2)
+    bottom = max(y1, y2)
+    return left, top, right, bottom

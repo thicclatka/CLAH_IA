@@ -28,7 +28,6 @@ class TwoOdorDecoder(BC):
     ) -> None:
         self.program_name = "TOD"
         self.class_type = "manager"
-        self.version = "0.1.0"
         BC.__init__(self, self.program_name, mode=self.class_type)
 
         self.static_class_var_init(

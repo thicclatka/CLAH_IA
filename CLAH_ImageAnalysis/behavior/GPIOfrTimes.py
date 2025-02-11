@@ -48,12 +48,12 @@ def importGPIO(folder_path: list | str = []) -> tuple[str, pd.DataFrame]:
         gpio_table: A pandas DataFrame containing the GPIO data.
     """
     utils.folder_tools.chdir_check_folder(folder_path, create=False)
-    gpio_ftag = utils.text_dict()["file_tag"]["GPIO"]
+    gpio_ftag = utils.text_dict()["file_tag"]["GPIO_SUFFIX"]
 
     gpio_fname = utils.findLatest(gpio_ftag)
     gpio_table = pd.read_csv(gpio_fname)
 
-    return gpio_fname, gpio_table
+    return gpio_fname.split(gpio_ftag)[0], gpio_table
 
 
 def parseGPIO(gpio_table: pd.DataFrame) -> dict:

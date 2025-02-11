@@ -3,25 +3,18 @@ This module contains the implementation of a basic GUI structure using tkinter.
 The BaseGUI class provides a foundation for creating GUI applications with common features such as a main window, console window, menu bar, and widgets.
 """
 
+import os
 import sys
 import tkinter as tk
+import easygui
 from rich import print
 from tkinter import scrolledtext
 from ttkthemes import ThemedTk
 from CLAH_ImageAnalysis.GUI import GUI_Utils
-from CLAH_ImageAnalysis.unitAnalysis import pks_utils
-from CLAH_ImageAnalysis.utils import text_dict, color_dict
+from CLAH_ImageAnalysis import utils
+from CLAH_ImageAnalysis import dependencies
 from matplotlib.colors import ListedColormap
 from typing import Callable
-
-text_lib = text_dict()
-FR, EFR = text_lib["frames"]["FR"], text_lib["frames"]["EFR"]
-color_dict = color_dict()
-GUI_ELE = text_lib["GUI_ELEMENTS"]
-GUICLASS = text_lib["GUICLASSUTILS"]
-GUI_str = text_lib["GUI_ELEMENTS"]
-breaker = text_lib["breaker"]["hash_half"]
-done_str = text_lib["completion"]["small_proc"]
 
 
 class BaseGUI(GUI_Utils):
@@ -78,6 +71,11 @@ class BaseGUI(GUI_Utils):
         self.root = ThemedTk()
         # set theme
         self.root.set_theme("breeze")
+
+        # init utilsNconstants
+        #! IMPORTANT: must be called before init_global_vars_basic
+        self.init_utilsNconstants()
+
         # set geometry of main window
         if not x and not y and not x_offset and not y_offset:
             # will revert to default geometry
@@ -86,21 +84,26 @@ class BaseGUI(GUI_Utils):
             self.init_global_vars_basic(
                 tot_column_used, x=x, y=y, x_offset=x_offset, y_offset=y_offset
             )
-        print(f"{FR}Creating main window with geometry: {self.geometry}")
+
+        self.print_wFrm(f"Creating main window with geometry: {self.geometry}")
 
         # determine if console window is enabled
         self.enable_console = enable_console
         if self.enable_console:
             # if True, all console output goes to console window
             # if false, all console output goes to terminal
-            print(f"{FR}Console window enabled")
-            print(f"{FR}Click View -> Console to toggle console visibility")
+            self.print_wFrm("Console window enabled")
+            self.print_wFrm(
+                f"{self.FR}Click View -> Console to toggle console visibility"
+            )
             self.create_console_window()
         # init WidgetUtils and MenuBarUtils
-        print(f"{FR}GUI Module is ready to be processed")
-        print(f"{FR}Initializing Widget Utils")
+        self.print_wFrm("GUI Module is ready to be processed")
+
+        self.print_wFrm("Initializing Widget Utils")
         self.WidgetUtils = self.WidgetFactory(self.root)
-        print(f"{FR}Initializing MenuBar Utils")
+
+        self.print_wFrm("Initializing MenuBar Utils")
         self.menubar = tk.Menu(self.root)
         self.MenuBarUtils = self.MenuBarFactory(self.menubar)
 
@@ -140,6 +143,35 @@ class BaseGUI(GUI_Utils):
         self.geometry = f"{x}x{y}+{x_offset}+{y_offset}"
         self.setup_colormaps()
 
+    def init_utilsNconstants(self) -> None:
+        """
+        Initializes utility functions and constants.
+        """
+        # funcs
+        self.utils = utils
+        self.color_dict = self.utils.color_dict()
+        self.enum_utils = self.utils.enum_utils
+        self.findLatest = self.utils.findLatest
+        self.image_utils = self.utils.image_utils
+        self.fig_tools = self.utils.fig_tools
+        self.saveNloadUtils = self.utils.saveNloadUtils
+        self.print_wFrm = self.utils.print_wFrame
+        self.dep = dependencies
+
+        # strings
+        self.text_lib = self.utils.text_dict()
+        self.file_tag = self.text_lib["file_tag"]
+        self.dict_name = self.text_lib["dict_name"]
+        self.FR, self.EFR = (
+            self.text_lib["frames"]["FR"],
+            self.text_lib["frames"]["EFR"],
+        )
+        self.GUI_ELE = self.text_lib["GUI_ELEMENTS"]
+        self.GUICLASS = self.text_lib["GUICLASSUTILS"]
+        self.GUI_str = self.text_lib["GUI_ELEMENTS"]
+        self.breaker = self.text_lib["breaker"]["hash_half"]
+        self.done_gui = self.text_lib["completion"]["GUI"]
+
     def create_console_window(self, height: int = 30, width: int = 100) -> None:
         """
         Create a console window for displaying standard output.
@@ -161,8 +193,8 @@ class BaseGUI(GUI_Utils):
             state="disabled",
             height=height,
             width=width,
-            bg=color_dict["black"],
-            fg=color_dict["white"],
+            bg=self.color_dict["black"],
+            fg=self.color_dict["white"],
         )
         self.console_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
@@ -182,8 +214,7 @@ class BaseGUI(GUI_Utils):
         - None
         """
         self.root.config(menu=self.menubar)
-        print(done_str)
-        print()
+        self.utils.print_done_small_proc()
 
     def toggle_console(self) -> None:
         """
@@ -206,21 +237,22 @@ class BaseGUI(GUI_Utils):
         Returns:
             None
         """
+        cspan = self.tot_column_used // 2
         # Create place a label for displaying information (e.g., file load status)
         load_file_frame = tk.Frame(self.root)
-        load_file_frame.grid(row=0, column=0)
+        load_file_frame.grid(row=0, column=0, columnspan=cspan)
 
         load_label_config = self.config_maker(
-            text=GUI_str["LOAD_ID_EMPTY"],
+            text=self.GUI_str["LOAD_ID_EMPTY"],
             row=0,
             column=0,
             sticky="w",
             in_=load_file_frame,
+            columnspan=cspan,
         )
         self.WidgetUtils.create_tk_widget(
-            widget_type="LABEL", name=GUICLASS["BU_LOAD"], config=load_label_config
+            widget_type="LABEL", name=self.GUICLASS["BU_LOAD"], config=load_label_config
         )
-        pass
 
     def setup_colormaps(self):
         """
@@ -233,12 +265,12 @@ class BaseGUI(GUI_Utils):
             None
         """
         self.cmaps = [
-            ListedColormap(["none", color_dict["red"]]),
-            ListedColormap(["none", color_dict["blue"]]),
-            ListedColormap(["none", color_dict["green"]]),
-            ListedColormap(["none", color_dict["yellow"]]),
-            ListedColormap(["none", color_dict["violet"]]),
-            ListedColormap(["none", color_dict["orange"]]),
+            ListedColormap(["none", self.color_dict["red"]]),
+            ListedColormap(["none", self.color_dict["blue"]]),
+            ListedColormap(["none", self.color_dict["green"]]),
+            ListedColormap(["none", self.color_dict["yellow"]]),
+            ListedColormap(["none", self.color_dict["violet"]]),
+            ListedColormap(["none", self.color_dict["orange"]]),
         ]
 
     def config_rowsNcols2resize(
@@ -290,7 +322,7 @@ class BaseGUI(GUI_Utils):
         self._prerun_GUI_proc()
         print("GUI is operational!")
         print("Output will be displayed below this line")
-        print(breaker)
+        print(self.breaker)
         self.root.mainloop()
 
     def quit_app(self) -> None:
@@ -306,7 +338,7 @@ class BaseGUI(GUI_Utils):
         sys.stdout = self.StdOutFuncs.original_stdout
         print("Closing GUI...")
         if not self.enable_console:
-            print(breaker)
+            print(self.breaker)
         self.root.quit()
 
     def set_GUI_title(self, title: str) -> None:
@@ -333,14 +365,86 @@ class BaseGUI(GUI_Utils):
             None
         """
         reset_button_config = self.config_maker(
-            text=GUI_ELE["RESET"],
+            text=self.GUI_ELE["RESET"],
             command=reset_command,
-            bg=color_dict["red"],
-            fg=color_dict["white"],
+            bg=self.color_dict["red"],
+            fg=self.color_dict["white"],
             row=row,
             column=0,
             columnspan=self.tot_column_used,
         )
         self.WidgetUtils.create_tk_widget(
-            widget_type="BUTTON", name=GUICLASS["BU_RESET"], config=reset_button_config
+            widget_type="BUTTON",
+            name=self.GUICLASS["BU_RESET"],
+            config=reset_button_config,
         )
+
+    def get_eligible_sessions(self, ql_file_tag: str, date_first: bool = False) -> None:
+        dataDir = None
+        sess_list = []
+        sess_list2use = []
+
+        QL = self.text_lib["Folders"]["QL"]
+        QL_FT = self.text_lib["QL_LNAMES"]
+        egu_msg = self.GUI_ELE["EGU_MSG_PAR"]
+
+        dataDir = easygui.diropenbox(msg=egu_msg)
+        os.chdir(dataDir)
+
+        sess_list = [os.path.join(dataDir, sess) for sess in os.listdir(dataDir)]
+        sess_list2use = []
+
+        for idx, sess in enumerate(sess_list):
+            ql_folder = os.path.join(sess, QL)
+            fileOFint = os.path.join(ql_folder, QL_FT[ql_file_tag])
+            if os.path.lexists(fileOFint):
+                file_path = os.path.realpath(fileOFint)
+                sess_basename = os.path.basename(sess)
+                if date_first:
+                    date = sess_basename.split("_")[0]
+                    subjID = sess_basename.split("_")[1]
+                    sessType = sess_basename.split("_")[2]
+                else:
+                    date = None
+                    subjID = sess_basename.split("_")[0]
+                    sessType = None
+                sess_list2use.append(
+                    (sess, sess_basename, file_path, date, subjID, sessType)
+                )
+
+        return dataDir, sess_list2use
+
+    # def get_eligible_sessions(
+    #     self, dict_name: str, file_tag: str, date_first: bool = False
+    # ) -> tuple[str, str, str | None, str | None]:
+    #     """
+    #     Function to get the pickle file name and file ID.
+
+    #     Parameters:
+    #         dict_name (str): The name of the dictionary.
+    #         file_tag (str): The file tag to filter the file selection.
+    #         date_first (bool, optional): Whether the date is the first part of the file name. Defaults to False.
+
+    #     Returns:
+    #         tuple: A tuple containing the pickle file name and file ID. If `date_first` is True, the tuple also contains
+    #         the date and session type.
+
+    #     """
+    #     QL = self.text_lib["Folders"]["QL"]
+    #     print("Loading folder...", end="", flush=True)
+    #     egu_msg = self.text_lib["EGU_MSG_SESS"].format(dict_name)
+
+    #     sess_dir = easygui.diropenbox(msg=egu_msg)
+
+    #     # change directory to session folder
+    #     os.chdir(sess_dir)
+
+    #     # get file id
+    #     if date_first:
+    #         fileID = fname.split("_")[1]
+    #         date = fname.split("_")[0]
+    #         session_type = fname.split("_")[2]
+    #         return pkl_fname, fileID, date, session_type
+    #     else:
+    #         fileID = fname.split("_")[0]
+    #         return pkl_fname, fileID

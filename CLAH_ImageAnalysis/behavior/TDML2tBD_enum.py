@@ -84,6 +84,7 @@ class TXT(Enum):
     DEC = "decorators"
     EVENT_VALVE = "valve"
     FRAME = "frames"
+    LAPSYNC = "lapSync"
     LAPSYNC_VALVE = 8
     LAP_KEY = "lap"
     LAP_LIST = "lap_list"

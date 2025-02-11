@@ -190,14 +190,16 @@ class TDML_extractor(BC):
         lapDict = {}
 
         xml_fname = self.findLatest(self.file_tag["XML"])
-        gpio_fname = self.findLatest(self.file_tag["GPIO"])
+        gpio_fname = self.findLatest(
+            [self.file_tag["GPIO_SUFFIX"], self.file_tag["CSV"]]
+        )
         # will have a .xml which will be removed later
         if xml_fname:
             lapDict_fname = xml_fname
             ftag2remove = self.file_tag["XML"]
         elif gpio_fname:
-            lapDict_fname = gpio_fname
-            ftag2remove = self.file_tag["GPIO"]
+            lapDict_fname = gpio_fname.split(self.file_tag["GPIO_SUFFIX"])[0]
+            ftag2remove = []
 
         # Iterate through each context in the list
         for context in context_info:
@@ -217,7 +219,8 @@ class TDML_extractor(BC):
                     lap_key = f"Lap_{lap}"
                     if lap_key not in lapDict:
                         lapDict[lap_key] = self._init_lapDict_entry()
-                    lapDict[lap_key][CUETYPE].append(ctype)
+                    if ctype is not None:
+                        lapDict[lap_key][CUETYPE].append(ctype)
                     lapDict[lap_key][SETTINGS_VALVE].extend(valves)
                     lapDict[lap_key][LOC].extend(location)
                     lapDict[lap_key][ID].append(id)

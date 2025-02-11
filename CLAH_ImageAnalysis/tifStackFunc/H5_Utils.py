@@ -170,7 +170,7 @@ class H5_Utils(BC):
         Total_frames = info[0] if endFr is None else endFr
 
         if len(info) == 5:
-            numCh = info[-1]
+            numCh = info[1]
             if numCh == 1:
                 segCh = 0  # selects green
                 chan_num = [1]
@@ -303,6 +303,9 @@ class H5_Utils(BC):
         twoChan: bool = False,
         export_sample: bool = False,
         high_pass_applied: bool = False,
+        CLAHE_applied: bool = False,
+        bandpass_applied: bool = False,
+        crop_applied: bool = False,
     ):
         """Squeeze an HDF5 file and write the squeezed data to a new HDF5 file.
 
@@ -317,9 +320,21 @@ class H5_Utils(BC):
             twoChan (bool, optional): Whether to add the channel index to the filename. Defaults to False.
             export_sample (bool, optional): Whether to export sample of the squeezed data. Defaults to False.
             high_pass_applied (bool, optional): Whether high-pass filter was applied to the data. Defaults to False.
+            CLAHE_applied (bool, optional): Whether CLAHE was applied to the data. Defaults to False.
+            bandpass_applied (bool, optional): Whether bandpass filter was applied to the data. Defaults to False.
+            crop_applied (bool, optional): Whether cropping was applied to the data. Defaults to False.
         Returns:
             str: The path to the squeezed HDF5 file.
+        Raises:
+            ValueError: If the array shape is unexpected.
         """
+
+        applied_strings = [
+            ("_BPF", bandpass_applied),
+            ("_HPF", high_pass_applied),
+            ("_CE", CLAHE_applied),
+            ("_CROPPED", crop_applied),
+        ]
 
         h5filename = file2read
         fname_split = h5filename.split(".")[0]
@@ -333,23 +348,33 @@ class H5_Utils(BC):
         if array2use is None:
             try:
                 hf = h5py.File(h5filename, "r+")
-                hf_loaded = hf[hf_key][:, 0, :, :, chan_idx[0]]
+                hf_loaded = hf[hf_key][()]
             except Exception as e:
                 hf.close()
                 self.utils.debug_utils.raiseVE_SysExit1(f"An error occurred: {e}")
         else:
             hf_loaded = array2use
 
-        if len(hf_loaded.shape) > 3:
-            hf_squeeze = np.squeeze(hf_loaded)
+        if len(hf_loaded.shape) == 5:
+            # dimension order is t,c,y,x,z
+            hf_squeeze = np.squeeze(hf_loaded[:, chan_idx[0], :, :, 0])
         elif len(hf_loaded.shape) == 3:
             # if data is 3D, implies miniscope data
-            # add _FILTERED to end of filename to denote background subtraction
+            # add keywords to filename pending on what was applied in preprocessing
+            # used _applied parameters to determine what was applied
+
             hf_squeeze = hf_loaded
-            filtered_fname_append = (
-                "_PREPROC_FILTERED_HPFS" if high_pass_applied else "_PREPROC"
-            )
+            filtered_fname_append = ""
+            for string, applied_bool in applied_strings:
+                if applied_bool:
+                    filtered_fname_append += string
+
             h5fname_sqz = fname_split + filtered_fname_append + self.file_tag["SQZ"]
+        else:
+            raise ValueError(
+                f"Unexpected array shape: {hf_loaded.shape}. "
+                "Expected either 5D array (t,1,y,x,c) or 3D array (t,y,x)"
+            )
 
         h5fname_sqz = self.write_to_file(
             array_to_write=hf_squeeze,
@@ -367,7 +392,7 @@ class H5_Utils(BC):
                 fname_split
                 + filtered_fname_append
                 + self.file_tag["SQZ"]
-                + "_ABBREVDATASET"
+                + self.file_tag["ABBR_DS"]
             )
             array2use = hf_squeeze[:500, :, :]
             # array2use = array2use[:, :256, -256:]

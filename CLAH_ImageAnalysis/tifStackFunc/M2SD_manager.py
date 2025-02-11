@@ -1,15 +1,14 @@
 import os
-
 import numpy as np
+from tqdm import tqdm
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.tifStackFunc import CNMF_Utils
 from CLAH_ImageAnalysis.tifStackFunc import H5_Utils
 from CLAH_ImageAnalysis.tifStackFunc import ImageStack_Utils
-from CLAH_ImageAnalysis.tifStackFunc import ISX_Utils
+from CLAH_ImageAnalysis.tifStackFunc import MoCoPreprocessing
 from CLAH_ImageAnalysis.tifStackFunc import Movie_Utils as movie_utils
 from CLAH_ImageAnalysis.tifStackFunc import NoRMCorre
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
-from tqdm import tqdm
 
 
 class M2SD_manager(BC):
@@ -18,45 +17,83 @@ class M2SD_manager(BC):
 
     Parameters:
         folder_path (list, optional): The path to the folder. Defaults to [].
+        sess2process (list, optional): List of sessions to process. Defaults to [].
+        motion_correct (bool, optional): Whether to perform motion correction. Defaults to False.
+        segment (bool, optional): Whether to perform segmentation. Defaults to False.
+        n_proc4MOCO (int | None, optional): Number of processes for motion correction. Defaults to None.
+        n_proc4CNMF (int | None, optional): Number of processes for CNMF. Defaults to None.
+        concatCheck (bool, optional): Whether to concatenate multiple sessions. Defaults to False.
+        prev_sd_varnames (bool, optional): Whether to use previous segmentation dictionary variable names. Defaults to False.
+        mc_iter (int, optional): Number of motion correction iterations. Defaults to 1.
+        overwrite (bool, optional): Whether to overwrite existing files. Defaults to False.
+        compute_metrics (bool, optional): Whether to compute motion correction metrics. Defaults to False.
+        folder_path (str | list): Path to the folder containing data
+        sess2process (list): List of sessions to process
+        motion_correct (bool): Whether to perform motion correction
+        segment (bool): Whether to perform segmentation
+        n_proc4MOCO (int | None): Number of processes for motion correction
+        n_proc4CNMF (int | None): Number of processes for CNMF
+        concatCheck (bool): Whether to concatenate multiple sessions
+        prev_sd_varnames (bool): Whether to use previous segmentation dictionary variable names
+        mc_iter (int): Number of motion correction iterations
+        overwrite (bool): Whether to overwrite existing files
+        compute_metrics (bool): Whether to compute motion correction metrics
+        use_cropper (bool): Whether to use the cropping utility. Defaults to False.
+        separate_channels (bool): Whether to motion correct channels separately. Defaults to False.
 
     Attributes:
-        dayPath (str): The path to the day.
-        dayDir (str): The day directory.
-        sess2process (list): The sessions to process.
-        H5U (H5_Utils): An instance of the H5_Utils class.
-        c (CaimanCluster): The Caiman cluster object.
-        dview (CaimanDView): The Caiman distributed view object.
-        n_processes (int): The number of processes.
-        array_for_cnmf (ndarray): The array for CNMF.
-        array_to_trim (ndarray): The array to trim.
-        trimmed_array (ndarray): The trimmed array.
-        basename (str): The basename.
-        trimYX (tuple): The trim YX coordinates.
-        CNMFU (CNMF_Utils): An instance of the CNMF_Utils class.
-        ISUtils (ImageStack_Utils): An instance of the ImageStack_Utils class.
-        mmap_fname (str): The mmap filename.
-        mmap_of_moco (str): The mmap filename of motion corrected image.
-        chan_idx (int): The channel index.
-        element_size_um (float): The element size in micrometers.
-        hfsiz (int): The h5 file size.
-        h5filename (str): The h5 filename.
-        h5fname_sqz (str): The squeezed h5 filename.
-        h5filename_postproc (str): The post-processed h5 filename.
-        dimension_labels (list): The dimension labels.
-        latest_eMC (str): The latest eMC file.
-        latest_h5 (str): The latest h5 file.
-        latest_h5sqz (str): The latest squeezed h5 file.
-        latest_mmap_moco (str): The latest mmap file for motion correction.
-        sess_idx (int): The session index.
-        sess_num (int): The session number.
-        folder_path (str): The folder path.
-        folder_name (str): The folder name.
-        norm_uint_tempfilteredDS_arr (ndarray): The normalized and temporally filtered array.
-        dx (int): The x dimension.
-        dy (int): The y dimension.
-        dims (tuple): The dimensions.
-        moco (NoRMCorre): An instance of the NoRMCorre class.
-        fname_mmap_postproc (str): The filename of the post-processed mmap.
+        H5U (H5_Utils): H5 utilities instance
+        ISXU (ISX_Utils): ISX utilities instance
+        folder_path (str | list): Path to data folder
+        sess2process (list): Sessions to process
+        motion_correct (bool): Motion correction flag
+        segment (bool): Segmentation flag
+        n_proc4MOCO (int | None): Processes for motion correction
+        n_proc4CNMF (int | None): Processes for CNMF
+        concatCheck (bool): Concatenation flag
+        prev_sd_varnames (bool): Previous segmentation dict flag
+        mc_iter (int): Motion correction iterations
+        overwrite (bool): Overwrite flag
+        compute_metrics (bool): Compute metrics flag
+        use_cropper (bool): Whether to use the cropping utility. Defaults to False.
+        separate_channels (bool): Whether to motion correct channels separately. Only applicable for 2photon data with 2 channels. Defaults to False.
+        onePhotonCheck (bool): One photon imaging flag
+        dview: Parallel processing view
+        CNMFpar (dict): CNMF parameters
+        ISUtils (ImageStack_Utils): Image stack utilities
+        CNMFU (CNMF_Utils): CNMF utilities
+        array_for_cnmf (list): Arrays for CNMF processing
+        dx (float): X dimension pixel size
+        dy (float): Y dimension pixel size
+        dims (tuple): Image dimensions
+        basename (str): Base filename
+        fname_mmap_postproc (str): Memory mapped filename
+        output_pathByID (str): Output path by ID
+
+    Methods:
+        __init__: Initialize the M2SD_manager class
+        static_class_var_init: Initialize static class variables
+        _init_vars4Iter: Initialize variables for each iteration
+        _init_CNMF_params: Initialize CNMF parameters
+        _init_parallel_processing: Initialize parallel processing
+        _init_ISUtils: Initialize ImageStack utilities
+        _init_CNMF_vars: Initialize CNMF variables
+        _init_output_paths: Initialize output paths
+        _ISU_chan2use_utils: Utility for handling two-channel data
+        _ISU_downsample_array: Downsample array using ISUtils
+        _ISU_normalizeNcorrect_tempfiltDSArr: Normalize and correct temporally filtered downsampled array
+        _ISU_saveImage: Save image using ISUtils
+        clear_ISUtils: Clear ISUtils and perform garbage collection
+        initializeCNMF: Initialize CNMF utilities
+        _onePhotonCheck_utils: Check if data is one-photon
+        find_init_patches_viaCNMF: Find initial patches using CNMF
+        evaluate_found_patches: Evaluate found patches
+        plot_contours: Plot component contours
+        refine_patches_using_accepted_patches: Refine patches using accepted ones
+        play_movie: Play movie with options
+        _create_recontructed_movie: Create reconstructed movie
+        _save_residual_movie: Save residual movie
+        endIter_funcs: Functions to run at end of iteration
     """
 
     ######################################################
@@ -66,7 +103,7 @@ class M2SD_manager(BC):
         self,
         program_name: str,
         path: str | list = [],
-        sess2process: list = [],
+        sess2process: list[int] | str = [],
         motion_correct: bool = False,
         segment: bool = False,
         n_proc4MOCO: int | None = None,
@@ -75,7 +112,28 @@ class M2SD_manager(BC):
         prev_sd_varnames: bool = False,
         mc_iter: int = 1,
         overwrite: bool = False,
-    ):
+        compute_metrics: bool = False,
+        use_cropper: bool = False,
+        separate_channels: bool = False,
+    ) -> None:
+        """
+        Initialize the M2SD_manager class.
+
+        Parameters:
+            program_name (str): Name of the program
+            path (str | list): Path or list of paths to the data files
+            sess2process (list[int] | str): List of sessions to process. If str, it must be 'all' & it will convert to list of integers representing all available sessions.
+            motion_correct (bool): Whether to perform motion correction
+            segment (bool): Whether to perform segmentation
+            n_proc4MOCO (int | None): Number of processes for motion correction
+            n_proc4CNMF (int | None): Number of processes for CNMF
+            concatCheck (bool): Whether to check for concatenated files
+            prev_sd_varnames (bool): Whether to use previous segmentation dictionary variable names
+            mc_iter (int): Number of motion correction iterations
+            overwrite (bool): Whether to overwrite existing files
+            compute_metrics (bool): Whether to compute performance metrics
+            use_cropper (bool): Whether to use the cropping utility. Defaults to False.
+        """
         self.program_name = program_name
         self.class_type = "manager"
 
@@ -90,8 +148,8 @@ class M2SD_manager(BC):
         # initiate H5 Utils
         self.H5U = H5_Utils()
 
-        # initiate ISXD Utils
-        self.ISXU = ISX_Utils()
+        # initiate MoCoPreprocessing for 1photon data
+        self.MCPP = MoCoPreprocessing()
 
         # init global vars
         self.static_class_var_init(
@@ -105,12 +163,15 @@ class M2SD_manager(BC):
             prev_sd_varnames=prev_sd_varnames,
             mc_iter=mc_iter,
             overwrite=overwrite,
+            compute_metrics=compute_metrics,
+            use_cropper=use_cropper,
+            separate_channels=separate_channels,
         )
 
     def static_class_var_init(
         self,
         folder_path: str | list,
-        sess2process: list,
+        sess2process: list[int] | str,
         motion_correct: bool,
         segment: bool,
         n_proc4MOCO: int | None,
@@ -119,13 +180,16 @@ class M2SD_manager(BC):
         prev_sd_varnames: bool,
         mc_iter: int,
         overwrite: bool,
+        compute_metrics: bool,
+        use_cropper: bool,
+        separate_channels: bool,
     ) -> None:
         """
         Initializes the static class variables.
 
         Parameters:
             folder_path (str | list): The path to the folder.
-            sess2process (list): The sessions to process.
+            sess2process (list[int] | str): The sessions to process. If str, it must be 'all' & it will convert to list of integers representing all available sessions.
             motion_correct (bool): Whether to motion correct the data.
             segment (bool): Whether to segment the data.
             n_proc4MOCO (int | None): The number of processes to use for motion correction.
@@ -134,6 +198,9 @@ class M2SD_manager(BC):
             prev_sd_varnames (bool): Whether to use previous SD variable names.
             mc_iter (int): Number of iterations for motion correction.
             overwrite (bool): Flag indicating whether to overwrite existing files.
+            compute_metrics (bool): Whether to compute metrics for motion correction.
+            use_cropper (bool): Whether to use the cropping utility. Defaults to False.
+            separate_channels (bool): Whether to motion correct channels separately. Only applicable for 2photon data with 2 channels. Defaults to False.
         """
         BC.static_class_var_init(
             self,
@@ -144,6 +211,7 @@ class M2SD_manager(BC):
         )
 
         self.CNMFpar = self.enum2dict(TSF_enum.CNMF_Params)
+        self.CNMFpar_1p = self.enum2dict(TSF_enum.CNMF_Params_1p)
         self.motion_correct = motion_correct
         self.segment = segment
         self.n_proc4MOCO = n_proc4MOCO
@@ -152,6 +220,9 @@ class M2SD_manager(BC):
         self.prev_sd_varnames = prev_sd_varnames
         self.mc_iter = mc_iter
         self.overwrite = overwrite
+        self.compute_metrics = compute_metrics
+        self.use_cropper = use_cropper
+        self.separate_channels = separate_channels
 
         # change sess2process to a tuple of session numbers grouped by ID
         # for when sessions need/were concatenated
@@ -202,6 +273,7 @@ class M2SD_manager(BC):
 
         # latest files
         self.latest_eMC = None
+        self.latest_eMC_concat = None
         self.latest_h5 = None
 
         self.latest_h5sqz = None
@@ -216,11 +288,16 @@ class M2SD_manager(BC):
         self.list_latest_sqz = []
         self.list_latest_mmap_moco = []
 
+        self.fname_mmap_postproc = []
+
         # onePhotonCheck
         self.onePhotonCheck = False
 
-        # high-pass filter applied
+        # certain pre-processes applied (boolean)
+        self.bandpass_applied = False
         self.high_pass_applied = False
+        self.CLAHE_applied = False
+        self.crop_applied = False
 
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
         """
@@ -285,18 +362,18 @@ class M2SD_manager(BC):
             # for non 2Ch files, latest_mmap_moco will be present
             mmap_moco_file = self.findLatest(
                 self.file_tag["MMAP"],
-                notInclude=[self.file_tag["MMAP_BASE"], "_Ch1", "_Ch2"],
+                notInclude=[self.file_tag["MMAP_MC_PROC"], "_Ch1", "_Ch2"],
                 full_path=full_path,
             )
             # for 2Ch sessions
             mmap_moco_ch1 = self.findLatest(
                 [self.file_tag["MMAP"], self.file_tag["SQZ"] + "_Ch1"],
-                notInclude=[self.file_tag["MMAP_BASE"], "_Ch2"],
+                notInclude=[self.file_tag["MMAP_MC_PROC"], "_Ch2"],
                 full_path=full_path,
             )
             mmap_moco_ch2 = self.findLatest(
                 [self.file_tag["MMAP"], self.file_tag["SQZ"] + "_Ch2"],
-                notInclude=[self.file_tag["MMAP_BASE"], "_Ch1"],
+                notInclude=[self.file_tag["MMAP_MC_PROC"], "_Ch1"],
                 full_path=full_path,
             )
             return (
@@ -315,23 +392,24 @@ class M2SD_manager(BC):
         if self.concatCheck:
             self.latest_eMC = []
             self.latest_h5 = []
-            self.latest_h5concat = []
+            # self.latest_isxd = []
+            # self.latest_tiff = []
             for directory in self.folder_path:
                 os.chdir(directory)
-                latest_eMC, latest_h5, latest_isxd, latest_tiff, _, _, _, _, _, _ = (
-                    _findFiles(full_path=self.concatCheck)
+                latest_eMC, latest_h5, _, _, _, _, _, _, _, _ = _findFiles(
+                    full_path=self.concatCheck
                 )
 
                 self.latest_eMC.append(latest_eMC)
                 self.latest_h5.append(latest_h5)
-                self.latest_isxd.append(latest_isxd)
-                self.latest_tiff.append(latest_tiff)
+                # self.latest_isxd.append(latest_isxd)
+                # self.latest_tiff.append(latest_tiff)
             os.chdir(self.output_pathByID)
             (
-                self.latest_eMC,
+                self.latest_eMC_concat,
                 self.latest_h5concat,
-                self.latest_isxd,
-                self.latest_tiff,
+                _,
+                _,
                 self.latest_h5sqz,
                 self.latest_h5sqz_ch1,
                 self.latest_h5sqz_ch2,
@@ -386,7 +464,10 @@ class M2SD_manager(BC):
             self.basename = os.path.basename(os.path.dirname(self.latest_tiff))
 
         if self.concatCheck:
-            self.basename = self.basename.replace("pre", "")
+            if "preK" in self.basename:
+                self.basename = self.basename.replace("preK", "")
+            else:
+                self.basename = self.basename.replace("pre", "")
 
     def _overwrite_files(self) -> None:
         """
@@ -396,23 +477,36 @@ class M2SD_manager(BC):
         def _find_files(ftag):
             return [os.path.abspath(f) for f in os.listdir() if ftag in f]
 
-        file_patterns = [
-            self.file_tag["SQZ"],
-            self.file_tag["EMC"],
-            self.file_tag["MMAP"],
-            self.file_tag["SD"],
-            self.file_tag["HTML"],
-            "Parameters",
-            "CompEval",
-            "PostSeg",
-        ]
+        print(f"Running overwrite for {self.basename} before processing")
 
         # find files
+        ftags2search = [
+            "SQZ",
+            "EMC",
+            "MMAP",
+            "SD",
+            "HTML",
+            "NPZ",
+            "PARAMS",
+            "C_EVAL",
+            "POST_SG",
+        ]
+        file_patterns = [self.file_tag[ftag] for ftag in ftags2search]
+
         files2remove = []
         for pattern in file_patterns:
             files2remove.extend(_find_files(pattern))
-
         files2remove.sort()
+
+        # find folders
+        folders = [
+            self.text_lib["Folders"][key] for key in self.text_lib["Folders"].keys()
+        ]
+        folders = [os.path.abspath(f) for f in os.listdir() if f in folders]
+        folders.sort()
+
+        # combine files and folders
+        files2remove += folders
         if files2remove:
             print(
                 "--overwrite was set to True & eligible M2SD output files were found that can be removed:"
@@ -504,24 +598,45 @@ class M2SD_manager(BC):
 
                 # store concatenated H5 filename into self.fname_concat
                 self.fname_concat = self.latest_h5concat
-                h52use = self.latest_h5concat
+                file2use = self.latest_h5concat
             else:
                 self.print_wFrm("Using files:")
                 for h5 in self.latest_h5:
+                    self.create_quickLinks_folder(fpath=os.path.dirname(h5))
+                    self.create_symlink4QL(
+                        src=h5,
+                        link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
+                        fpath4link=self.folder_tools.get_dirname(h5),
+                    )
                     self.print_wFrm(f"{h5}", frame_num=1)
                 concath5name = f"{self.basename}{self.file_tag['CYCLE']}{self.file_tag['CODE']}{self.file_tag['ELEMENT']}{self.file_tag['CODE']}"
                 self.fname_concat = os.path.join(self.output_pathByID, concath5name)
-                h52use = self.H5U.concatH5s(
+                file2use = self.H5U.concatH5s(
                     H5s=self.latest_h5, fname_concat=self.fname_concat
+                )
+                self.create_symlink4QL(
+                    src=file2use,
+                    link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
+                    fpath4link=self.folder_tools.get_dirname(file2use),
                 )
             self.print_done_small_proc()
         else:
+            self.create_quickLinks_folder()
             if self.latest_isxd:
                 file2use = self.latest_isxd
+                qlName = self.text_lib["QL_LNAMES"]["RAW_ISXD"]
             elif self.latest_tiff:
                 file2use = self.latest_tiff
+                qlName = self.text_lib["QL_LNAMES"]["RAW_TIFF"]
             else:
                 file2use = self.latest_h5
+                qlName = self.text_lib["QL_LNAMES"]["RAW_H5"]
+
+            self.create_symlink4QL(
+                src=file2use,
+                link_name=qlName,
+                fpath4link=self.folder_tools.get_dirname(file2use),
+            )
 
         if file2use.endswith(self.file_tag["ISXD"]) or file2use.endswith(
             self.file_tag["TIFF"]
@@ -530,7 +645,7 @@ class M2SD_manager(BC):
             self.segCh = None
             self.chan_idx = [1]
             self.isxd_fname = file2use
-            self.total_frames, self.isxsiz = self.ISXU.get_movie_data(file2use)
+            self.total_frames, self.isxsiz = self.MCPP.get_movie_data(file2use)
 
             print(f"Reading isxd file: {file2use}")
             self.print_wFrm(f"Total frames: {self.total_frames}")
@@ -546,7 +661,7 @@ class M2SD_manager(BC):
                 self.segCh,
                 self.chan_idx,
                 self.element_size_um,
-            ) = self.H5U.read_file4MOCO(h52use)
+            ) = self.H5U.read_file4MOCO(file2use)
 
             # set total frames
             self.total_frames = self.info[0]
@@ -569,7 +684,7 @@ class M2SD_manager(BC):
                     f"Writing post-processed image stack for Ch{chan} into h5"
                 )
                 twoChan = True
-            self.list_h5fn_pproc[idx] = self.H5U.write_to_file(
+            h5fname = self.H5U.write_to_file(
                 array_to_write=array,
                 filename=h5fname,
                 chan_idx=[chan],
@@ -579,6 +694,29 @@ class M2SD_manager(BC):
                 return_fname=True,
                 twoChan=twoChan,
             )
+            self.list_h5fn_pproc[idx] = h5fname
+
+            if idx == 0:
+                if not self.concatCheck:
+                    self.create_symlink4QL(
+                        src=os.path.join(self.folder_path, h5fname),
+                        link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_H5"],
+                        fpath4link=self.folder_tools.get_dirname(h5fname),
+                    )
+
+            print("Exporting image stack as colormapped AVI:")
+            avi_fname = self.ISUtils.apply_colormap2stack_export2avi(
+                array_to_use=array,
+                fname_save=h5fname,
+            )
+            if not self.concatCheck:
+                self.create_symlink4QL(
+                    src=os.path.join(self.folder_path, avi_fname),
+                    link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_AVI"],
+                    fpath4link=self.folder_tools.get_dirname(avi_fname),
+                )
+            self.print_done_small_proc()
+
         # clear self.norm_uint_tempfilteredDS_arr for memory
         with self.StatusPrinter.garbage_collector():
             self.norm_uint_tempfilteredDS_arr = None
@@ -614,13 +752,22 @@ class M2SD_manager(BC):
                     remove_Cycle=True,
                     twoChan=twoChan,  # if 2Ch, will add Ch1/Ch2 to filename
                 )
+                h5fname_sqz = self.create_FullFolderPath4file(h5fname_sqz)
+
                 if self.oneCh:
                     self.h5fname_sqz = h5fname_sqz
                 elif self.twoCh:
-                    if chan == 0:
+                    if chan == 1:
                         self.h5fname_sqz_ch2 = h5fname_sqz
-                    elif chan == 1:
+                    elif chan == 0:
                         self.h5fname_sqz_ch1 = h5fname_sqz
+                if self.oneCh or (self.twoCh and chan == 0):
+                    if not self.concatCheck:
+                        self.create_symlink4QL(
+                            src=h5fname_sqz,
+                            link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
+                            fpath4link=self.folder_tools.get_dirname(h5fname_sqz),
+                        )
         else:
             print(
                 f"Loading: {self.latest_isxd if self.latest_isxd else self.latest_tiff}"
@@ -633,8 +780,16 @@ class M2SD_manager(BC):
             elif self.latest_tiff:
                 file2use = self.latest_tiff
 
-            filtered_arr, self.high_pass_applied = self.ISXU.preprocessing_movie(
-                file2use, output_fname=self.basename
+            (
+                filtered_arr,
+                self.bandpass_applied,
+                self.high_pass_applied,
+                self.CLAHE_applied,
+                self.crop_applied,
+            ) = self.MCPP.preprocessing_movie(
+                file2use,
+                output_fname=self.basename,
+                use_cropper=self.use_cropper,
             )
 
             self.h5fname_sqz = self.H5U.squeeze_fileNwrite(
@@ -646,7 +801,28 @@ class M2SD_manager(BC):
                 remove_Cycle=True,
                 export_sample=True,
                 high_pass_applied=self.high_pass_applied,
+                CLAHE_applied=self.CLAHE_applied,
+                bandpass_applied=self.bandpass_applied,
+                crop_applied=self.crop_applied,
             )
+            if not self.concatCheck:
+                self.create_symlink4QL(
+                    src=os.path.join(self.folder_path, self.h5fname_sqz),
+                    link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
+                    fpath4link=self.folder_tools.get_dirname(self.h5fname_sqz),
+                )
+                self.create_symlink4QL(
+                    src=os.path.join(
+                        self.folder_path,
+                        self.findLatest(self.file_tag["ABBR_DS"]),
+                    ),
+                    link_name=self.text_lib["QL_LNAMES"]["SMP_SQZ_H5"],
+                    fpath4link=self.folder_tools.get_dirname(
+                        os.path.join(
+                            self.folder_path, self.findLatest(self.file_tag["ABBR_DS"])
+                        )
+                    ),
+                )
 
     def pre_moco_h5_tools(self) -> None:
         """
@@ -813,15 +989,24 @@ class M2SD_manager(BC):
             if self.twoCh:
                 print(f"...Ch{chan2use + 1}", end="", flush=True)
             fname_mmap_postproc = self.utils.caiman_utils.save_mmap(
-                fname2save=fname2save, chan_num=chan2use
+                fname2save=fname2save,
+                chan_num=chan2use,
+                base_name=self.file_tag["MMAP_MC_PROC"],
             )
 
             self.print_wFrm(f"Filename: {fname_mmap_postproc}")
 
             list_fname_mmap_pp.append(fname_mmap_postproc)
 
-        # store first entry into fname_mmapp_postproc for segmentation
-        self.fname_mmap_postproc = list_fname_mmap_pp[0]
+        # store fname_mmapp_postproc for segmentation
+        self.fname_mmap_postproc = list_fname_mmap_pp
+
+        if not self.concatCheck:
+            self.create_symlink4QL(
+                src=os.path.join(self.folder_path, self.fname_mmap_postproc),
+                link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_MMAP"],
+                fpath4link=self.folder_tools.get_dirname(self.fname_mmap_postproc),
+            )
 
     def find_mmap_fname(self) -> str:
         """
@@ -830,15 +1015,29 @@ class M2SD_manager(BC):
         Returns:
             str: The mmap filename.
         """
+        mmaps = []
         # extract latest mmap file (not Ch1)
         if self.concatCheck:
             os.chdir(self.output_pathByID)
-        mmap_fname = self.findLatest(
-            self.file_tag["MMAP_BASE"], notInclude="Ch1", full_path=self.concatCheck
+        mmap_fname_ch2 = self.findLatest(
+            filetags=self.file_tag["MMAP_MC_PROC"],
+            notInclude="Ch1",
+            full_path=self.concatCheck,
+        )
+        mmap_fname_ch1 = self.findLatest(
+            filetags=self.file_tag["MMAP_MC_PROC"],
+            notInclude="Ch2",
+            full_path=self.concatCheck,
         )
         # store latest mmap into self
-        self.fname_mmap_postproc = mmap_fname
-        return mmap_fname
+        if mmap_fname_ch2:
+            self.fname_mmap_postproc.append(mmap_fname_ch2)
+            mmaps.append(mmap_fname_ch2)
+        if mmap_fname_ch1:
+            self.fname_mmap_postproc.append(mmap_fname_ch1)
+            mmaps.append(mmap_fname_ch1)
+
+        return mmaps
 
     ######################################################
     #  motion correction
@@ -897,6 +1096,8 @@ class M2SD_manager(BC):
                 dview=dview_to_use,
                 onePhotonCheck=self.onePhotonCheck,
                 mc_iter=self.mc_iter,
+                compute_metrics=self.compute_metrics,
+                separate_channels=self.separate_channels,
             )
             # order of list entries in moco
             # - 1) Ch2 (green)
@@ -908,17 +1109,28 @@ class M2SD_manager(BC):
             if self.oneCh:
                 self.mmap_of_moco = self.moco[0].fname_tot_els.copy()
                 self.mmap_of_moco = self.mmap_of_moco[0]
+                mmap4ql = self.mmap_of_moco
             elif self.twoCh:
                 self.mmap_of_moco_ch2 = self.moco[0].fname_tot_els.copy()
                 self.mmap_of_moco_ch1 = self.moco[1].fname_tot_els.copy()
                 # index 0th entry
                 self.mmap_of_moco_ch2 = self.mmap_of_moco_ch2[0]
                 self.mmap_of_moco_ch1 = self.mmap_of_moco_ch1[0]
+                mmap4ql = self.mmap_of_moco_ch2
 
+            if not self.concatCheck:
+                mmap4ql = os.path.join(self.folder_path, mmap4ql)
+
+                self.create_symlink4QL(
+                    src=mmap4ql,
+                    link_name=self.text_lib["QL_LNAMES"]["NORM_MMAP"],
+                    fpath4link=self.folder_tools.get_dirname(mmap4ql),
+                )
             # stop cluster to clear memory
             self.print_wFrm("Stopping cluster", end="", flush=True)
             self.stop_cluster()
             self.print_done_small_proc(new_line=False)
+
             for idx, _ in enumerate(self.chan_idx):
                 if idx == 0:
                     # for 1Ch, will use self.mmap_of_moco
@@ -1045,29 +1257,33 @@ class M2SD_manager(BC):
         self.trimYX = []
         for idx, array in enumerate(self.array_to_trim):
             # set chan2use & print 2Ch str if so
-            chan2use = self._ISU_chan2use_utils(idx, "Trimming")
+            # chan2use = self._ISU_chan2use_utils(idx, "Trimming")
 
             if not self.onePhotonCheck:
                 # trim stack
-                trimmed_array, trimYX = self.ISUtils.trim2pStack(
-                    array_to_trim=array, store=False
-                )
-            elif self.onePhotonCheck and self.high_pass_applied:
-                print(
-                    "---Skipping trimming & min-z projection removal step for 1Photon data given high-pass filter was applied---"
-                )
+                # trimmed_array, trimYX = self.ISUtils.trim2pStack(
+                #     array_to_trim=array, store=False
+                # )
                 trimmed_array = array
                 trimYX = None
-            elif self.onePhotonCheck and not self.high_pass_applied:
-                trimmed_array = self.ISUtils.min_zProj_removal(array_to_use=array)
+            # elif self.onePhotonCheck and self.high_pass_applied:
+            #     print(
+            #         "---Skipping trimming & min-z projection removal step for 1Photon data given high-pass filter was applied---"
+            #     )
+            #     trimmed_array = array
+            #     trimYX = None
+            # elif self.onePhotonCheck and not self.high_pass_applied:
+            elif self.onePhotonCheck:
+                # trimmed_array = self.ISUtils.min_zProj_removal(array_to_use=array)
+                trimmed_array = array
                 trimYX = None
 
             self.trimmed_array.append(trimmed_array)
             self.trimYX.append(trimYX)
 
             # save as tif
-            print("| Saving Calcium Channel average tif")
-            self._ISU_saveImage(array_to_use=trimmed_array, twoChanInt=chan2use)
+            # print("| Saving Calcium Channel average tif")
+            # self._ISU_saveImage(array_to_use=trimmed_array, twoChanInt=chan2use)
 
     def _ISU_tempFilter(self, array2tf: list[np.ndarray], Downsample=False) -> list:
         """
@@ -1170,7 +1386,7 @@ class M2SD_manager(BC):
         Temp_Exp: bool = False,
         Downsample: bool = False,
         bit_range: list[int] = [8, 16],
-    ):
+    ) -> None:
         """
         Save the average of the image stack as a TIFF file.
 
@@ -1216,109 +1432,102 @@ class M2SD_manager(BC):
     #  CNMF funcs
     ######################################################
 
-    def initializeCNMF(self) -> None:
+    def run_CNMF(self) -> None:
         """
         Initializes the CNMF_Utils object.
         """
-        if not self.onePhotonCheck:
-            self._onePhotonCheck_utils()
 
-        self.CNMFU = CNMF_Utils(
-            basename=self.basename,
-            Ca_Array=self.array_for_cnmf[0],
-            dview=self.dview,
-            dx=self.dx,
-            dy=self.dy,
-            dims=self.dims,
-            n_processes=self.n_proc4CNMF,
-            onePhotonCheck=self.onePhotonCheck,
-            # method_init=self.method_init,
-            # meth_deconv=self.meth_deconv,
-        )
+        def _onePhotonCheck_utils() -> None:
+            """
+            Sets the onePhotonCheck attribute to True. If MotionCorr parameters file contains onePhoton in title. This is a failsafe mechanism.
+            """
+            paramsFile = self.findLatest(
+                "onePhoton",
+                path2check=os.path.join(
+                    self.folder_path, self.text_lib["Folders"]["PARAMS"]
+                ),
+            )
+            if paramsFile:
+                self.onePhotonCheck = True
 
-    def _onePhotonCheck_utils(self) -> None:
-        """
-        Sets the onePhotonCheck attribute to True. If MotionCorr parameters file contains onePhoton in title. This is a failsafe mechanism.
-        """
-        paramsFile = self.findLatest("onePhoton")
-        if paramsFile:
-            self.onePhotonCheck = True
+        if not self.onePhotonCheck and not self.concatCheck:
+            _onePhotonCheck_utils()
 
-    def find_init_patches_viaCNMF(self) -> None:
-        """
-        Finds initial patches using CNMF.
+        for idx, array in enumerate(self.array_for_cnmf):
+            if "Ch2" in self.fname_mmap_postproc[idx]:
+                basename2use = self.basename + "_Ch2"
+            elif "Ch1" in self.fname_mmap_postproc[idx]:
+                basename2use = self.basename + "_Ch1"
+            else:
+                basename2use = self.basename
 
-        This method uses CNMF to find initial patches based on the specified receptive field (rf) and stride.
-        """
-        self.CNMFU.find_initial_patches(
-            rf=self.CNMFpar["RF"], stride=self.CNMFpar["STRIDE"]
-        )
+            print(
+                f"Running CNMF for {self.fname_mmap_postproc[idx]} - {idx + 1} of {len(self.array_for_cnmf)}"
+            )
 
-    def evaluate_found_patches(self) -> None:
-        """
-        Evaluates the found patches using the comp_evaluator method of the CNMFU object.
+            self.CNMFU = CNMF_Utils(
+                basename=basename2use,
+                Ca_Array=array,
+                dview=self.dview,
+                dx=self.dx,
+                dy=self.dy,
+                dims=self.dims,
+                n_processes=self.n_proc4CNMF,
+                onePhotonCheck=self.onePhotonCheck,
+            )
 
-        This method is responsible for evaluating the patches found by the CNMFU object.
-        It calls the comp_evaluator method to perform the evaluation.
-        """
-        self.CNMFU.comp_evaluator()
+            # find initial patches
+            self.CNMFU.find_initial_patches(
+                rf=self.CNMFpar["RF"], stride=self.CNMFpar["STRIDE"]
+            )
 
-    def plot_contours(self) -> None:
-        """
-        Plots the contours of the components using the comp_contour_plotter method.
-        """
-        folder_path = None
-        if self.concatCheck:
-            folder_path = self.output_pathByID
+            # evaluate found patches
+            self.CNMFU.comp_evaluator()
 
-        self.CNMFU.comp_contour_plotter(folder_path=folder_path)
+            # plot contours
+            folder_path = None
+            if self.concatCheck:
+                folder_path = self.output_pathByID
+            self.CNMFU.comp_contour_plotter(folder_path=folder_path)
 
-    def refine_patches_using_accepted_patches(self) -> None:
-        """
-        Refines the patches using the accepted patches.
+            # RE-RUN seeded CNMF on accepted patches to refine & perform deconvolution
+            self.CNMFU.fill_in_accepted_patches()
+            # refine patches
+            self.CNMFU.refine_patches(stride=None, rf=None)
 
-        This method re-runs seeded CNMF on the accepted patches to refine and perform deconvolution.
-        It fills in the accepted patches and then refines them.
-        """
-        # RE-RUN seeded CNMF on accepted patches to refine & perform deconvolution
-        self.CNMFU.fill_in_accepted_patches()
-        # refine patches
-        self.CNMFU.refine_patches(stride=None, rf=None)
+            if self.concatCheck:
+                fname_mmap = self.fname_mmap_postproc[idx]
+            else:
+                fname_mmap = os.path.join(
+                    self.folder_path, self.fname_mmap_postproc[idx]
+                )
 
-    def calc_CaTransients(self) -> None:
-        """
-        Calculates calcium transients.
+            Yr, _, _ = self.utils.caiman_utils.load_mmap(fname_mmap=fname_mmap)
+            self.CNMFU.calc_F_dff(Yr=Yr)
 
-        Loads the mmap file, calculates the fluorescence dF/F using CNMF algorithm.
-        """
-        if self.concatCheck:
-            fname_mmap = self.fname_mmap_postproc
-        else:
-            fname_mmap = os.path.join(self.folder_path, self.fname_mmap_postproc)
+            folder_path_concat = None
+            folder_path_subj = []
 
-        Yr, _, _ = self.utils.caiman_utils.load_mmap(fname_mmap=fname_mmap)
-        self.CNMFU.calc_F_dff(Yr=Yr)
+            if self.concatCheck:
+                folder_path_concat = self.output_pathByID
+                folder_path_subj = self.folder_path
 
-    def save_segDict(self) -> None:
-        """
-        Saves the segmentation dictionary using the CNMFU object's createNexport_segDict method.
+            self.CNMFU.createNexport_segDict(
+                concatCheck=self.concatCheck,
+                folder_path_concat=folder_path_concat,
+                folder_path_subj=folder_path_subj,
+                prev_sd_varnames=self.prev_sd_varnames,
+            )
 
-        This method is responsible for saving the segmentation dictionary by calling the createNexport_segDict method
-        of the CNMFU object.
-        """
-        folder_path_concat = None
-        folder_path_subj = []
-
-        if self.concatCheck:
-            folder_path_concat = self.output_pathByID
-            folder_path_subj = self.folder_path
-
-        self.CNMFU.createNexport_segDict(
-            concatCheck=self.concatCheck,
-            folder_path_concat=folder_path_concat,
-            folder_path_subj=folder_path_subj,
-            prev_sd_varnames=self.prev_sd_varnames,
-        )
+            if not self.concatCheck:
+                for ftype in ["H5", "MAT", "PKL"]:
+                    latest_sd = self.findLatest(
+                        [self.file_tag["SD"], self.file_tag[ftype]]
+                    )
+                    self.create_symlink4QL(
+                        src=os.path.join(self.folder_path, latest_sd),
+                        link_name=self.text_lib["QL_LNAMES"][f"SD_{ftype}"],
+                    )
 
     ######################################################
     # view motion correction with denoised
@@ -1348,52 +1557,84 @@ class M2SD_manager(BC):
             "Finding difference between original & denoised movie (reconstructed from CNMF)"
         )
         # load original movie, normalized & converted to 16-bit unsigned
+
+        fname2load = []
         if self.concatCheck:
             fname2load = self.fname_mmap_postproc
         else:
-            fname2load = os.path.join(self.folder_path, self.fname_mmap_postproc)
+            fname2load = [
+                os.path.join(self.folder_path, f) for f in self.fname_mmap_postproc
+            ]
 
-        m_els = movie_utils.load_movie(fname2load)
+        for idx, fname in enumerate(fname2load):
+            wCH = None
+            if "Ch2" in fname:
+                wCH = "Ch2"
+            elif "Ch1" in fname:
+                wCH = "Ch1"
+            wCH_tag = f"_{wCH}" if wCH is not None else ""
 
-        # extract denoised movies, with & without background
-        denoised_noback = self._create_recontructed_movie()
-        denoised_wback = self._create_recontructed_movie(wBackground=True)
+            m_els = movie_utils.load_movie(fname)
 
-        # normalize & convert to uint
-        CdotA = movie_utils.normNconvert2uint(denoised_noback)
-        # noncap_noise = full film - (C dot A + b dot f)
-        noncap_noise = movie_utils.normNconvert2uint(m_els - denoised_wback)
-        # concatenate C dot A & noncap_noise
-        concatenated_residual_movie = movie_utils.concatenate_movies(
-            [CdotA, noncap_noise], axis=2
-        )
-        # movie_utils.process_and_play_movie(concatenated_movie, downsample_ratio)
+            # extract denoised movies, with & without background
+            denoised_noback = self._create_recontructed_movie()
+            denoised_wback = self._create_recontructed_movie(wBackground=True)
 
-        # save residual movie
-        for movies2save in [
-            CdotA,
-            noncap_noise,
-            concatenated_residual_movie,
-        ]:
-            if movies2save is CdotA:
-                moviefname = self.file_tag["CDA_MOV"]
-            elif movies2save is noncap_noise:
-                moviefname = self.file_tag["NOISE_MOV"]
-            elif movies2save is concatenated_residual_movie:
-                moviefname = self.file_tag["CON_RES_MOV"]
-            for ftype in [self.file_tag["AVI"], self.file_tag["H5"]]:
-                if self.concatCheck:
-                    moviefname = os.path.join(self.output_pathByID, moviefname)
-                else:
-                    moviefname = os.path.join(self.folder_path, moviefname)
-                self._save_residual_movie(movies2save, moviefname, ftype)
-        TKEEPER.setEndNprintDuration()
-        print()
-        # clear for memory
-        with self.StatusPrinter.garbage_collector():
-            CdotA, noncap_noise, m_els = None, None, None
-            concatenated_residual_movie = None
-            denoised_noback, denoised_wback = None, None
+            # normalize & convert to uint
+            # add caption to first 30 frames
+            CdotA = movie_utils.add_caption_to_movie(
+                movie=movie_utils.normNconvert2uint(denoised_noback),
+                text="Accepted Components",
+            )
+            # noncap_noise = full film - (C dot A + b dot f)
+            # add caption to first 30 frames
+            noncap_noise = movie_utils.add_caption_to_movie(
+                movie=movie_utils.normNconvert2uint(m_els - denoised_wback),
+                text="Non-segmented Noise",
+            )
+            # concatenate C dot A & noncap_noise
+            concatenated_residual_movie = movie_utils.concatenate_movies(
+                [CdotA, noncap_noise], axis=2, use_caiman=False
+            )
+            # movie_utils.process_and_play_movie(concatenated_movie, downsample_ratio)
+
+            # save residual movie
+            for movies2save in [
+                # CdotA,
+                # noncap_noise,
+                concatenated_residual_movie,
+            ]:
+                if movies2save is CdotA:
+                    moviefname = self.file_tag["CDA_MOV"] + wCH_tag
+                elif movies2save is noncap_noise:
+                    moviefname = self.file_tag["NOISE_MOV"] + wCH_tag
+                elif movies2save is concatenated_residual_movie:
+                    moviefname = self.file_tag["CON_RES_MOV"] + wCH_tag
+                for ftype in [self.file_tag["AVI"], self.file_tag["H5"]]:
+                    if self.concatCheck:
+                        moviefname = os.path.join(self.output_pathByID, moviefname)
+                    else:
+                        moviefname = os.path.join(self.folder_path, moviefname)
+                    self._save_residual_movie(movies2save, moviefname, ftype)
+                    if (
+                        movies2save is concatenated_residual_movie
+                        and ftype == self.file_tag["AVI"]
+                    ):
+                        if not self.concatCheck:
+                            self.create_symlink4QL(
+                                src=moviefname + self.file_tag["AVI"],
+                                link_name=self.text_lib["QL_LNAMES"][
+                                    "RES_MOV_CCAT_AVI"
+                                ],
+                                fpath4link=self.folder_tools.get_dirname(moviefname),
+                            )
+            TKEEPER.setEndNprintDuration()
+            print()
+            # clear for memory
+            with self.StatusPrinter.garbage_collector():
+                CdotA, noncap_noise, m_els = None, None, None
+                concatenated_residual_movie = None
+                denoised_noback, denoised_wback = None, None
 
     def view_movie(
         self,
@@ -1436,9 +1677,10 @@ class M2SD_manager(BC):
             numpy.ndarray: The reconstructed movie.
         """
 
-        cnm = self.CNMFU.NonNegMatrix_post_refining.estimates
         denoised = movie_utils.create_denoised_movie(
-            cnm, self.dims, wBackground=wBackground
+            cnm_estimates=self.CNMFU.NonNegMatrix_post_refining.estimates,
+            dims=self.dims,
+            wBackground=wBackground,
         )
         return denoised
 
@@ -1455,17 +1697,21 @@ class M2SD_manager(BC):
         """
 
         movie_utils.save_movie(
-            residual_movie, fname, ftag, element_size_um=self.element_size_um
+            residual_movie,
+            fname,
+            ftag,
+            element_size_um=self.element_size_um,
+            use_caiman=False,
         )
 
         fname2print = self.folder_tools.os_splitterNcheck(fname, baseORpath="base")
 
-        if "CdotA" in fname2print:
+        if "CdotA" in fname2print and "NonCapNoise" not in fname2print:
             mtype = "C dot A"
-        elif "NonSeg_Noise" in fname2print:
+        elif "NonSegNoise" in fname2print and "CdotA" not in fname2print:
             mtype = "Non-segmented Noise"
-        elif "Concatenated" in fname2print:
-            mtype = "Concatenated"
+        elif "CdotA" in fname2print and "NonSegNoise" in fname2print:
+            mtype = "C dot A & Non-segmented Noise"
 
         self.print_wFrm(f"Residual movie ({mtype}) saved as: {fname2print}{ftag}")
 

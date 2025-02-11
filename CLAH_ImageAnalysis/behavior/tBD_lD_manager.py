@@ -131,7 +131,7 @@ class tBD_lD_manager(BC):
                 self.X2Fkey["FRIDX_KEY"],
             ]
             ftag2remove = self.file_tag["XML"]
-        elif self.findLatest([self.file_tag["GPIO"], self.file_tag["CSV"]]):
+        elif self.findLatest([self.file_tag["GPIO_SUFFIX"], self.file_tag["CSV"]]):
             self.FRdict, data_fname = GPIOfrTimes.getGPIOfrTimes(self.folder_path)
             self.key_list = [
                 self.GPIOkey["FR_KEY"],
@@ -139,7 +139,7 @@ class tBD_lD_manager(BC):
                 self.GPIOkey["CUE_KEY"],
                 self.GPIOkey["EXLED_KEY"],
             ]
-            ftag2remove = self.file_tag["GPIO"]
+            ftag2remove = []
 
         # fill tBD with FRD data
         self._fill_tBDwFRD()

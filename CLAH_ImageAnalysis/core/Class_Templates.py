@@ -74,7 +74,12 @@ def get_project_version() -> str:
         return "0.0.0"
 
 
-def run_CLAH_script(script_class: Any, parser_enum: Any, alt_run: bool = False) -> None:
+def run_CLAH_script(
+    script_class: Any,
+    parser_enum: Any,
+    alt_run: bool = False,
+    clear_terminal: bool = True,
+) -> None:
     """
     Runs a CLAH script.
 
@@ -82,13 +87,13 @@ def run_CLAH_script(script_class: Any, parser_enum: Any, alt_run: bool = False) 
         script_class: The class of the script to run.
         parser_enum: The parser enum for creating arguments.
         alt_run: A boolean indicating whether to run the alternative run method.
-
+        clear_terminal: A boolean indicating whether to clear the terminal before running the script.
     Returns:
         None
     """
 
     args = utils.parser_utils.createParserNextractArgs(
-        parser_enum=parser_enum, clear_terminal=True
+        parser_enum=parser_enum, clear_terminal=clear_terminal
     )
     # convert args to dictionary
     args_dict = vars(args).copy()
@@ -330,8 +335,9 @@ class BaseClass:
         self,
         folder_path: list | str,
         file_of_interest: str,
-        selection_made: bool,
+        selection_made: list | bool,
         select_by_ID: bool = False,
+        noTDML4SD: bool = False,
     ) -> None:
         """
         Initializes static class variables based on the provided inputs.
@@ -340,6 +346,8 @@ class BaseClass:
             folder_path (str): The path to the folder.
             file_tag (str): The file tag.
             selection_made (bool): Indicates whether a selection has been made.
+            select_by_ID (bool): Indicates whether to select by ID.
+            noTDML4SD (bool): Indicates whether to exclude TDML from the selection specifically when selecting for SD (segDict).
 
         Returns:
             None
@@ -367,11 +375,12 @@ class BaseClass:
         # self.rprint(self.text_lib["steps"][PFS][f"note_{self.program_name}"])
 
         selector_result, self.multSessIDDict = self.utils.subj_selector(
-            self.dayPath,
-            self.dayDir,
-            file_of_interest,
+            dayPath=self.dayPath,
+            dayDir=self.dayDir,
+            file_of_interest=file_of_interest,
             selection_made=selection_made,
             select_by_ID=select_by_ID,
+            noTDML4SD=noTDML4SD,
         )
 
         if self.multSessIDDict is None:
@@ -442,7 +451,10 @@ class BaseClass:
         parts = path.split(os.sep)
 
         #! USING A & B FOR PRE VS POST FOR NOW, TEMPORARY FOR NOW
-        etype2use = self.etype.replace("A-", "-")
+        if "A-" in self.etype:
+            etype2use = self.etype.replace("A-", "-")
+        else:
+            etype2use = self.etype.replace("-001", "")
 
         if len(parts) > 2:
             self.output_path = os.sep.join(parts[:-2])
@@ -517,3 +529,64 @@ class BaseClass:
         """
         var = replacement_var if var2check is None else var2check
         return var
+
+    @check_mode4BC("manager")
+    def create_quickLinks_folder(self, fpath: str | None = None) -> None:
+        """
+        Creates a hidden quickLinks folder.
+
+        Parameters:
+        - fpath (str | None, optional): Base folder path where the quickLinks folder will be created.
+                                        If None, uses the default quickLinks folder path. Defaults to None.
+
+        Returns:
+        None
+        """
+        if fpath is None:
+            fpath = self.text_lib["Folders"]["QL"]
+        else:
+            fpath = os.path.join(fpath, self.text_lib["Folders"]["QL"])
+        self.utils.create_folder(fpath, verbose=False)
+
+    @check_mode4BC("manager")
+    def create_symlink4QL(
+        self,
+        src: str,
+        link_name: str,
+        fpath4link: str | None = None,
+    ) -> None:
+        """
+        Create a symbolic link to a file in the quickLinks folder.
+
+        Parameters:
+            src (str): Source file path to create symbolic link from.
+            link_name (str): Name of the symbolic link to create.
+            fpath4link (str | None, optional): Base folder path where the quickLinks folder and symbolic link will be created.
+                                                If None, uses the default quickLinks folder path. Defaults to None.
+
+        The symbolic link will be created in a quickLinks subfolder, either at the default location or under the specified fpath4link.
+        The link_name parameter should be just the name of the link, not the full path.
+        """
+        if fpath4link is None:
+            fpath4link = self.text_lib["Folders"]["QL"]
+        else:
+            fpath4link = os.path.join(fpath4link, self.text_lib["Folders"]["QL"])
+
+        link_name = os.path.join(fpath4link, link_name)
+        self.folder_tools.create_symlink(src, link_name)
+
+    @check_mode4BC("manager")
+    def create_FullFolderPath4file(self, fname: str) -> str:
+        """
+        Create a full folder path for a file.
+
+        Parameters:
+        - fname (str): The file name.
+
+        Returns:
+        - str: The full folder path for the file. If the file name contains a '/', this implies the file name already includes the folder path and will return the file name as is.
+        """
+        if "/" not in fname:
+            return os.path.join(self.folder_path, fname)
+        else:
+            return fname

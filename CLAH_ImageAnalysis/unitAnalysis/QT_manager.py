@@ -384,11 +384,11 @@ class QT_manager(BC):
             self.latest_file_segDict, C_Temporal=True, A_Spatial=True
         )
 
-        print("Creating image of cell numbers overlayed onto downsampled image")
-        self.plotting.plot_cellNum_overDSImage(
-            A_Spat=self.A_Spatial, DS_image=self.DS_image
-        )
-        self.print_done_small_proc()
+        # print("Creating image of cell numbers overlayed onto downsampled image")
+        # self.plotting.plot_cellNum_overDSImage(
+        #     A_Spat=self.A_Spatial, DS_image=self.DS_image
+        # )
+        # self.print_done_small_proc()
 
     def wrapCueShift2cueShiftStrucExporter(self) -> tuple:
         """
@@ -445,9 +445,11 @@ class QT_manager(BC):
             if self.findLatest(self.file_tag["XML"]):
                 ftag2remove = self.file_tag["XML"]
                 fname = self.findLatest(self.file_tag["XML"])
-            elif self.findLatest(self.file_tag["GPIO"]):
-                ftag2remove = self.file_tag["GPIO"]
-                fname = self.findLatest(self.file_tag["GPIO"])
+            elif self.findLatest([self.file_tag["GPIO_SUFFIX"], self.file_tag["CSV"]]):
+                ftag2remove = []
+                fname = self.findLatest(
+                    [self.file_tag["GPIO_SUFFIX"], self.file_tag["CSV"]]
+                ).split(self.file_tag["GPIO_SUFFIX"])[0]
 
             # fill in css with refLapType & laptypename
             # if css wasn't loaded from prev file

@@ -26,14 +26,17 @@ Parser arguments:
     --sess2process, -s2p: List of sessions to process
     --motion_correct, -mc: Flag for motion correction (default: False)
     --segment, -sg: Flag for segmentation (default: False)
-    --convolve_parallel, -cpar: Flag for parallel convolution (default: False)
     --n_proc4MOCO, -n4mc: Number of processors for motion correction (default: 1)
     --n_proc4CNMF, -n4cnmf: Number of processors for CNMF (default: 1)
-    --n_proc4PC, -n4pc: Number of processors for parallel convolution (default: None)
-
+    --concatenate, -c: Flag for concatenating sessions (default: False)
+    --prev_sd_varnames, -pvs: Flag for using previous SD variable names (default: False)
+    --overwrite, -o: Flag for overwriting existing files (default: False)
+    --mc_iter, -mci: Number of iterations for motion correction (default: 1)
+    --compute_metrics, -cm: Flag for computing metrics for motion correction (default: False)
+    --use_cropper, -uc: Flag for using the cropping utility (default: False)
 
 Example:
-python MoCo2segDict.py --path /path/to/data --motion_correct yes --segment yes --convolve_parallel no
+python MoCo2segDict.py --path /path/to/data --motion_correct yes --segment yes
 """
 
 from CLAH_ImageAnalysis.core import run_CLAH_script
@@ -50,30 +53,29 @@ class MoCo2segDict(M2SDM):
             sess2process (list): A list of sessions to process.
             n_proc4MOCO (int): Number of processors for motion correction. Default is 1.
             n_proc4CNMF (int): Number of processors for CNMF. Default is 1.
-            convolve_parallel (bool): Flag indicating whether to use parallel convolution. Default is False.
-            n_proc4PC (int): Number of processors for parallel convolution. Default is None.
             motion_correct (bool): Flag indicating whether to perform motion correction. Default is True.
             segment (bool): Flag indicating whether to perform segmentation. Default is True.
             prev_sd_varnames (bool): Use the old variable names for the segDict (i.e. A, C, S, etc). Default is False, in which names will be A_Spatial, C_Temporal, etc.
             overwrite (bool): Flag indicating whether to overwrite existing files. Default is False.
             mc_iter (int): Number of iterations for motion correction. Default is 1.
+            compute_metrics (bool): Flag indicating whether to compute metrics for motion correction. Default is False.
+            use_cropper (bool): Flag indicating whether to use the cropping utility. Default is False.
+            separate_channels (bool): Flag indicating whether to motion correct channels separately. Only applicable for 2photon data with 2 channels. Default is False.
         """
         self.program_name = "M2SD"
         path = kwargs.get("path", [])
         sess2process = kwargs.get("sess2process", [])
-        n_proc4MOCO = kwargs.get("n_proc4MOCO", 1)
+        n_proc4MOCO = kwargs.get("n_proc4MOCO", 26)
         n_proc4CNMF = kwargs.get("n_proc4CNMF", 1)
-
         concatCheck = kwargs.get("concatenate", False)
-
         motion_correct = kwargs.get("motion_correct", True)
         segment = kwargs.get("segment", True)
-
         prev_sd_varnames = kwargs.get("prev_sd_varnames", False)
-
         overwrite = kwargs.get("overwrite", False)
-
         mc_iter = kwargs.get("mc_iter", 1)
+        compute_metrics = kwargs.get("compute_metrics", False)
+        use_cropper = kwargs.get("use_cropper", False)
+        separate_channels = kwargs.get("separate_channels", False)
 
         M2SDM.__init__(
             self,
@@ -88,6 +90,9 @@ class MoCo2segDict(M2SDM):
             prev_sd_varnames=prev_sd_varnames,
             mc_iter=mc_iter,
             overwrite=overwrite,
+            compute_metrics=compute_metrics,
+            use_cropper=use_cropper,
+            separate_channels=separate_channels,
         )
 
         self.step_headers = self.text_lib["steps"][self.program_name]["header"]
@@ -221,11 +226,11 @@ class MoCo2segDict(M2SDM):
         # load mmap file of processed image stack
         # reshape into [frames, y, x]
         if self.motion_correct:
-            mmap_postproc_to_load = self.fname_mmap_postproc
+            mmaps2load = self.fname_mmap_postproc
         else:
             # w/no moco, need to find mmap file
-            mmap_postproc_to_load = self.find_mmap_fname()
-            if not mmap_postproc_to_load:
+            mmaps2load = self.find_mmap_fname()
+            if not mmaps2load:
                 # if no mmap is found assumes motion correction has not been done
                 self.rprint("No post-processed memmap file found")
                 self.rprint("Running Motion Correction & post-processing again...")
@@ -234,11 +239,9 @@ class MoCo2segDict(M2SDM):
                 self.M2SD_MOCO()
                 self.M2SD_POST_MOCO_PROC()
                 # load mmap file of processed image stack
-                mmap_postproc_to_load = self.fname_mmap_postproc
+                mmaps2load = self.fname_mmap_postproc
 
-        self.load_mmap_ImageStack(
-            mmap_fname_to_load=mmap_postproc_to_load, store4CNMF=True
-        )
+        self.load_mmap_ImageStack(mmap_fname_to_load=mmaps2load, store4CNMF=True)
         self.utils.section_breaker("dotted", mini=True)
         self.rprint("Memmap is loaded\n")
 
@@ -253,33 +256,10 @@ class MoCo2segDict(M2SDM):
         # - method_deconvolution, check_nan
         # otherwise uses default values from CNMF_enum
         # initialized class finds patches, evaluates components, plots components, & refines patches
-        self.initializeCNMF()
-
-        # find initial patches
-        self.find_init_patches_viaCNMF()
-
-        # COMPONENT EVALUATION
-        # the components are evaluated in three ways:
-        #   a) the shape of each component must be correlated with the data
-        #   b) a minimum peak SNR is required over the length of a transient
-        #   c) each shape passes a CNN based classifier
-        self.evaluate_found_patches()
-
-        # plot contours of components/patches
-        self.plot_contours()
-
-        # REFINING PATCHES
-        self.refine_patches_using_accepted_patches()
-
-        # Extract DF/F values
-        self.calc_CaTransients()
-
-        # Creating & saving segDict
-        # print("Saving segDict")
-        # keys w/in segDict:
-        # - A_Spatial, C_Temporal, DF/F0, dx, dy, S_Deconvolution
-        # full segDict name ending = _[DATE, if duplicate]_sqz_eMC_caChExpDS_segDict.mat
-        self.save_segDict()
+        # saves results as segDict
+        # - structure of segDict:
+        #   - A_Spatial, C_Temporal, DF/F0, dx, dy, S_Deconvolution
+        self.run_CNMF()
 
         # save Residuals as .mp4
         # concatenate movie of moco - reconstruced (w/wo background)

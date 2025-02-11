@@ -193,10 +193,8 @@ class pks_utils:
         N, edges = np.histogram(std_nonzero, bins=10)
 
         # Find indices of the elements in the lowest std bin
-        bin_indices = np.digitize(
-            std_nonzero, edges
-        )  # Get bin indices for each element
-        lowest_std_bin = bin_indices == 1  # Bin 1 is the first bin (lowest std)
+        bin_indices = np.digitize(std_nonzero, edges)
+        lowest_std_bin = bin_indices == 1
 
         # Calculate mean and std of epochMean for the lowest std bin
         caMeanBaseline = np.mean(means_nonzero[lowest_std_bin])

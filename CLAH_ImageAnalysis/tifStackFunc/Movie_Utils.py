@@ -1,6 +1,7 @@
 import caiman as cm
 import h5py
 import numpy as np
+import cv2
 from skimage.util import img_as_uint
 
 
@@ -75,7 +76,7 @@ def create_denoised_movie(
     dims: tuple,
     wBackground: bool = False,
     normalize: bool = False,
-) -> np.ndarray:
+) -> object:
     """
     Create a denoised movie from CNMF-Estimates.
 
@@ -125,22 +126,31 @@ def normNconvert2uint(stack_to_norm: np.ndarray) -> np.ndarray:
     return norm_uint_stack_movie
 
 
-def concatenate_movies(movies: list, axis: int = 2) -> np.ndarray:
+def concatenate_movies(
+    movies: list, axis: int = 2, use_caiman: bool = True
+) -> np.ndarray | object:
     """
     Concatenates a list of movies along a specified axis.
 
     Parameters:
         movies (list): A list of movies to be concatenated.
         axis (int, optional): The axis along which the movies should be concatenated. Defaults to 2.
-
+        use_caiman (bool, optional): Whether to use Caiman's concatenate function. Defaults to True.
     Returns:
         ndarray: The concatenated movie.
     """
-    return cm.concatenate(movies, axis=axis)
+    if use_caiman:
+        return cm.concatenate(movies, axis=axis)
+    else:
+        return np.concatenate(movies, axis=axis)
 
 
 def save_movie(
-    movie: object, fname: str, ftag: str, element_size_um: list[float] = []
+    movie: object,
+    fname: str,
+    ftag: str,
+    element_size_um: list[float] | None = None,
+    use_caiman: bool = True,
 ) -> None:
     """
     Save a movie to a file.
@@ -157,7 +167,16 @@ def save_movie(
     file_tag = text_dict()["file_tag"]
 
     if ftag == file_tag["AVI"]:
-        movie.save(f"{fname}{ftag}")
+        if use_caiman:
+            movie.save(f"{fname}{ftag}")
+        else:
+            fourcc = cv2.VideoWriter_fourcc(*"XVID")
+            out = cv2.VideoWriter(
+                f"{fname}{ftag}", fourcc, 30.0, (movie.shape[2], movie.shape[1])
+            )
+            for frame in movie:
+                out.write(frame)
+            out.release()
     elif ftag == file_tag["H5"]:
         fname = f"{fname}{ftag}"
         with h5py.File(fname, "w") as hf:
@@ -167,3 +186,53 @@ def save_movie(
                 ds.attrs["element_size_um"] = np.array(element_size_um)
             else:
                 ds.attrs["element_size_um"] = np.array([np.nan, np.nan, np.nan])
+
+
+def add_caption_to_movie(
+    movie: np.ndarray,
+    text: str,
+    num_frames: int = 100,
+    bit_depth: type = np.uint8,
+) -> object:
+    """
+    Add a caption with a semi-transparent background to the first N frames of a movie.
+
+    Parameters:
+        movie (np.ndarray): The input movie array with shape (frames, height, width).
+        text (str): The text caption to add to the frames.
+        num_frames (int, optional): Number of frames to add the caption to. Defaults to 30.
+        bit_depth (type, optional): The bit depth of the movie. Defaults to np.uint8.
+
+    Returns:
+        np.ndarray: Movie array with caption added to specified number of frames.
+            The caption includes a semi-transparent black background rectangle with
+            red text overlaid.
+    """
+    movie_norm = cv2.normalize(
+        movie, None, 0, np.iinfo(bit_depth).max, cv2.NORM_MINMAX
+    ).astype(bit_depth)
+
+    movie_bgr = []
+    for frame in movie_norm:
+        movie_bgr.append(cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR))
+    movie_bgr = np.array(movie_bgr)
+
+    # only process first num_frames (or all frames if num_frames > len(movie))
+    num_frames = min(num_frames, len(movie))
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    position = (10, 30)
+    font_scale = 0.5
+    color = (0, 0, np.iinfo(bit_depth).max)  # Red
+    thickness = 1
+
+    # Add red text to first N frames
+    for frame_idx in range(min(num_frames, len(movie))):
+        cv2.putText(
+            movie_bgr[frame_idx], text, position, font, font_scale, color, thickness
+        )
+
+    # # convert to movie
+    # movie_bgr = cm.movie(movie_bgr)
+
+    return movie_bgr

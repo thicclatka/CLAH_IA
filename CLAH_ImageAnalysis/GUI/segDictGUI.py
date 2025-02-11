@@ -1,32 +1,14 @@
+import os
 import tkinter as tk
 from textwrap import dedent
 
+import numpy as np
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 from typing import Any, Optional
 
 from CLAH_ImageAnalysis.GUI import BaseGUI
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
-from CLAH_ImageAnalysis.utils import color_dict
-from CLAH_ImageAnalysis.utils import enum2dict
-from CLAH_ImageAnalysis.utils import findLatest
-from CLAH_ImageAnalysis.utils import image_utils
-from CLAH_ImageAnalysis.utils import load_file
-from CLAH_ImageAnalysis.utils import text_dict
-
-text_lib = text_dict()
-file_tag = text_lib["file_tag"]
-dict_name = text_lib["dict_name"]
-FR, EFR = text_lib["frames"]["FR"], text_lib["frames"]["EFR"]
-GUICLASS = text_lib["GUICLASSUTILS"]
-GUI_ELE = text_lib["GUI_ELEMENTS"]
-color_dict = color_dict()
-cSS_str = enum2dict(UA_enum.CSS)
-done_gui = text_lib["completion"]["GUI"]
-
-
-DS_image = (
-    file_tag["AVGCA"] + file_tag["TEMPFILT"] + file_tag["DOWNSAMPLE"] + file_tag["IMG"]
-)
+from CLAH_ImageAnalysis.unitAnalysis import pks_utils
 
 
 class segDictGUI(BaseGUI):
@@ -37,7 +19,7 @@ class segDictGUI(BaseGUI):
         segDict (dict): A dictionary containing segmentation data.
         cueShiftTuning (dict): A dictionary containing cue shift tuning data.
         pksDict (dict): A dictionary containing peak data.
-        fileID (str): The ID of the loaded file.
+        subjID (str): The ID of the loaded file.
         ax_list (list): A list of axes objects for the plots.
         Frame_List (list): A list of frame objects for resizing.
         canvas_list (list): A list of canvas objects for the plots.
@@ -54,8 +36,6 @@ class segDictGUI(BaseGUI):
     """
 
     def __init__(self, enable_console: bool = False) -> None:
-        print(GUI_ELE["GUI_TITLE_START"].format(GUI_ELE["SD_TITLE"]))
-
         # init BaseGUI with 1400x1400+100+100 geometry
         super().__init__(
             enable_console=enable_console,
@@ -66,19 +46,21 @@ class segDictGUI(BaseGUI):
             y_offset=100,
         )
 
+        print(self.GUI_ELE["GUI_TITLE_START"].format(self.GUI_ELE["SD_TITLE"]))
+
         # set GUI title
-        self.set_GUI_title(GUI_ELE["SD_TITLE"])
+        self.set_GUI_title(self.GUI_ELE["SD_TITLE"])
 
         # init global vars for specific GUI
-        print(f"{FR}{GUICLASS['BU_GLOBALVARS']}")
+        self.print_wFrm(f"{self.GUICLASS['BU_GLOBALVARS']}")
         self.init_global_vars_SD()
 
         # init widgets
-        print(f"{FR}{GUICLASS['BU_INITWIDGETS']}")
+        self.print_wFrm(f"{self.GUICLASS['BU_INITWIDGETS']}")
         self.init_widgets()
 
         # display menubar
-        print(f"{FR}{GUICLASS['BU_MENUBAR']}")
+        self.print_wFrm(f"{self.GUICLASS['BU_MENUBAR']}")
         self.display_menu_bar()
 
         # TODO fix scale
@@ -101,7 +83,7 @@ class segDictGUI(BaseGUI):
         - segDict: A dictionary for segmentation.
         - cueShiftTuning: A dictionary for cue shift tuning.
         - pksDict: A dictionary for peaks.
-        - fileID: The file ID.
+        - subjID: The file ID.
         - ax_list: A list of axes.
         - Frame_List: A list of frames.
         - canvas_list: A list of canvases.
@@ -119,9 +101,10 @@ class segDictGUI(BaseGUI):
         self.segDict = {}
         self.cueShiftTuning = {}
         self.pksDict = {}
-        self.fileID = None
+        self.subjID = None
         self.ax_list = []
         self.Frame_List = []
+        self.LB_list = []
         self.canvas_list = []
         self.figsize_ASP = (3, 3)
         self.figsize_CTP = (7, 2)
@@ -133,9 +116,24 @@ class segDictGUI(BaseGUI):
         self.ASP_VAR.set("0")
 
         self.entryspan_ASP = int(self.tot_column_used // (4))
-        self.figspan_ASP = int(self.tot_column_used // (4 / 3))
+        self.figspan_ASP = int(self.tot_column_used // 2)
         self.figspan_CTP = int(self.tot_column_used // (3 / 2))
         self.figspan_ACTP = int(self.tot_column_used // (3))
+        self.cspan4list_ratio = 2 / 3
+        self.cspan4AEntry_ratio = 1 - self.cspan4list_ratio
+
+        self.PKSkey = self.enum_utils.enum2dict(UA_enum.PKS)
+        # self.cSS_str = self.enum_utils.enum2dict(UA_enum.CSS)
+
+        self.fps = UA_enum.Parser4QT.ARG_DICT.value[("fps", "f")]["DEFAULT"]
+        self.sdThresh = UA_enum.Parser4QT.ARG_DICT.value[("sdThresh", "sdt")]["DEFAULT"]
+        self.timeout = UA_enum.Parser4QT.ARG_DICT.value[("timeout", "to")]["DEFAULT"]
+
+        self.PKSUtils = pks_utils(
+            fps=self.fps,
+            sdThresh=self.sdThresh,
+            timeout=self.timeout,
+        )
 
     def init_widgets(self) -> None:
         """
@@ -152,6 +150,7 @@ class segDictGUI(BaseGUI):
             None
         """
         self._create_fig_frames()
+        self._create_listbox()
         self._create_entry_frames()
         self._create_plts()
         self._create_buttons()
@@ -185,26 +184,26 @@ class segDictGUI(BaseGUI):
         # Filling out menu bar
         # Add File menu
         file_commands = {
-            GUI_ELE["LOAD"]: self.load_file4GUI,
-            GUI_ELE["SAV_FIG"]: [],
+            self.GUI_ELE["LOAD_SESS"]: self.load_sessions4GUI,
+            self.GUI_ELE["SAV_FIG"]: [],
             "separator": None,
             "Quit": self.quit_app,
         }
-        self.MenuBarUtils.create_menu(GUI_ELE["MMENU"], file_commands)
+        self.MenuBarUtils.create_menu(self.GUI_ELE["MMENU"], file_commands)
         self.MenuBarUtils.update_menu_item_state(
-            GUI_ELE["MMENU"], GUI_ELE["SAV_FIG"], tk.DISABLED
+            self.GUI_ELE["MMENU"], self.GUI_ELE["SAV_FIG"], tk.DISABLED
         )
 
         # Add Edit menu
-        edit_commands = {GUI_ELE["RESET"]: self.reset_gui}
-        self.MenuBarUtils.create_menu(GUI_ELE["EDIT"], edit_commands)
+        edit_commands = {self.GUI_ELE["RESET"]: self.reset_gui}
+        self.MenuBarUtils.create_menu(self.GUI_ELE["EDIT"], edit_commands)
 
         if self.enable_console:
             # Add View menu
             view_commands = {
-                GUI_ELE["CONSOLE"]: self.toggle_console,
+                self.GUI_ELE["CONSOLE"]: self.toggle_console,
             }
-            self.MenuBarUtils.create_menu(GUI_ELE["VIEW"], view_commands)
+            self.MenuBarUtils.create_menu(self.GUI_ELE["VIEW"], view_commands)
 
     def _create_fig_frames(self) -> None:
         """
@@ -245,6 +244,73 @@ class segDictGUI(BaseGUI):
             config=figframe_CTP_peaktrace_config,
         )
 
+    def _create_listbox(self) -> None:
+        self.cspan4listbox = int(self.figspan_ASP * self.cspan4list_ratio)
+        # create label for listbox
+        listbox_label_config = self.config_maker(
+            text="Sessions",
+            row=0,
+            column=self.figspan_ASP,
+            columnspan=self.cspan4listbox,
+            sticky="nsew",
+        )
+        self.WidgetUtils.create_tk_widget(
+            widget_type="LABEL", name="SESSIONS_LABEL", config=listbox_label_config
+        )
+        # Create a frame to hold listbox and button
+        listbox_frame_config = self.config_maker(
+            row=1,
+            column=self.figspan_ASP,
+            columnspan=self.cspan4listbox,
+            sticky="nsew",
+        )
+        self.WidgetUtils.create_tk_widget(
+            widget_type="FRAME",
+            name="LISTBOX_FRAME",
+            config=listbox_frame_config,
+        )
+        self.LISTBOX_FRAME = self.WidgetUtils.frames["LISTBOX_FRAME"]
+
+        # Listbox to the right of ASP image
+        listbox_config = self.config_maker(
+            row=0,
+            column=0,
+            sticky="nsew",
+            height=20,
+            width=30,
+            in_=self.LISTBOX_FRAME,
+        )
+
+        self.WidgetUtils.create_tk_widget(
+            widget_type="LISTBOX",
+            name="DISPLAY_SESSIONS",
+            config=listbox_config,
+            diff_parent=self.LISTBOX_FRAME,
+        )
+
+        # add button to select session
+        load_button_config = self.config_maker(
+            text=self.GUI_ELE["UNUSABLE"],
+            row=1,
+            column=0,
+            sticky="nsew",
+            command=self.load_file4GUI,
+            in_=self.LISTBOX_FRAME,
+            state=tk.DISABLED,
+        )
+        self.WidgetUtils.create_tk_widget(
+            widget_type="BUTTON",
+            name="LOAD_SESSION",
+            config=load_button_config,
+            diff_parent=self.LISTBOX_FRAME,
+        )
+
+        self.LISTBOX = self.WidgetUtils.listboxes["DISPLAY_SESSIONS"]
+
+        self.LB_list.append(self.LISTBOX)
+
+        self.Frame_List.append(self.LISTBOX_FRAME)
+
     def _create_entry_frames(self) -> None:
         """
         Creates entry frames for ASP and CTP in the GUI.
@@ -258,7 +324,10 @@ class segDictGUI(BaseGUI):
         """
         # frame entry for ASP entry
         entryframe_ASpat_config = self.config_maker(
-            row=1, column=self.figspan_ASP, rowspan=1, sticky="nsew"
+            row=1,
+            column=int(self.figspan_ASP + self.cspan4listbox),
+            rowspan=1,
+            sticky="nsew",
         )
         self.WidgetUtils.create_tk_widget(
             widget_type="FRAME", name="ASPAT_ENTRY", config=entryframe_ASpat_config
@@ -278,13 +347,11 @@ class segDictGUI(BaseGUI):
         self.ASP_ENTRY = self.WidgetUtils.frames["ASPAT_ENTRY"]
         self.CTP_ENTRY = self.WidgetUtils.frames["CTP_ENTRY"]
         # store frames into list for easy access later for resizing
-        self.Frame_List = [
-            self.ASP_FIG_FRAME,
-            self.CTP_FIG_FRAME,
-            self.CTP_FIG_TRACE_FRAME,
-            self.ASP_ENTRY,
-            self.CTP_ENTRY,
-        ]
+        self.Frame_List.append(self.ASP_FIG_FRAME)
+        self.Frame_List.append(self.CTP_FIG_FRAME)
+        self.Frame_List.append(self.CTP_FIG_TRACE_FRAME)
+        self.Frame_List.append(self.ASP_ENTRY)
+        self.Frame_List.append(self.CTP_ENTRY)
 
     def _create_plts(self) -> None:
         """
@@ -315,7 +382,9 @@ class segDictGUI(BaseGUI):
             column=0,
             columnspan=self.figspan_ASP,
         )
-        self.ax_ASP.set_facecolor(color_dict["black"])
+        self.ax_ASP.set_facecolor(self.color_dict["black"])
+        self.ax_ASP.set_xticks([])
+        self.ax_ASP.set_yticks([])
 
         # C Temporal plot
         self.fig_CTP, self.ax_CTP, self.canvas_CTP = self.create_canvas_plt(
@@ -368,33 +437,92 @@ class segDictGUI(BaseGUI):
         # resize frames
         for frame in self.Frame_List:
             self.config_rowsNcols2resize(columns=True, rows=True, parent=frame)
-        self.canvas_CTP.draw()
-        self.canvas_ASP.draw()
-        self.canvas_CTP_trc.draw()
+        for lb in self.LB_list:
+            self.config_rowsNcols2resize(columns=True, rows=True, parent=lb)
+        for can in self.canvas_list:
+            can.draw()
         self.root.update()
 
     ######################################################
     #  Load file funcs
     ######################################################
 
-    def load_file4GUI(self) -> None:
+    def load_sessions4GUI(self) -> None:
         """
         Loads a file for the GUI.
 
         If a file is already loaded, it resets the GUI.
         It then performs various update operations and prints messages.
         """
-        if self.fileID:
+        if self.subjID:
             self.reset_gui()
-        self._CSS_load_utils()
-        self._update_load_label_post_load()
-        self._update_ASP_wDSimage_at_Start()
-        self._format_post_load_entries()
-        self.print_post_loadORreset_msg()
-        self.update_ASpat_image_wDS_Entry()
-        self.update_CTP_plot(reset=True)
+        self._load_sessionsNfill_listbox()
 
-    def _CSS_load_utils(self) -> None:
+    def load_file4GUI(self) -> None:
+        self._load_selected_session()
+        self._load_segDictNRelatedData()
+        self._update_load_label_post_load()
+        self._format_post_load_entries()
+        self._update_ASP_wDSimage_at_Start()
+        self.print_post_loadORreset_msg()
+        self.update_CTP_plot(reset=True)
+        print()
+        # self.update_ASpat_image_wDS_Entry()
+        pass
+
+    def _load_selected_session(self) -> None:
+        """
+        Event handler for the listbox selection event.
+        """
+        if not self.LISTBOX.curselection():
+            return
+        selected_idx = self.LISTBOX.curselection()[0]
+        self.selected_sess = self.sess_list2use[selected_idx]
+
+        self.full_sessPath = self.selected_sess[0]
+        self.sess_basename = self.selected_sess[1]
+        self.pkl_fname = self.selected_sess[2]
+        self.date = self.selected_sess[3]
+        self.subjID = self.selected_sess[4]
+        self.sessType = self.selected_sess[5]
+
+        # change directory to the selected session
+        os.chdir(self.full_sessPath)
+
+        print(f"Selected session: {self.sess_basename}")
+        self.print_wFrm(f"Full Session Path: {self.full_sessPath}")
+        self.print_wFrm(f"PKL File Name: {os.path.basename(self.pkl_fname)}")
+        self.print_wFrm(f"Date: {self.date}", frame_num=1)
+        self.print_wFrm(f"Subject ID: {self.subjID}", frame_num=1)
+        self.print_wFrm(f"Session Type: {self.sessType}", frame_num=1)
+
+    def _load_sessionsNfill_listbox(self) -> None:
+        self.dataDir, self.sess_list2use = self.get_eligible_sessions(
+            ql_file_tag="SD_PKL", date_first=True
+        )
+        self.LISTBOX.delete(0, tk.END)
+        for sess in self.sess_list2use:
+            self.LISTBOX.insert(tk.END, sess[1])
+
+        # activate load button
+        load_button_config = self.config_maker(
+            text=self.GUI_ELE["LOAD_SESS_SELECTED"],
+            row=1,
+            column=0,
+            sticky="nsew",
+            command=self.load_file4GUI,
+            in_=self.LISTBOX_FRAME,
+            state=tk.NORMAL,
+        )
+        self.WidgetUtils.create_tk_widget(
+            widget_type="BUTTON",
+            name="LOAD_SESSION",
+            config=load_button_config,
+            diff_parent=self.LISTBOX_FRAME,
+        )
+        # print()
+
+    def _load_segDictNRelatedData(self) -> None:
         """
         Load utilities for CSS (Cue Shift Structure).
 
@@ -405,25 +533,25 @@ class segDictGUI(BaseGUI):
         Returns:
             None
         """
-        (
+        self.print_wFrm("Extracting segDict", end="", flush=True)
+        self.segDict = self.saveNloadUtils.load_file(
             self.pkl_fname,
-            self.fileID,
-            self.date,
-            self.session,
-        ) = self.get_pkl_fnameNfileID(
-            dict_name["CSS"], file_tag["PKL"], date_first=True
         )
-        print("cueShiftStruc selected...", end="", flush=True)
-        self.cueShiftStruc = load_file(self.pkl_fname, file_tag["PKL"])
-        print("extracting segDict...", end="", flush=True)
-        self.segDict = load_file(
-            self.cueShiftStruc["segDict"].replace(file_tag["MAT"], file_tag["PKL"]),
-            file_tag["PKL"],
-        )
-        print("filling in pksDict...", end="", flush=True)
-        self.pksDict = self.cueShiftStruc[cSS_str["PKS"]]
-        # remove cueShiftStruc
-        del self.cueShiftStruc
+        self.C_Temporal = self.segDict["C_Temporal"]
+        self.A_Spatial = self.segDict["A_Spatial"]
+        self.max_cell_num = self.A_Spatial.shape[1]
+
+        self.utils.print_done_small_proc(new_line=False)
+
+        self.print_wFrm("Finding pks", end="", flush=True, frame_num=1)
+        self.pks = {}
+        for seg in range(self.C_Temporal.shape[0]):
+            pks, _, _ = self.PKSUtils.find_CaTransients(
+                self.C_Temporal[seg, :].copy(), cell_num=seg
+            )
+            self.pks[f"{self.PKSkey['SEG']}{seg}"] = pks
+
+        self.utils.print_done_small_proc(new_line=False)
 
     def _update_load_label_post_load(self) -> None:
         """
@@ -439,11 +567,11 @@ class segDictGUI(BaseGUI):
         Returns:
             None
         """
-        load_label_wfileID_config = self.config_maker(
-            text=GUI_ELE["LOAD_ID"].format(self.fileID)
+        load_label_wsubjID_config = self.config_maker(
+            text=self.GUI_ELE["LOAD_ID"].format(self.subjID, self.date, self.sessType)
         )
         self.WidgetUtils.tk_update(
-            name=GUICLASS["BU_LOAD"], config=load_label_wfileID_config
+            name=self.GUICLASS["BU_LOAD"], config=load_label_wsubjID_config
         )
 
     def _format_post_load_entries(self) -> None:
@@ -460,9 +588,8 @@ class segDictGUI(BaseGUI):
         Returns:
             None
         """
-        max_val = self.segDict["A_Spatial"].shape[1]
         range_label_config = self.config_maker(
-            text=f" Available Range: 0 - {max_val} ",
+            text=f" Available Range: 0 - {self.max_cell_num} ",
             row=0,
             column=0,
             sticky="nsew",
@@ -470,7 +597,7 @@ class segDictGUI(BaseGUI):
         )
         self.WidgetUtils.create_tk_widget(
             widget_type="LABEL",
-            name=GUICLASS["BU_RANGE"],
+            name=self.GUICLASS["BU_RANGE"],
             config=range_label_config,
             diff_parent=self.WidgetUtils.frames["ASPAT_ENTRY"],
         )
@@ -485,6 +612,7 @@ class segDictGUI(BaseGUI):
             bindings={"<Return>": self.update_ASpat_image_wDS_Entry(reset=True)},
             justify="right",
         )
+
         self.WidgetUtils.create_tk_widget(
             widget_type="ENTRY",
             name="ENTRY_ASPAT",
@@ -495,13 +623,29 @@ class segDictGUI(BaseGUI):
 
         # set up CTP scale
         self.CTP_ENTRY_columnspan = self.CTP_ENTRY.grid_info()["columnspan"]
+
+        label_CTP_config = self.config_maker(
+            text=f"Select Cell # for Signal Trace (0-{self.max_cell_num})",
+            row=0,
+            column=0,
+            columnspan=1,
+            sticky="nsew",
+            in_=self.CTP_ENTRY,
+        )
+        self.WidgetUtils.create_tk_widget(
+            widget_type="LABEL",
+            name="CTP_ENTRY_LABEL",
+            config=label_CTP_config,
+            diff_parent=self.CTP_ENTRY,
+        )
+
         scale_CTP_config = self.config_maker(
             from_=0,
-            to=max_val,
+            to=self.max_cell_num,
             orient="horizontal",
             variable=self.CTP_VAR,
             command=self.on_slider_move,
-            row=0,
+            row=1,
             column=0,
             columnspan=1,
             padx=self.CTP_pad,
@@ -518,12 +662,15 @@ class segDictGUI(BaseGUI):
 
         # set up CTP entry
         self.CTP_VAR.trace("w", self.on_var_change)
-        vcmd = (self.root.register(lambda P: self.validate_entry(P, max_val)), "%P")
+        vcmd = (
+            self.root.register(lambda P: self.validate_entry(P, self.max_cell_num)),
+            "%P",
+        )
         entry_CTP_config = self.config_maker(
             textvariable=self.CTP_VAR,
             validate="key",
             validatecommand=vcmd,
-            row=1,
+            row=2,
             column=0,
             columnspan=1,
             padx=self.CTP_pad,
@@ -559,17 +706,20 @@ class segDictGUI(BaseGUI):
 
         for axes in self.ax_list:
             axes.clear()
+            axes.clf()
 
-        self.ax_ASP.set_facecolor(color_dict["black"])
+        self.ax_ASP.set_facecolor(self.color_dict["black"])
 
         for can in self.canvas_list:
+            can.figure.clear()
             can.draw()
 
         for entry in self.Frame_List:
             if entry in [self.ASP_ENTRY, self.CTP_ENTRY] and entry is not None:
                 entry.destroy()
         # after destroying must rebuild entry frames
-        self._create_entry_frames()
+        self.create_base_gui_header()
+        self.init_widgets()
 
         self.print_post_loadORreset_msg()
 
@@ -589,13 +739,23 @@ class segDictGUI(BaseGUI):
         Returns:
             None
         """
+        import matplotlib.pyplot as plt
+
         self.ax_ASP.clear()
-        image_file = findLatest(DS_image)
-        img = image_utils.read_image(image_file)
-        self.ax_ASP.set_title(
-            GUI_ELE["PLT_TITLE_CSS"].format(self.date, self.session), fontsize=7
-        )
-        self.ax_ASP.imshow(img, cmap="gray", aspect="equal")
+
+        image_file = self.findLatest(self.image_utils.get_DSImage_filename(wCMAP=True))
+        if image_file:
+            img = plt.imread(image_file)
+            # self.print_wFrm("Loaded DS image with CMap", frame_num=1)
+            self.ax_ASP.imshow(img)
+        else:
+            image_file = self.findLatest(self.image_utils.get_DSImage_filename())
+            img = self.image_utils.read_image(image_file)
+            # self.print_wFrm("Loaded DS image", frame_num=1)
+            self.ax_ASP.imshow(img, cmap="gray", aspect="equal")
+
+        self.ax_ASP.set_xticks([])
+        self.ax_ASP.set_yticks([])
         self.canvas_ASP.draw()
 
     def update_ASpat_image_wDS_Entry(
@@ -621,7 +781,7 @@ class segDictGUI(BaseGUI):
                 A_Spatial=A_Spatial, cell_num=cell, ax=self.ax_ASP, cmap=self.cmaps[0]
             )
         self.canvas_ASP.draw()
-        print(done_gui)
+        print(self.done_gui)
         print("Plotting Cell #s:")
         self.print_cell_num_plotted(selected_cells=selected_cells)
         print()
@@ -645,13 +805,11 @@ class segDictGUI(BaseGUI):
         self.ax_CTP_trc.clear()
 
         # Initialize matrices to plot
-        A_Spatial = self.segDict["A_Spatial"]
-        C_Temporal = self.segDict["C_Temporal"]
         selected_cell = int(self.CTP_VAR.get())
 
         # Plot selected cell in A_Spatial
         self.plot_select_cell_ASpat(
-            A_Spatial=A_Spatial,
+            A_Spatial=self.A_Spatial,
             cell_num=selected_cell,
             ax=self.ax_ASP,
             cmap=self.cmaps[1],
@@ -660,8 +818,8 @@ class segDictGUI(BaseGUI):
 
         # Plot selected cell in CTP
         self.plot_select_cell_CTP(
-            CTP=C_Temporal,
-            pks=self.pksDict,
+            CTP=self.C_Temporal,
+            pks=self.pks,
             cell_num=selected_cell,
             ax_CTP=self.ax_CTP,
             ax_pk_trace=self.ax_CTP_trc,
@@ -672,7 +830,7 @@ class segDictGUI(BaseGUI):
         for can in self.canvas_list:
             can.draw()
 
-        print(done_gui)
+        print(self.done_gui)
         print("Plotting Cell #s:")
 
         # For print, need to pass selected_cell as a list
@@ -722,13 +880,13 @@ class segDictGUI(BaseGUI):
         If a file ID is present, it indicates that the file was loaded and the status is set to "created".
         If no file ID is present, it indicates that the file was removed and the status is set to "removed".
         """
-        status = "created" if self.fileID else "removed"
+        status = "created" if self.subjID else "removed"
         print(
             dedent(
                 f"""\
-    {done_gui}
-    {FR}Loaded ID: {self.fileID}
-    {FR}Entry selection for cells was {status}
+    {self.done_gui}
+    {self.FR}Loaded ID: {self.subjID}
+    {self.FR}Entry selection for cells was {status}
     """
             )
         )

@@ -1,4 +1,5 @@
 import os
+import shutil
 import caiman as cm
 import matplotlib.pyplot as plt
 import numpy as np
@@ -68,8 +69,6 @@ class CNMF_Utils(BC):
         dims: tuple,
         n_processes: int,
         onePhotonCheck: bool = False,
-        method_init: str | None = None,
-        meth_deconv: str | None = None,
         extract_OR_detrend: str = "extract",
     ) -> None:
         """
@@ -107,68 +106,98 @@ class CNMF_Utils(BC):
         self.extract_OR_detrend = extract_OR_detrend
 
         # CNMF parameters vsee TSF_enum.CNMF_Params
-        self.k = self.CNMFpar["K"]
-        self.merge_thresh = self.CNMFpar["MERGE_THRESH"]
-        self.p = int(self.CNMFpar["P"])
-        self.gnb = self.CNMFpar["GNB"]
-        self.gSig = self.CNMFpar["GSIG"]
         self.alpha_snmf = int(self.CNMFpar["ALPHA_SNMF"])
-        self.only_init_patch = bool(self.CNMFpar["ONLY_INIT_PATCH"])
-        self.memory_fact = int(self.CNMFpar["MEMORY_FACT"])
-        self.frames = self.CNMFpar["FPS"]
+        self.check_nan = bool(self.CNMFpar["CHECK_NAN"])
+        self.center_psf = bool(self.CNMFpar["CENTER_PSF"])
         self.decay_time = self.CNMFpar["DECAY"]
+        self.frames = self.CNMFpar["FPS"]
+        self.frames_window = self.CNMFpar["FRAME_WINDOW"]
+        self.gSig = self.CNMFpar["GSIG"]
+        self.gSiz = self.CNMFpar["GSIZ"]
+        self.gnb = self.CNMFpar["GNB"]
+        self.k = self.CNMFpar["K"]
+        self.low_rank_background = bool(self.CNMFpar["LOW_RANK_BACKGROUND"])
+        self.memory_fact = int(self.CNMFpar["MEMORY_FACT"])
+        self.merge_thresh = self.CNMFpar["MERGE_THRESH"]
+        self.method_deconvolution = self.CNMFpar["METH_DECONV"]
+        self.method_init = self.CNMFpar["METHOD_INIT"]
+        self.min_pnr = self.CNMFpar["MIN_PNR"]
+        self.min_SNR = self.CNMFpar["MIN_SNR"]
+        self.min_corr = self.CNMFpar["MIN_CORR"]
+        self.nb_patch = self.CNMFpar["NB_PATCH"]
+        self.only_init_patch = bool(self.CNMFpar["ONLY_INIT_PATCH"])
+        self.p = int(self.CNMFpar["P"])
+        self.quantileMin = self.CNMFpar["QUANTILE_MIN"]
         self.r_values_min = self.CNMFpar["RVAL_THR"]
-        self.use_cnn = bool(self.CNMFpar["USE_CNN"])
+        self.s_min = self.CNMFpar["SPIKE_MIN"]
+        self.thresh_cnn_min = self.CNMFpar["CNN_THR"]
         self.thresh_cnn_min = self.CNMFpar["CNN_THR"]
         self.threshold = self.CNMFpar["CE_THRESH"]
+        self.use_cnn = bool(self.CNMFpar["USE_CNN"])
         self.vmax = self.CNMFpar["CE_VMAX"]
-        self.method_deconvolution = self.CNMFpar["METH_DECONV"]
-        self.check_nan = bool(self.CNMFpar["CHECK_NAN"])
-        self.quantileMin = self.CNMFpar["QUANTILE_MIN"]
-        self.frames_window = self.CNMFpar["FRAME_WINDOW"]
 
         if onePhotonCheck:
+            self.center_psf = bool(self.CNMFpar_1p["CENTER_PSF"])
+            self.frames = self.CNMFpar_1p["FPS"]
+            self.gSiz = self.CNMFpar_1p["GSIZ"]
+            self.gSig = self.CNMFpar_1p["GSIG"]
+            self.k = self.CNMFpar_1p["K"]
+            self.low_rank_background = self.CNMFpar_1p["LOW_RANK_BACKGROUND"]
+            self.merge_thresh = self.CNMFpar_1p["MERGE_THRESH"]
+            self.method_init = self.CNMFpar_1p["METHOD_INIT"]
+            self.min_pnr = self.CNMFpar_1p["MIN_PNR"]
             self.min_SNR = self.CNMFpar_1p["MIN_SNR"]
+            self.min_corr = self.CNMFpar_1p["MIN_CORR"]
+            self.r_values_min = self.CNMFpar_1p["RVAL_THR"]
+            self.s_min = self.CNMFpar_1p["SPIKE_MIN"]
             self.thresh_cnn_min = self.CNMFpar_1p["CNN_THR"]
-        else:
-            self.min_SNR = self.CNMFpar["MIN_SNR"]
-            self.thresh_cnn_min = self.CNMFpar["CNN_THR"]
 
-        # CNMF params that can be input via parser
         # see TSF_enum.CNMF_Params for defaults
-        self.method_init = (
-            self.CNMFpar["METHOD_INIT"] if method_init is None else method_init
-        )
-        self.method_deconvolution = (
-            self.CNMFpar["METH_DECONV"] if meth_deconv is None else meth_deconv
-        )
-
         paramsDict = {
-            "K": self.k,
-            "MERGE_THRESH": self.merge_thresh,
-            "P": self.p,
-            "GNB": self.gnb,
-            "GSIG": self.gSig,
             "ALPHA_SNMF": self.alpha_snmf,
-            "ONLY_INIT_PATCH": self.only_init_patch,
-            "MEMORY_FACT": self.memory_fact,
-            "METH_DECONV": self.method_deconvolution,
-            "CHECK_NAN": self.check_nan,
-            "QUANTILE_MIN": self.quantileMin,
-            "FRAME_WINDOW": self.frames_window,
-            "DECAY": self.decay_time,
-            "MIN_SNR": self.min_SNR,
-            "RVAL_THR": self.r_values_min,
-            "USE_CNN": self.use_cnn,
-            "CNN_THR": self.thresh_cnn_min,
+            "CENTER_PSF": self.center_psf,
             "CE_THRESH": self.threshold,
             "CE_VMAX": self.vmax,
+            "CHECK_NAN": self.check_nan,
+            "CNN_THR": self.thresh_cnn_min,
+            "DECAY": self.decay_time,
+            "FRAME_WINDOW": self.frames_window,
+            "GNB": self.gnb,
+            "GSIG": self.gSig,
+            "GSIZ": self.gSiz,
+            "K": self.k,
+            "LOW_RANK_BACKGROUND": self.low_rank_background,
+            "MEMORY_FACT": self.memory_fact,
+            "MERGE_THRESH": self.merge_thresh,
+            "METH_DECONV": self.method_deconvolution,
+            "METH_INIT": self.method_init,
+            "MIN_CORR": self.min_corr,
+            "MIN_PNR": self.min_pnr,
+            "MIN_SNR": self.min_SNR,
+            "NB_PATCH": self.nb_patch,
+            "ONLY_INIT_PATCH": self.only_init_patch,
+            "P": self.p,
+            "QUANTILE_MIN": self.quantileMin,
+            "RF": self.CNMFpar["RF"],
+            "RVAL_THR": self.r_values_min,
+            "SPIKE_MIN": self.s_min,
+            "STRIDE": self.CNMFpar["STRIDE"],
+            "USE_CNN": self.use_cnn,
         }
 
         CNMF_enum = Enum("CNMF_Params", paramsDict)
-        parFile = "CNMF" + "_onePhoton" if onePhotonCheck else ""
+        parFile = "CNMF" + ("_onePhoton" if onePhotonCheck else "")
 
         TSF_enum.export_settings2file(CNMF_enum, parFile)
+
+        wCH = None
+        if "Ch2" in self.basename:
+            wCH = "Ch2"
+        elif "Ch1" in self.basename:
+            wCH = "Ch1"
+
+        # DS image fname
+        self.DS_image = self.utils.image_utils.get_DSImage_filename(wCH=wCH)
 
         # strucs to fill
         self._init_strucs_to_fill()
@@ -225,6 +254,7 @@ class CNMF_Utils(BC):
                 n_processes=self.n_processes,
                 k=self.k,
                 gSig=self.gSig,
+                gSiz=self.gSiz,
                 merge_thresh=self.merge_thresh,
                 p=self.p,
                 dview=self.dview,
@@ -235,6 +265,13 @@ class CNMF_Utils(BC):
                 alpha_snmf=self.alpha_snmf,
                 only_init_patch=self.only_init_patch,
                 gnb=self.gnb,
+                low_rank_background=self.low_rank_background,
+                nb_patch=self.nb_patch,
+                min_corr=self.min_corr,
+                min_pnr=self.min_pnr,
+                min_SNR=self.min_SNR,
+                s_min=self.s_min,
+                center_psf=self.center_psf,
             )
             # fit CNMF model to image stack
             self.NonNegMatrix = NonNegMatrix.fit(self.Ca_Array)
@@ -260,6 +297,7 @@ class CNMF_Utils(BC):
                 n_processes=self.n_processes,
                 k=self.A_in.shape[-1],
                 gSig=self.gSig,
+                gSiz=self.gSiz,
                 p=self.p,
                 dview=self.dview,
                 merge_thresh=self.merge_thresh,
@@ -272,78 +310,18 @@ class CNMF_Utils(BC):
                 gnb=self.gnb,
                 method_deconvolution=self.method_deconvolution,
                 check_nan=self.check_nan,
+                center_psf=self.center_psf,
+                low_rank_background=self.low_rank_background,
+                nb_patch=self.nb_patch,
+                min_corr=self.min_corr,
+                min_pnr=self.min_pnr,
+                min_SNR=self.min_SNR,
+                s_min=self.s_min,
             )
             # fit CNMF model to image stack
             self.NonNegMatrix_post_refining = NonNegMatrix_post_refining.fit(
                 self.Ca_Array
             )
-
-        log_file = "ASpat/ASpat_log.txt"
-        if os.path.exists(log_file):
-            os.remove(log_file)
-
-        for i in range(self.NonNegMatrix_post_refining.estimates.A.shape[1]):
-            import tifffile as tif
-            from skimage.util import img_as_uint
-
-            comp = self.NonNegMatrix_post_refining.estimates.A[:, i]
-            comp = comp.toarray()
-            comp = np.transpose(comp.reshape(self.dims))
-            comp = comp / np.max(comp)
-            comp = img_as_uint(comp)
-
-            os.makedirs("ASpat", exist_ok=True)
-
-            tif.imwrite(
-                f"ASpat/Component_{i:02}.tif",
-                comp,
-            )
-
-            non_zero = np.where(comp > 0)
-            if len(non_zero[0]) == 0:
-                continue
-
-            # Calculate bounding box
-            min_y, max_y = np.min(non_zero[0]), np.max(non_zero[0])
-            min_x, max_x = np.min(non_zero[1]), np.max(non_zero[1])
-
-            region = comp[min_y:max_y, min_x:max_x]
-            # Check corners
-            corners = [(0, 0), (0, -1), (-1, 0), (-1, -1)]
-            for y, x in corners:
-                if region[y, x] == 0:
-                    # Check if surrounded by non-zeros
-                    if y == 0:  # top row
-                        below = region[1, x] > 0
-                    else:  # bottom row
-                        below = region[-2, x] > 0
-
-                    if x == 0:  # left column
-                        right = region[y, 1] > 0
-                    else:  # right column
-                        right = region[y, -2] > 0
-
-                    if below and right:
-                        region[y, x] = np.max(region)
-
-            height = max_y - min_y + 1
-            width = max_x - min_x + 1
-
-            region = comp[min_y:max_y, min_x:max_x]
-            is_perfect = np.all(region > 0)
-
-            aspect_ratio = max(height / width, width / height)
-            msg = f"Component {i:02}: Aspect ratio: {aspect_ratio}"
-            print(msg)
-            with open(log_file, "a") as f:
-                f.write(msg + "\n")
-            if is_perfect:
-                msg = f"|-- Perfect Component {i:02}: {is_perfect}"
-                print(msg)
-                with open(log_file, "a") as f:
-                    f.write(msg + "\n")
-
-        print()
 
         # clear NonNegMatrix for memory
         with self.StatusPrinter.garbage_collector():
@@ -523,7 +501,7 @@ class CNMF_Utils(BC):
         dict_name = self.text_lib["dict_name"]
 
         segDict = {}
-        segFilename = self.basename + self.file_tag["COMP_SDFNAME"]
+        segFilename = self.basename + self.file_tag["SD"]
         filetype_to_save = [
             self.file_tag["H5"],
             self.file_tag["PKL"],
@@ -535,10 +513,7 @@ class CNMF_Utils(BC):
         SDkey = self.enum2dict(TSF_enum.segDict_Txt)
 
         if prev_sd_varnames:
-            segFilename = (
-                self.basename + "_prevNameVar_" + self.file_tag["COMP_SDFNAME"]
-            )
-            filetype_to_save = [self.file_tag["MAT"]]
+            segFilename = self.basename + "_prevNameVar_" + self.file_tag["SD"]
             SDkey["A_SPATIAL"] = "A"
             SDkey["C_TEMPORAL"] = "C"
             SDkey["B_BACK_SPAT"] = "b"
@@ -547,6 +522,8 @@ class CNMF_Utils(BC):
             SDkey["DX"] = "d1"
             SDkey["DY"] = "d2"
             SDkey["S_DECONV"] = "S"
+            SDkey["YRA"] = "YrA"
+            SDkey["RSR"] = "R"
 
         segDict = {
             SDkey["C_TEMPORAL"]: self.NonNegMatrix_post_refining.estimates.C,
@@ -557,7 +534,10 @@ class CNMF_Utils(BC):
             SDkey["DX"]: self.dx,
             SDkey["DY"]: self.dy,
             SDkey["S_DECONV"]: self.NonNegMatrix_post_refining.estimates.S,
+            SDkey["YRA"]: self.NonNegMatrix_post_refining.estimates.YrA,
+            SDkey["RSR"]: self.NonNegMatrix_post_refining.estimates.R,
         }
+
         self.saveNloadUtils.savedict2file(
             dict_to_save=segDict,
             dict_name=dict_name["SD"],
@@ -566,7 +546,12 @@ class CNMF_Utils(BC):
             filetype_to_save=filetype_to_save,
         )
 
+        print("Plotting C Temporal Results", end="", flush=True)
         self._plot_CTemp(CTemp=segDict[SDkey["C_TEMPORAL"]])
+        self.print_done_small_proc(new_line=False)
+        print("Plotting A Spatial Results", end="", flush=True)
+        self._plot_A_Spat(A_Spat=segDict[SDkey["A_SPATIAL"]])
+        self.print_done_small_proc(new_line=False)
 
         if concatCheck:
             print(
@@ -649,3 +634,112 @@ class CNMF_Utils(BC):
             showlegend=False,
         )
         self.fig_tools.save_plotly(plotly_fig=fig, fig_name=f"{self.basename}_CTemp")
+
+    def _plot_A_Spat(self, A_Spat: np.ndarray) -> None:
+        DS_image = self.image_utils.read_image(self.findLatest(self.DS_image))
+
+        fig, ax = self.fig_tools.create_plt_subplots()
+        ax.imshow(DS_image, cmap="grey", aspect="equal")
+
+        new_shape = (A_Spat.shape[1], DS_image.shape[0], DS_image.shape[1])
+        ASpat2use = A_Spat.toarray()
+        ASpat2use = np.transpose(ASpat2use)
+        ASpat2use = ASpat2use.reshape(new_shape)
+
+        RGB_color = self.fig_tools.hex_to_rgba(self.color_dict["green"], wAlpha=False)
+        cmap = self.fig_tools.make_segmented_colormap(
+            cmap_name="DSImage", hex_color=RGB_color, from_white=True
+        )
+
+        cell_num = ASpat2use.shape[0]
+
+        for cell in range(cell_num):
+            data_2d = ASpat2use[cell, :, :]
+            self.fig_tools.plot_imshow(
+                fig=fig,
+                axis=ax,
+                data2plot=data_2d.T,
+                cmap=cmap,
+                alpha=1,
+                vmax=data_2d.max(),
+            )
+            self.fig_tools.label_cellNum_overDSImage(
+                axis=ax,
+                data=data_2d,
+                cell_str=f"Cell_{cell}",
+                color=self.color_dict["red"],
+                fontsize=10,
+            )
+
+        self.fig_tools.save_figure(
+            plt_figure=fig,
+            fig_name=f"{self.basename}_ASpat",
+        )
+
+        # ASP_fname = self.text_lib["Folders"]["ASPAT_CHECK"]
+        # log_file = f"{ASP_fname}/ASpat_log.txt"
+        # if os.path.exists(log_file):
+        #     os.remove(log_file)
+        # if os.path.exists(ASP_fname):
+        #     shutil.rmtree(ASP_fname)
+
+        # for i in range(A_Spat.shape[1]):
+        #     import tifffile as tif
+        #     from skimage.util import img_as_ubyte
+
+        #     comp = A_Spat[:, i]
+        #     comp = comp.toarray()
+        #     comp = np.transpose(comp.reshape(self.dims))
+        #     comp = comp / np.max(comp)
+        #     comp = img_as_ubyte(comp)
+
+        #     os.makedirs(ASP_fname, exist_ok=True)
+
+        #     tif.imwrite(
+        #         f"{ASP_fname}/Component_{i:03}.tif",
+        #         comp,
+        #     )
+
+        #     non_zero = np.where(comp > 0)
+        #     if len(non_zero[0]) == 0:
+        #         continue
+
+        #     # Calculate bounding box
+        #     min_y, max_y = np.min(non_zero[0]), np.max(non_zero[0])
+        #     min_x, max_x = np.min(non_zero[1]), np.max(non_zero[1])
+
+        #     region = comp[min_y:max_y, min_x:max_x]
+        #     # Check corners
+        #     corners = [(0, 0), (0, -1), (-1, 0), (-1, -1)]
+        #     for y, x in corners:
+        #         if region[y, x] == 0:
+        #             # Check if surrounded by non-zeros
+        #             if y == 0:  # top row
+        #                 below = region[1, x] > 0
+        #             else:  # bottom row
+        #                 below = region[-2, x] > 0
+
+        #             if x == 0:  # left column
+        #                 right = region[y, 1] > 0
+        #             else:  # right column
+        #                 right = region[y, -2] > 0
+
+        #             if below and right:
+        #                 region[y, x] = np.max(region)
+
+        #     height = max_y - min_y + 1
+        #     width = max_x - min_x + 1
+
+        #     # region = comp[min_y:max_y, min_x:max_x]
+        #     # is_perfect = np.all(region > 0)
+
+        #     aspect_ratio = max(height / width, width / height)
+        #     msg = f"Component {i:03}: Aspect ratio: {aspect_ratio}"
+        #     # print(msg)
+        #     with open(log_file, "a") as f:
+        #         f.write(msg + "\n")
+        #     # if is_perfect:
+        #     #     msg = f"|-- Perfect Component {i:03}: {is_perfect}"
+        #     #     # print(msg)
+        #     #     with open(log_file, "a") as f:
+        #     #         f.write(msg + "\n")

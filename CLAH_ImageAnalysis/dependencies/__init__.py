@@ -6,6 +6,7 @@ __all__ = [
     "local_minima",
     "find_maxIndNsortmaxInd",
     "filter_utils",
+    "normalization_utils",
     "geometric_tools",
     "CUDA_utils",
     # "GPU_SignalProc",
@@ -20,6 +21,7 @@ if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from .local_minima import *
     from .find_maxIndNsortmaxInd import *
     from .filter_utils import *
+    from .normalization_utils import *
     from .geometric_tools import *
     from .CUDA_utils import *
     # from .GPU_SignalProc import *

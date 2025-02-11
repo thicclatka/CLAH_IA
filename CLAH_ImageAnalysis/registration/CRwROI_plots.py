@@ -11,7 +11,11 @@ class CRwROI_plots(BC):
         # set ID
         self.ID = ID
         # RED, BLUE, GREEN
-        self.RBG = [(1, 0, 0), (0, 0, 1), (0, 1, 0)]
+        self.RBG = [
+            self.color_dict["red_base_rgb"],
+            self.color_dict["blue_base_rgb"],
+            self.color_dict["green_base_rgb"],
+        ]
         self.sim_rel_size = (20, 7)
         self.FOV_cluster_size = (20, 15)
         self.cue_cell_color = self.fig_tools.hex_to_rgba(

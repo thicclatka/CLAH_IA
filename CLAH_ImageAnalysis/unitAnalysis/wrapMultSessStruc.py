@@ -76,7 +76,6 @@ class wrapMultSessStruc(BC):
 
         self.program_name = "WMSS"
         self.class_type = "manager"
-        self.version = "0.1.0"
         BC.__init__(self, self.program_name, mode=self.class_type)
         # initiate H5_Utils
         self.H5_Utils = H5_Utils()

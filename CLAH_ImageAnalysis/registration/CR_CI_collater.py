@@ -10,7 +10,6 @@ class CR_CI_collater(BC):
     def __init__(self, path: str | list, sess2process: list, forPres: bool) -> None:
         self.program_name = "CIC"
         self.class_type = "manager"
-        self.version = "0.1.0"
         BC.__init__(self, self.program_name, mode=self.class_type)
 
         self.static_class_var_init(path, sess2process, forPres)
@@ -101,13 +100,18 @@ class CR_CI_collater(BC):
 
         self.optoCheck = False
 
-        if "Ag_VS_nonAg" in self.dayPath:
+        if "Ag_vs_nonAg" in self.dayPath and "NIAMossy" not in self.dayPath:
             if self.ID.startswith("aDk"):
                 self.df2input["Group"] = "AGED"
             elif self.ID.startswith("Dk"):
                 self.df2input["Group"] = "DK"
             elif self.ID.startswith("Wt"):
                 self.df2input["Group"] = "WT"
+        elif "Ag_vs_nonAg" in self.dayPath and "NIAMossy" in self.dayPath:
+            if any(substring in self.ID for substring in ["C"]):
+                self.df2input["Group"] = "NONAGED"
+            else:
+                self.df2input["Group"] = "AGED"
         elif "AD" in self.dayPath:
             if any(substring in self.ID for substring in ["21", "22", "23", "24"]):
                 self.df2input["Group"] = "AD"
@@ -373,7 +377,7 @@ class CR_CI_collater(BC):
 
         pVals = {
             t: {
-                r: {f"S{idx+1}": None for idx in range(n_sessions)}
+                r: {f"S{idx + 1}": None for idx in range(n_sessions)}
                 for r in ["Cue", "Tuned"]
             }
             for t in ["accepted_clusters", "underlying_cells"]
@@ -381,7 +385,7 @@ class CR_CI_collater(BC):
         mean_semVals = {
             t: {
                 gr: {
-                    f"S{idx+1}": {"MEAN": np.nan, "SEM": np.nan}
+                    f"S{idx + 1}": {"MEAN": np.nan, "SEM": np.nan}
                     for idx in range(n_sessions)
                 }
                 for gr in self.groupsCat
@@ -420,7 +424,7 @@ class CR_CI_collater(BC):
                     meanVal = filtered_table[f"{group}_mean"]
                     semVal = filtered_table[f"{group}_sem"]
                     for s_idx, idxname in enumerate(index2use):
-                        mean_semVals[t][group][f"S{s_idx+1}"] = {
+                        mean_semVals[t][group][f"S{s_idx + 1}"] = {
                             "MEAN": meanVal.loc[idxname],
                             "SEM": semVal.loc[idxname],
                         }
@@ -456,7 +460,7 @@ class CR_CI_collater(BC):
                         fontsize=8,
                         return_Pval=True,
                     )
-                    pVals[total2usekey][pVal_rkey][f"S{s_idx+1}"] = pVal
+                    pVals[total2usekey][pVal_rkey][f"S{s_idx + 1}"] = pVal
 
             total_means = [
                 self.means_table[f"{gr}_mean"][total2usekey] for gr in self.groupsCat
@@ -491,6 +495,7 @@ class CR_CI_collater(BC):
                 label=[gr for gr in self.groupsCat] + ["Cue", "Tuned"],
                 hatch=[None] * len(self.groupsCat) + ["//", None],
                 edgecolor=[self.color_dict["black"]] * len(fc),
+                alpha=[1.0] * len(self.groupsCat) + [None] * 2,
             )
 
             if t_idx == 0:
@@ -499,9 +504,9 @@ class CR_CI_collater(BC):
                 ax2plot.set_xlabel("Session", fontsize=self.label_fs)
             ax2plot.set_ylabel("Ratio", fontsize=self.label_fs)
             if t == "AC":
-                ax2plot.set_ylim(0, 0.4)
+                ax2plot.set_ylim(0, 0.5)
             elif t == "UC":
-                ax2plot.set_ylim(0, 0.12)
+                ax2plot.set_ylim(0, 0.2)
             ax2plot.set_xticks(index)
             ax2plot.tick_params(axis="both", which="major", labelsize=self.axis_fs)
             ax2plot.set_title(
@@ -581,17 +586,12 @@ class CR_CI_collater(BC):
             fontsize=self.title_fs_small,
         )
 
-        legend_handles = []
         fc = [colors2use[g_idx] for g_idx in range(len(self.groupsCat))]
-        labels = self.groupsCat
-        edgecolors = [self.color_dict["black"]] * len(fc)
-        for i in range(len(fc)):
-            self.fig_tools.create_legend_patch(
-                legend_handles,
-                facecolor=fc[i],
-                label=labels[i],
-                edgecolor=edgecolors[i],
-            )
+        legend_handles = self.fig_tools.create_legend_patch_fLoop(
+            facecolor=fc,
+            label=self.groupsCat,
+            edgecolor=[self.color_dict["black"]] * len(fc),
+        )
         ax.legend(handles=legend_handles, loc="upper center")
 
         self.fig_tools.save_figure(
@@ -684,7 +684,6 @@ class CR_CI_collater(BC):
         legend_handles = self.fig_tools.create_legend_patch_fLoop(
             facecolor=fc,
             label=self.groupsCat,
-            hatch=[None] * len(fc),
             edgecolor=[self.color_dict["black"]] * len(fc),
         )
         ax.legend(handles=legend_handles, loc="upper right")

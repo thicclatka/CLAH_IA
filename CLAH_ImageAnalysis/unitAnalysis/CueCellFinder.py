@@ -385,6 +385,10 @@ class CueCellFinder(CCF_Utils):
             omit2use = "OMITBOTH"
         elif len(self.cues) == 3:
             omit2use = "OMITALL"
+        # omit2use = "OMITCUE1"
+
+        if omit2use not in self.RankSumDict[cue2use].keys():
+            omit2use = "OMITCUE1"
 
         sigArr = np.array(
             self.RankSumDict[cue2use][omit2use][:, self.CCF_Stats.sig_idx]

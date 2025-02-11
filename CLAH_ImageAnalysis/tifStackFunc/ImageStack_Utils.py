@@ -1,7 +1,5 @@
 import numpy as np
 import tifffile as tiff
-from skimage.util import img_as_uint
-from skimage.util import img_as_ubyte
 from tqdm import tqdm
 import cv2
 import multiprocessing
@@ -263,6 +261,11 @@ class ImageStack_Utils(BC):
             tiff.imwrite(fname_save, norm_avg_uint)
             self.print_done_small_proc(new_line=False)
 
+            if bit_range == 8 and self.onePhotonCheck:
+                self.save_colored_tiff(
+                    norm_avg_uint, fname_save, clip_limit=4.0, tile_grid_size=(6, 6)
+                )
+
     def norm_uint_converter(
         self, array_to_norm: np.ndarray, bit_range: int | None = None
     ) -> np.ndarray:
@@ -284,12 +287,10 @@ class ImageStack_Utils(BC):
         norm_array = array_to_norm / np.max(array_to_norm)
 
         self.print_wFrm(f"Converting to {bit_range}-bit range")
-        if bit_range == 8:
-            norm_array_img = img_as_ubyte(norm_array)
-        elif bit_range == 16:
-            norm_array_img = img_as_uint(norm_array)
+        if bit_range == 8 or bit_range == 16:
+            norm_array_img = self.dep.convert_bit_range(norm_array, bit_range)
         else:
-            raise ValueError("bit_range must be either 8 or 16")
+            raise ValueError(f"Bit range {bit_range} not supported")
 
         return norm_array_img
 
@@ -317,7 +318,7 @@ class ImageStack_Utils(BC):
         array_to_use: np.ndarray,
         tau: int = 3,
         store: bool = False,
-        num_threads: int = None,
+        num_threads: int | None = None,
         temp_filter_start: int = 1,
         temp_filter_tail: int = 6,
     ):
@@ -352,8 +353,7 @@ class ImageStack_Utils(BC):
 
         # setting threads
         # if None, will use all available threads
-        if num_threads is None:
-            num_threads = cv2.getNumberOfCPUs()
+        num_threads = cv2.getNumberOfCPUs() if num_threads is None else num_threads
 
         cv2.setNumThreads(num_threads)
 
@@ -363,8 +363,10 @@ class ImageStack_Utils(BC):
             )
         )
 
-        convolved_data = cv2.filter2D(
-            reshaped_array, -1, yexp[:, None], borderType=cv2.BORDER_CONSTANT
+        convolved_data = self.dep.apply_filter2D(
+            array2filter=reshaped_array,
+            kernel=yexp[:, None],
+            borderType=cv2.BORDER_CONSTANT,
         )
 
         array_filtered = convolved_data[:frames, :]
@@ -432,12 +434,14 @@ class ImageStack_Utils(BC):
 
     def min_zProj_removal(self, array_to_use: np.ndarray) -> np.ndarray:
         print("Finding min z-projection & subtracting from each frame")
-        z_min = np.zeros_like(array_to_use[0, :, :])
+        # z_min = np.zeros_like(array_to_use[0, :, :])
 
-        for frame_idx in tqdm(
-            range(array_to_use.shape[0]), desc="Finding min z-projection"
-        ):
-            z_min = np.minimum(z_min, array_to_use[frame_idx, :, :])
+        # for frame_idx in tqdm(
+        #     range(array_to_use.shape[0]), desc="Finding min z-projection"
+        # ):
+        #     z_min = np.minimum(z_min, array_to_use[frame_idx, :, :])
+
+        z_min = np.min(array_to_use, axis=0)
 
         self.print_wFrm("Subtracting min z-projection from each frame")
         array_post_minZ = array_to_use - z_min
@@ -475,3 +479,76 @@ class ImageStack_Utils(BC):
             self.norm_uint_tempfilteredDS_arr = norm_uint_tempfilteredDS_arr
         else:
             return norm_uint_tempfilteredDS_arr
+
+    def apply_colormap2stack_export2avi(
+        self,
+        array_to_use: np.ndarray,
+        fname_save: str,
+        colormap: int = cv2.COLORMAP_PLASMA,
+        fps: float = 20,
+        clip_limit: float = 2.0,
+        tile_grid_size: tuple = (8, 8),
+    ) -> str:
+        """
+        Apply a colormap to an image stack and export it as an AVI video file.
+
+        This method takes a 3D numpy array representing an image stack, applies a colormap
+        to each frame, and saves the result as an AVI video file. The array is first
+        normalized to 8-bit range (0-255) before applying the colormap.
+
+        Parameters:
+            array_to_use (np.ndarray): 3D array of shape (frames, height, width) containing
+                the image stack to be processed.
+            fname_save (str): Path where the output AVI file will be saved. If it doesn't
+                end with .avi extension, it will be added automatically.
+            colormap (int, optional): OpenCV colormap to apply to each frame. Defaults to
+                cv2.COLORMAP_PLASMA.
+            fps (float, optional): Frames per second for the output video. Defaults to 20.
+
+        Returns:
+            str: The full path to the saved AVI file.
+        """
+        AVI = self.file_tag["AVI"]
+
+        # remove extension if present
+        fname_save = fname_save.split(".")[0]
+
+        if not fname_save.endswith(AVI):
+            fname_save = fname_save + AVI
+
+        array_8bit = self.dep.normalize_array(array_to_use, dtype=np.uint8)
+
+        _, height, width = array_8bit.shape
+
+        fourcc = cv2.VideoWriter_fourcc(*"XVID")
+        out = cv2.VideoWriter(fname_save, fourcc, fps, (width, height))
+
+        for frame in tqdm(array_8bit, desc="Creating colormapped AVI"):
+            frame_adjusted = self.dep.apply_CLAHE(frame, clip_limit, tile_grid_size)
+            frame_colored = self.dep.apply_colormap(frame_adjusted, colormap)
+            out.write(frame_colored)
+
+        self.print_wFrm("Exporting resulting AVI file")
+        out.release()
+
+        return fname_save
+
+    def save_colored_tiff(
+        self,
+        array_to_save: np.ndarray,
+        fname_save: str,
+        colormap: int = cv2.COLORMAP_PLASMA,
+        clip_limit: float = 4.0,
+        tile_grid_size: tuple = (8, 8),
+    ) -> str:
+        """
+        Save a colored TIFF file.
+        """
+        array_adjusted = self.dep.apply_CLAHE(array_to_save, clip_limit, tile_grid_size)
+        colored_array = self.dep.apply_colormap(array_adjusted, colormap)
+
+        fname_save = (
+            fname_save.split(".")[0] + self.file_tag["CMAP"] + self.file_tag["IMG"]
+        )
+
+        cv2.imwrite(fname_save, colored_array)

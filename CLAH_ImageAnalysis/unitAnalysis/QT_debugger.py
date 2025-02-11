@@ -12,7 +12,7 @@ breakers = text_lib["breaker"]
 hash = breakers["hash"]
 
 path_FW = "/mnt/MegaDrive/Practice_Data"
-path_HS2 = "/mnt/DataDrive1/alex/Practice_Data"
+path_HS2 = "/mnt/DataDrive1/alex/Data/Data_Clay/"
 
 # Check if the directories exist and select the appropriate path
 if os.path.exists(path_FW):
