@@ -27,14 +27,25 @@ theme:
     - search.highlight
     - content.code.copy
     - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
 
 repo_url: https://github.com/thicclatka/CLAH_IA
 repo_name: CLAH_IA
 
 nav:
-  - Home: index.md
-  - Getting Started:
-      - Installation: installation.md
+  - Home: 0_index.md
+  - Installation:
+      - Step-by-step guide: 1_installation.md
+  - Organization:
+      - Order of Operations: 2_order-of-operations.md
+      - Structure for path names: 3_structure-folder-path-names.md
+  - Functions (CLIs):
+      - TifStack Utilities: CLIs/tifStackFunc.md
+      - Unit Analysis: CLIs/unitAnalysis.md
+      - Cell Registration: CLIs/cellRegistration.md
+  - GUIs:
+      - Motion Correction & Segmentation: GUIs/MOCOGUI.md
 
 markdown_extensions:
   - tables

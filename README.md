@@ -72,8 +72,7 @@ For directories where each subdirectory holds multiple sessions or holding multS
   - notes each folder within directory contains multSessSegStruc (see [wrapMultSessStruc](#wrapmultsessstruc))
   - automatically prepended by [wrapMultSessStruc](#wrapmultsessstruc)
 - [DIR_NAME_FT_EXPERIMENT_KEYWORDS]
-  - see above
-  - however, in this case, recommended to use words like OPTO, eOPN3, AD (Alzheimers), Ag (Aged)
+  - recommended to use words like OPTO, eOPN3, AD (Alzheimers), Ag (Aged)
   - if output_folder is not specified (by default, it is not), [wrapMultSessStruc](#wrapmultsessstruc) will prompt user to input experiment keywords for output folder name
   - these keywords are required in order to trigger certain conditions to run in [PostCR_CueCellFinder](#post-cell-registrar-cue-cell-finder-postcr_cuecellfinder) and [CR_CI_collater](#cell-registrar-cluster-info-collater-cr_ci_collater)
 - [BRAIN_REGION]

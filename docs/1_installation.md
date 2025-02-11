@@ -2,9 +2,10 @@
 
 ## Prerequisites
 
-Before installing CLAH Image Analysis, ensure you have:
-
 - [Anaconda](https://docs.anaconda.com/)
+
+## Dependencies
+
 - [CaImAn](https://github.com/thicclatka/CaImAn)
 - [ROICaT](https://github.com/RichieHakim/ROICaT)
 
@@ -24,7 +25,7 @@ conda env create -f environment.yml -n caiman
 conda activate caiman
 
 # Install CaImAn
-pip install -e .  # Use -e for editable mode
+pip install -e .  # Use -e for editable mode, but this is optional
 ```
 
 ### 2. Install CLAH Image Analysis
@@ -34,7 +35,7 @@ pip install -e .  # Use -e for editable mode
 git clone git@github.com:thicclatka/CLAH_IA.git
 
 # Install package
-pip install -e /path/to/CLAH_IA  # Use -e for editable mode
+pip install -e /path/to/CLAH_IA  # -e is optional here as well
 ```
 
 ### 3. Install ROICaT

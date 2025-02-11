@@ -14,7 +14,8 @@ CLAH Image Analysis provides tools for:
 
 ## Quick Navigation
 
-- [Installation Guide](installation.md)
-<!-- - [Requirements](requirements.md)
-- [Order of Operations](order-of-operations.md)
-- [Function Documentation](functions/tifstack.md) -->
+- [Installation Guide](1_installation.md)
+- [Order of Operations](2_order-of-operations.md)
+- [Structure for path names](3_structure-folder-path-names.md)
+- [CLIs](CLIs/tifStackFunc.md)
+- [GUIs](GUIs/MOCOGUI.md)
