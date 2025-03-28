@@ -41,7 +41,6 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         miniconda-version: latest
-        activate-environment: caiman
         auto-activate-base: true
         auto-update-conda: false
         remove-profiles: true
@@ -49,8 +48,9 @@ jobs:
         clean-patched-environment-file: true
         run-post: true
 
-    - name: Create conda environment from environment.yml
+    - name: Create/Update conda environment
       run: |
+        conda env remove -n caiman || true
         conda env create -f environment.yml -n caiman
         conda activate caiman
 
