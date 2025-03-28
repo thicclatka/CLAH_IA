@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 99999
+    target-branch: "dev"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    reviewers:
+      - "thicclatka"
+    assignees:
+      - "thicclatka"
+    labels:
+      - "dependencies"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "numpy"
+        versions: [">=2.0.0"]
+      - dependency-name: "torch"
+        versions: [">=2.0.0"]
+      - dependency-name: "torchvision"
+        versions: [">=2.0.0"]
+      # Ignore all updates for Git dependencies
+      - dependency-name: "git+https://github.com/thicclatka/CaImAn.git"
+      - dependency-name: "git+https://github.com/RichieHakim/roiextractors.git"
+      - dependency-name: "git+https://github.com/lebedov/scikit-cuda.git"
+      - dependency-name: "git+https://github.com/thicclatka/SQLJobScheduler.git"

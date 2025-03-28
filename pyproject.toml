@@ -14,7 +14,6 @@ requires-python = ">=3.11"
 dependencies = [
   "aenum",
   "cairosvg",
-  "customtkinter",
   "easygui",
   "h5py",
   "inquirer",
@@ -37,7 +36,6 @@ dependencies = [
   "toml",
   "tomli",
   "tqdm",
-  "ttkthemes",
 ]
 
 [project.urls]

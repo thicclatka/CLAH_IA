@@ -3,7 +3,6 @@ av
 bokeh>=3.1.1
 cairosvg
 coverage
-customtkinter
 cython
 easygui
 h5py>=3.4.0
@@ -42,7 +41,7 @@ scikit-learn>=1.2
 scipy>=1.10.1
 seaborn
 streamlit
-tensorflow>=2.4.0,<2.15.0
+tensorflow>=2.4.0,<2.16.0
 tifffile
 toml
 tomli

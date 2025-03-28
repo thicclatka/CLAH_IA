@@ -6,7 +6,6 @@ dependencies:
   - bokeh >=3.1.1
   - cairosvg
   - coverage
-  - customtkinter
   - cython
   - easygui
   - h5py
@@ -48,7 +47,6 @@ dependencies:
   - streamlit
   - tensorflow >=2.4.0,<2.16
   - tifffile
-  - tk
   - toml
   - tomli
   - tqdm

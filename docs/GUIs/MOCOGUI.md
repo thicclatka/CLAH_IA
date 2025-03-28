@@ -1,10 +1,5 @@
 # Motion Correction & Segmentation (GUI)
 
-
-<!-- ### Desktop App
-
-<!-- ![MOCO GUI](../images/mocogui.png) --> -->
-
 ## Web App
 
 The M2SD Web App provides a streamlined interface for running motion correction and segmentation analysis on imaging data. The app is built using Streamlit and runs as a system service for continuous availability.

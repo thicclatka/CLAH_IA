@@ -1,7 +1,7 @@
 import os
 
 # set order for modules to import
-__all__ = ["segDictWA", "segDictGUI"]
+__all__ = []
 
 # note which ones to import as is
 modules_import_as_is = []
