@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CLAH_ImageAnalysis"
+version = "1.2.0"
+description = "Suite of Python programs used for 2-photon calcium imaging analysis"
+authors = [{ name = "Alex Hurowitz" }]
+readme = "README.md"
+keywords = ["2-photon", "miniscope", "1-photon", "calcium imaging", "analysis"]
+requires-python = "==3.11.11"
+
+dependencies = [
+  "SimpleITK",
+  "aenum",
+  "cairosvg",
+  "customtkinter",
+  "easygui",
+  "h5py",
+  "inquirer",
+  "isx",
+  "libsvm",
+  "lxml",
+  "numpy<2.0",
+  "opencv-python",
+  "opencv-contrib-python",
+  "pandas",
+  "plotly",
+  "prettytable",
+  "rasterio",
+  "rich",
+  "scikit-image",
+  "scikit-learn",
+  "scipy",
+  "seaborn",
+  "streamlit",
+  "streamlit-cropper",
+  "toml",
+  "tomli",
+  "tqdm",
+  "ttkthemes",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/thicclatka/CLAH_IA"
+"Documentation" = "https://thicclatka.github.io/CLAH_IA"
+
+[tool.setuptools.packages.find]
+where = ["."]

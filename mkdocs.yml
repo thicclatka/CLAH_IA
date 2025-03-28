@@ -1,0 +1,71 @@
+site_name: CLAH Image Analysis
+site_description: Suite of Python programs used for 2-photon calcium imaging analysis
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - content.code.annotate
+    - toc.integrate
+    - navigation.footer
+  favicon: images/CLAH_logo.png
+  logo: images/CLAH_logo.png
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/thicclatka/CLAH_IA
+repo_name: CLAH_IA
+
+nav:
+  - Home: index.md
+  - Installation:
+      - Step-by-step guide: 1_installation.md
+  - Organization:
+      - Order of Operations: 2_order-of-operations.md
+      - Structure for path names: 3_structure-folder-path-names.md
+  - Functions (CLIs):
+      - TifStack Utilities: CLIs/tifStackFunc.md
+      - Unit Analysis: CLIs/unitAnalysis.md
+      - Cell Registration: CLIs/cellRegistration.md
+  - GUIs:
+      - Motion Correction & Segmentation: GUIs/MOCOGUI.md
+
+markdown_extensions:
+  - tables
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji
+  - pymdownx.tilde

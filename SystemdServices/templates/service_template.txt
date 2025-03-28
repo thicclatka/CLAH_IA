@@ -1,0 +1,13 @@
+[Unit]
+Description={description}
+After=network.target
+
+[Service]
+User={user}
+WorkingDirectory={working_dir}
+ExecStart={script_path}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
