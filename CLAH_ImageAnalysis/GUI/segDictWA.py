@@ -1,14 +1,12 @@
 import os
-import pwd
-import grp
-import stat
 import json
 import numpy as np
-import time
+import pandas as pd
 from pathlib import Path
 import scipy.sparse as sparse
 import streamlit as st
 from matplotlib.colors import ListedColormap
+from sklearn.metrics import confusion_matrix
 from CLAH_ImageAnalysis.utils import db_utils
 from CLAH_ImageAnalysis.utils import Streamlit_utils
 from CLAH_ImageAnalysis.utils import text_dict
@@ -16,13 +14,20 @@ from CLAH_ImageAnalysis.utils import findLatest
 from CLAH_ImageAnalysis.utils import saveNloadUtils
 from CLAH_ImageAnalysis.utils import image_utils
 from CLAH_ImageAnalysis.utils import fig_tools
+from CLAH_ImageAnalysis.utils import paths
 from CLAH_ImageAnalysis.utils import color_dict
 from CLAH_ImageAnalysis.unitAnalysis import pks_utils
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
+from CLAH_ImageAnalysis.decoder import GeneralModelRunner
+from CLAH_ImageAnalysis.decoder import NNModel4BinaryClassification
+from CLAH_ImageAnalysis.decoder import FeatureExtractor4segDict
+from CLAH_ImageAnalysis.decoder import dbHandler4CompEvaluator
 
-JSON_FNAME = "accepted_rejected_components.json"
-PKS_FNAME = "pks_dict.json"
+
+ACC_REJ_JSON_FNAME = "accepted_rejected_components.json"
+PKS_FNAME = "_pksDict.json"
 DB_NAME = "paths_cache4SD"
+DB_NAME4NN = "paths_cache4NN_COMP_EVAL"
 EMOJIS = text_dict()["emojis"]
 HASH = text_dict()["breaker"]["hash"]
 CMAPS = [
@@ -96,10 +101,10 @@ def init_session_state():
         st.session_state.preview_pks_dict_bool = False
     if "loaded_AL_fromSDISX" not in st.session_state:
         st.session_state.loaded_AL_fromSDISX = None
-    if "cnmf_accepted" not in st.session_state:
-        st.session_state.cnmf_accepted = None
-    if "cnmf_rejected" not in st.session_state:
-        st.session_state.cnmf_rejected = None
+    if "CNMF_accepted" not in st.session_state:
+        st.session_state.CNMF_accepted = None
+    if "CNMF_rejected" not in st.session_state:
+        st.session_state.CNMF_rejected = None
     if "export_menu_bool" not in st.session_state:
         st.session_state.export_menu_bool = False
     if "adjust_labels_bool" not in st.session_state:
@@ -112,6 +117,74 @@ def init_session_state():
         st.session_state.ASpat = None
     if "DSimage_fname" not in st.session_state:
         st.session_state.DSimage_fname = None
+    if "ASPatList" not in st.session_state:
+        st.session_state.ASPatList = []
+    if "CTempList" not in st.session_state:
+        st.session_state.CTempList = []
+    if "listExpNames" not in st.session_state:
+        st.session_state.listExpNames = []
+    if "labelList" not in st.session_state:
+        st.session_state.labelList = []
+    if "dim4spatial" not in st.session_state:
+        st.session_state.dim4spatial = None
+    if "dim4spatialList" not in st.session_state:
+        st.session_state.dim4spatialList = []
+    if "nn_success_bool" not in st.session_state:
+        st.session_state.nn_success_bool = False
+    if "model_runner" not in st.session_state:
+        st.session_state.model_runner = None
+    if "feature_extractor" not in st.session_state:
+        st.session_state.feature_extractor = None
+    if "features_vector" not in st.session_state:
+        st.session_state.features_vector = None
+    if "labels_vector" not in st.session_state:
+        st.session_state.labels_vector = None
+    if "metadata" not in st.session_state:
+        st.session_state.metadata = None
+    if "model_name2save" not in st.session_state:
+        st.session_state.model_name2save = ""
+    if "model_name2load" not in st.session_state:
+        st.session_state.model_name2load = ""
+    if "run_train_model_bool" not in st.session_state:
+        st.session_state.run_train_model_bool = False
+    if "NNCE_accepted" not in st.session_state:
+        st.session_state.NNCE_accepted = set()
+    if "NNCE_rejected" not in st.session_state:
+        st.session_state.NNCE_rejected = set()
+    if "NNCE_predictions" not in st.session_state:
+        st.session_state.NNCE_predictions = None
+    if "use_CNMF_CE_checkbox_result" not in st.session_state:
+        st.session_state.use_CNMF_CE_checkbox_result = False
+    if "use_AL_SDISX_checkbox_result" not in st.session_state:
+        st.session_state.use_AL_SDISX_checkbox_result = False
+    if "use_NNCE_checkbox_result" not in st.session_state:
+        st.session_state.use_NNCE_checkbox_result = False
+    if "CNMF_CE_bool" not in st.session_state:
+        st.session_state.CNMF_CE_bool = False
+    if "AL_SDISX_accepted" not in st.session_state:
+        st.session_state.AL_SDISX_accepted = set()
+    if "AL_SDISX_rejected" not in st.session_state:
+        st.session_state.AL_SDISX_rejected = set()
+    if "AL_SDISX_undecided" not in st.session_state:
+        st.session_state.AL_SDISX_undecided = set()
+    if "save_model_bool" not in st.session_state:
+        st.session_state.save_model_bool = False
+    if "load_model_bool" not in st.session_state:
+        st.session_state.load_model_bool = False
+    if "selected_model_dict" not in st.session_state:
+        st.session_state.selected_model_dict = {}
+    if "eval_completed_bool" not in st.session_state:
+        st.session_state.eval_completed_bool = False
+    if "PREV_JSON_accepted" not in st.session_state:
+        st.session_state.PREV_JSON_accepted = set()
+    if "PREV_JSON_rejected" not in st.session_state:
+        st.session_state.PREV_JSON_rejected = set()
+    if "PREV_JSON_undecided" not in st.session_state:
+        st.session_state.PREV_JSON_undecided = set()
+    if "use_PREV_JSON_checkbox_result" not in st.session_state:
+        st.session_state.use_PREV_JSON_checkbox_result = False
+    if "show_eval_results_bool" not in st.session_state:
+        st.session_state.show_eval_results_bool = False
 
 
 def file_check4dbCreation(filenames: list[str]):
@@ -156,7 +229,8 @@ def get_segDict(selected_session: str):
         )
         return CTempnew, ASpatnew, accepted_labels
 
-    st.subheader(f"segDict for {selected_session}")
+    ss2print = "/".join(selected_session.split("/")[-2:])
+    st.subheader(ss2print)
     file_tag = text_dict()["file_tag"]
 
     os.chdir(selected_session)
@@ -164,12 +238,10 @@ def get_segDict(selected_session: str):
     st.session_state.DSimage_fname = findLatest(image_utils.get_DSImage_filename())
     if not st.session_state.DSimage_fname:
         st.session_state.DSimage_fname = findLatest([file_tag["PNG"], "cells-map"])
-    accepted_rejected_json = findLatest([JSON_FNAME])
+    accepted_rejected_json = findLatest([ACC_REJ_JSON_FNAME])
 
-    st.write(f"Loaded segDict: {st.session_state.segDict_fname}")
+    st.write(f"Loaded segDict: ***{st.session_state.segDict_fname}***")
     print(f"Loaded segDict: {st.session_state.segDict_fname}")
-
-    cnmf_CE_bool = False
 
     if st.session_state.CTemp is None or st.session_state.ASpat is None:
         st.session_state.CTemp, st.session_state.ASpat = saveNloadUtils.load_segDict(
@@ -180,31 +252,32 @@ def get_segDict(selected_session: str):
     print(f"Ctemp shape: {st.session_state.CTemp.shape}")
     print(f"ASpat shape: {st.session_state.ASpat.shape}")
 
-    if st.session_state.cnmf_accepted is None or st.session_state.cnmf_rejected is None:
+    if st.session_state.CNMF_accepted is None or st.session_state.CNMF_rejected is None:
         try:
-            cnmf_accepted, cnmf_rejected = saveNloadUtils.load_segDict(
+            CNMF_accepted, CNMF_rejected = saveNloadUtils.load_segDict(
                 st.session_state.segDict_fname,
                 idx_components=True,
                 idx_components_bad=True,
                 print_prev_bool=False,
             )
-            cnmf_CE_bool = True
+            st.session_state.CNMF_CE_bool = True
             print("Loaded component evaluation results from CNMF")
         except Exception as e:
-            print(f"Error loading cnmf_accepted, cnmf_rejected: {e}")
-            cnmf_accepted = None
-            cnmf_rejected = None
-            cnmf_CE_bool = False
+            print(f"Error loading CNMF_accepted, CNMF_rejected: {e}")
+            print("Culprit: no CNMF Component Evaluation found in segDict")
+            CNMF_accepted = None
+            CNMF_rejected = None
+            st.session_state.CNMF_CE_bool = False
 
-        st.session_state.cnmf_accepted = cnmf_accepted
-        st.session_state.cnmf_rejected = cnmf_rejected
+        st.session_state.CNMF_accepted = CNMF_accepted
+        st.session_state.CNMF_rejected = CNMF_rejected
     elif (
-        st.session_state.cnmf_accepted is not None
-        and st.session_state.cnmf_rejected is not None
+        st.session_state.CNMF_accepted is not None
+        and st.session_state.CNMF_rejected is not None
     ):
-        cnmf_CE_bool = True
+        st.session_state.CNMF_CE_bool = True
 
-    if cnmf_CE_bool:
+    if st.session_state.CNMF_CE_bool:
         st.write(
             "|-- Loaded accepted/rejected components from CNMF Component Evaluation"
         )
@@ -224,6 +297,15 @@ def get_segDict(selected_session: str):
         )
         st.session_state.CTemp = CTempnew
         st.session_state.ASpat = ASpatnew.toarray()
+        st.session_state.AL_SDISX_accepted = set(
+            np.where(accepted_labels == "accepted")[0].astype(int)
+        )
+        st.session_state.AL_SDISX_rejected = set(
+            np.where(accepted_labels == "rejected")[0].astype(int)
+        )
+        st.session_state.AL_SDISX_undecided = set(
+            np.where(accepted_labels == "undecided")[0].astype(int)
+        )
 
     if isinstance(st.session_state.ASpat, sparse.csr_matrix):
         st.session_state.ASpat = st.session_state.ASpat.toarray()
@@ -244,9 +326,9 @@ def get_segDict(selected_session: str):
     if accepted_rejected_json and not st.session_state.adjust_labels_bool:
         with open(accepted_rejected_json, "r") as f:
             accepted_rejected_dict = json.load(f)
-        st.session_state.accepted = set(accepted_rejected_dict["accepted"])
-        st.session_state.rejected = set(accepted_rejected_dict["rejected"])
-        st.session_state.undecided = set(accepted_rejected_dict["undecided"])
+        st.session_state.PREV_JSON_accepted = set(accepted_rejected_dict["accepted"])
+        st.session_state.PREV_JSON_rejected = set(accepted_rejected_dict["rejected"])
+        st.session_state.PREV_JSON_undecided = set(accepted_rejected_dict["undecided"])
 
     if accepted_rejected_json:
         st.write("|-- Loaded previously done accepted/rejected components from json")
@@ -259,47 +341,129 @@ def get_segDict(selected_session: str):
             temp_set.remove(und)
     st.session_state.undecided = temp_set
 
-    imported_accepted_mainBool = cnmf_CE_bool or st.session_state.loaded_AL_fromSDISX
+    imported_accepted_mainBool = (
+        st.session_state.CNMF_CE_bool
+        or st.session_state.loaded_AL_fromSDISX
+        or st.session_state.NNCE_accepted
+        or st.session_state.PREV_JSON_accepted
+    )
+
+    options4radio = ["None"]
+    if st.session_state.CNMF_CE_bool:
+        options4radio.append("CNMF Component Evaluation")
+    if st.session_state.AL_SDISX_accepted:
+        options4radio.append("Accepted Labels from segDict (ISX)")
+    if st.session_state.NNCE_accepted:
+        options4radio.append("Neural Network Component Evaluation")
+    if st.session_state.PREV_JSON_accepted:
+        options4radio.append("Previously Done Accepted/Rejected Components")
 
     col1, col2 = st.columns(2)
     with col1:
-        use_cnmf_CE_checkbox = st.checkbox(
-            "Use CNMF Component Evaluation",
-            disabled=not cnmf_CE_bool,
-            key="use_cnmf_CE_checkbox",
-            help="Use the accepted/rejected components from the CNMF Component Evaluation. If the button is disabled, the CNMF Component Evaluation was not found in the segDict.",
-        )
-        use_AL_SDISX_checkbox = st.checkbox(
-            "Use Accepted Labels from segDict dervied from ISX output",
-            disabled=not st.session_state.loaded_AL_fromSDISX,
-            key="use_AL_SDISX_checkbox",
-            help="Use the accepted/rejected components from the segDict derived from ISX output. Component evaluation here was usually done by hand via the ISX platform. If the button is disabled, the accepted labels were not found in the segDict.",
+        selected_option = st.radio(
+            "Select Component Evaluation Method",
+            options=options4radio,
+            disabled=not imported_accepted_mainBool,
+            key="component_eval_method",
+            help="Select which accepted/rejected components to use. CNMF for the CNMF Component Evaluation, ISX for the Accepted Labels from segDict that was done by hand (ISX), and NNCE for the Neural Network Component Evaluation.",
         )
 
+        if (
+            selected_option == "CNMF Component Evaluation"
+            and st.session_state.CNMF_CE_bool
+        ):
+            st.session_state.use_CNMF_CE_checkbox_result = True
+            st.session_state.use_AL_SDISX_checkbox_result = False
+            st.session_state.use_NNCE_checkbox_result = False
+            st.session_state.use_PREV_JSON_checkbox_result = False
+        elif (
+            selected_option == "Accepted Labels from segDict (ISX)"
+            and st.session_state.loaded_AL_fromSDISX
+        ):
+            st.session_state.use_AL_SDISX_checkbox_result = True
+            st.session_state.use_CNMF_CE_checkbox_result = False
+            st.session_state.use_NNCE_checkbox_result = False
+            st.session_state.use_PREV_JSON_checkbox_result = False
+        elif (
+            selected_option == "Neural Network Component Evaluation"
+            and st.session_state.NNCE_accepted
+        ):
+            st.session_state.use_NNCE_checkbox_result = True
+            st.session_state.use_CNMF_CE_checkbox_result = False
+            st.session_state.use_AL_SDISX_checkbox_result = False
+            st.session_state.use_PREV_JSON_checkbox_result = False
+        elif (
+            selected_option == "Previously Done Accepted/Rejected Components"
+            and st.session_state.PREV_JSON_accepted
+        ):
+            st.session_state.use_NNCE_checkbox_result = False
+            st.session_state.use_CNMF_CE_checkbox_result = False
+            st.session_state.use_AL_SDISX_checkbox_result = False
+            st.session_state.use_PREV_JSON_checkbox_result = True
+        else:  # "None" or disabled options
+            st.session_state.use_CNMF_CE_checkbox_result = False
+            st.session_state.use_AL_SDISX_checkbox_result = False
+            st.session_state.use_NNCE_checkbox_result = False
+            st.session_state.use_PREV_JSON_checkbox_result = False
     with col2:
         adjust_labels_checkbox = st.checkbox(
-            "Adjust previously done accepted/rejected components",
+            "Adjust CNMF, ISX, or NNCE accepted/rejected components",
             disabled=not imported_accepted_mainBool,
             value=st.session_state.adjust_labels_bool,
             key="adjust_labels_checkbox",
             help="If you have already done accepted/rejected components but want to adjust them, check this box. Otherwise, if left unchecked, any changes made will not be registered.",
         )
+        st.session_state.adjust_labels_bool = adjust_labels_checkbox
 
-    if use_cnmf_CE_checkbox:
-        use_AL_SDISX_checkbox = False
-    if use_AL_SDISX_checkbox:
-        use_cnmf_CE_checkbox = False
+    if st.session_state.AL_SDISX_accepted and st.session_state.NNCE_accepted:
+        st.write(
+            f"- Accepted by ISX, but not by NNCE: {sorted(list(st.session_state.AL_SDISX_accepted - st.session_state.NNCE_accepted))}"
+        )
+        # st.write(
+        #     f"- Accepted by NNCE, but not by ISX: {sorted(list(st.session_state.NNCE_accepted - st.session_state.AL_SDISX_accepted))}"
+        # )
+    if st.session_state.AL_SDISX_rejected and st.session_state.NNCE_rejected:
+        st.write(
+            f"- Rejected by ISX, but not by NNCE: {sorted(list(st.session_state.AL_SDISX_rejected - st.session_state.NNCE_rejected))}"
+        )
+        # st.write(
+        #     f"- Rejected by NNCE, but not by ISX: {sorted(list(st.session_state.NNCE_rejected - st.session_state.AL_SDISX_rejected))}"
+        # )
 
-    if use_cnmf_CE_checkbox and not st.session_state.adjust_labels_bool:
-        st.session_state.accepted = set(st.session_state.cnmf_accepted.astype(int))
-        st.session_state.rejected = set(st.session_state.cnmf_rejected.astype(int))
+    if (
+        st.session_state.use_CNMF_CE_checkbox_result
+        and not st.session_state.adjust_labels_bool
+    ):
+        st.session_state.accepted = set(st.session_state.CNMF_accepted.astype(int))
+        st.session_state.rejected = set(st.session_state.CNMF_rejected.astype(int))
         st.session_state.undecided = set()
-    if use_AL_SDISX_checkbox and not st.session_state.adjust_labels_bool:
-        st.session_state.accepted = set(np.where(accepted_labels == "accepted")[0])
-        st.session_state.rejected = set(np.where(accepted_labels == "rejected")[0])
-        st.session_state.undecided = set(np.where(accepted_labels == "undecided")[0])
-
-    if not use_cnmf_CE_checkbox and not use_AL_SDISX_checkbox:
+    if (
+        st.session_state.use_AL_SDISX_checkbox_result
+        and not st.session_state.adjust_labels_bool
+    ):
+        st.session_state.accepted = st.session_state.AL_SDISX_accepted
+        st.session_state.rejected = st.session_state.AL_SDISX_rejected
+        st.session_state.undecided = st.session_state.AL_SDISX_undecided
+    if (
+        st.session_state.use_NNCE_checkbox_result
+        and not st.session_state.adjust_labels_bool
+    ):
+        st.session_state.accepted = set(st.session_state.NNCE_accepted)
+        st.session_state.rejected = set(st.session_state.NNCE_rejected)
+        st.session_state.undecided = set()
+    if (
+        st.session_state.use_PREV_JSON_checkbox_result
+        and not st.session_state.adjust_labels_bool
+    ):
+        st.session_state.accepted = st.session_state.PREV_JSON_accepted
+        st.session_state.rejected = st.session_state.PREV_JSON_rejected
+        st.session_state.undecided = st.session_state.PREV_JSON_undecided
+    if (
+        not st.session_state.use_CNMF_CE_checkbox_result
+        and not st.session_state.use_AL_SDISX_checkbox_result
+        and not st.session_state.use_NNCE_checkbox_result
+        and not st.session_state.use_PREV_JSON_checkbox_result
+    ):
         st.session_state.accepted = set()
         st.session_state.rejected = set()
         st.session_state.undecided = set(list(range(st.session_state.CTemp.shape[0])))
@@ -308,6 +472,413 @@ def get_segDict(selected_session: str):
         f"Adjust labels checkbox clicked -- State: {st.session_state.adjust_labels_bool}"
     )
     st.divider()
+
+
+def NNsectionHandler(selected_session: str, model_name: str = ""):
+    def create_model_performance_string(metrics: dict, model_name: str = "") -> str:
+        stats2print = ""
+        stats2print += (
+            f"Model Name: {model_name}\n" if model_name else "New Model (unsaved)\n"
+        )
+        stats2print += " | "
+        numSessions = len(metrics["metadata"]["listExpNames"])
+        for key, (mean, stdev) in metrics["mean"].items():
+            stats2print += f"{key.upper()}: {mean:.3f} ± {stdev:.3f} | "
+        st.markdown(
+            f"**Model Performance (numSessions: {numSessions})**",
+            help=stats2print,
+        )
+
+    with st.expander("Neural Network Settings"):
+        cols = st.columns([6, 1, 1])
+        with cols[0]:
+            model2print = (
+                st.session_state.model_name2load
+                if st.session_state.model_name2load
+                else "No model loaded"
+            )
+            st.write(f"Current Model: {model2print}")
+        with cols[-1]:
+            if st.button(
+                "Reset",
+                disabled=not st.session_state.model_runner,
+                help="Reset NN settings to start fresh.",
+            ):
+                _refresh_NN_settings()
+                st.rerun()
+
+        col1, col2, col3 = st.columns((1, 2, 1))
+        with col1:
+            if st.button(
+                "Add session to training set",
+                help="Add the current session to the training set. All the cells need to be accepted/rejected before adding to the training set.",
+            ):
+                if selected_session not in st.session_state.listExpNames:
+                    current_labels = np.full(st.session_state.CTemp.shape[0], np.nan)
+                    for cell in sorted(st.session_state.accepted):
+                        current_labels[cell] = 1
+                    for cell in sorted(st.session_state.rejected):
+                        current_labels[cell] = 0
+
+                    if np.any(np.isnan(current_labels)):
+                        st.warning(
+                            "Undecided cells found. Please accept/reject all cells before adding to training set."
+                        )
+                    else:
+                        st.session_state.listExpNames.append(selected_session)
+                        st.session_state.ASPatList.append(st.session_state.ASpat)
+                        st.session_state.CTempList.append(st.session_state.CTemp)
+                        st.session_state.labelList.append(current_labels)
+                        st.session_state.dim4spatialList.append(
+                            st.session_state.dim4spatial
+                        )
+                elif st.session_state.undecided:
+                    st.error(
+                        "Undecided cells found. Please accept/reject all cells before adding to training set."
+                    )
+                elif selected_session in st.session_state.listExpNames:
+                    st.error("Session already in training set")
+        with col2:
+            if st.session_state.listExpNames and st.session_state.CTempList:
+                total_cells = sum(
+                    st.session_state.CTempList[i].shape[0]
+                    for i in range(len(st.session_state.listExpNames))
+                )
+                total_accepted = int(
+                    sum(
+                        np.sum(st.session_state.labelList[i])
+                        for i in range(len(st.session_state.listExpNames))
+                    )
+                )
+                total_rejected = total_cells - total_accepted
+                st.write(f"Training set: {len(st.session_state.listExpNames)} sessions")
+                st.write(
+                    f"Total cells: {total_cells} | Accepted: {total_accepted} | Rejected: {total_rejected}"
+                )
+            else:
+                st.write("No sessions in training set")
+        with col3:
+            if st.button("Delete last session from training set"):
+                for ls in [
+                    "listExpNames",
+                    "ASPatList",
+                    "CTempList",
+                    "labelList",
+                    "dim4spatialList",
+                ]:
+                    if ls in st.session_state:
+                        if len(st.session_state[ls]) > 1:
+                            st.session_state[ls] = st.session_state[ls][:-1]
+                        else:
+                            st.session_state[ls] = []
+                    st.rerun()
+
+        col1, col2, col3 = st.columns((1, 2, 1))
+        with col1:
+            if st.button(
+                "Train Model",
+                help="Train a model on the training set. This will create a new model and overwrite any existing model.",
+                disabled=not st.session_state.listExpNames,
+            ):
+                st.session_state.run_train_model_bool = True
+
+        with col2:
+            if (
+                st.session_state.run_train_model_bool
+                and not st.session_state.model_name2load
+            ):
+                st.session_state.nn_success_bool = False
+                st.session_state.model_runner = ""
+                st.session_state.feature_extractor = None
+                st.session_state.features_vector = None
+                st.session_state.labels_vector = None
+                st.session_state.metadata = None
+
+                with st.spinner("Creating features vector..."):
+                    feature_extractor = FeatureExtractor4segDict(
+                        CTempList=st.session_state.CTempList,
+                        ASpatList=st.session_state.ASPatList,
+                        dim4spatialList=st.session_state.dim4spatialList,
+                        listExpNames=st.session_state.listExpNames,
+                        labelList=st.session_state.labelList,
+                    )
+
+                    features_vector, labels_vector, metadata = (
+                        feature_extractor.create_Vectors(train=True)
+                    )
+                with st.spinner("Initializing model..."):
+                    model_runner = GeneralModelRunner(
+                        model=NNModel4BinaryClassification(
+                            feature_size=int(len(feature_extractor.features_order))
+                        ),
+                        features_order=feature_extractor.features_order,
+                    )
+                with st.spinner("Cross-validating model..."):
+                    model_runner.cross_validate(
+                        features_vector=features_vector,
+                        labels_vector=labels_vector,
+                        metadata=metadata,
+                    )
+                    st.session_state.nn_success_bool = True
+                    st.session_state.model_runner = model_runner
+                    st.session_state.feature_extractor = feature_extractor
+                    st.session_state.features_vector = features_vector
+                    st.session_state.labels_vector = labels_vector
+                    st.session_state.metadata = metadata
+                    st.session_state.model_name2load = "New Model (unsaved)"
+                    st.rerun()
+            if st.session_state.nn_success_bool:
+                create_model_performance_string(
+                    st.session_state.model_runner.metrics,
+                    st.session_state.model_name2load,
+                )
+
+        col1, col2, col3 = st.columns((1, 2, 1))
+        with col1:
+            if st.button(
+                "Save Model",
+                disabled=not st.session_state.nn_success_bool,
+                help="Save model to file. Whatever is inputted will have number of sessions, model type, file ending, and date automatically appended.",
+            ):
+                st.session_state.save_model_bool = not st.session_state.save_model_bool
+
+            if st.session_state.save_model_bool:
+                st.session_state.model_name2save = st.text_input(
+                    "Enter model name", value=st.session_state.model_name2save
+                )
+            if st.session_state.model_name2save:
+                fname = st.session_state.model_runner.save_model(
+                    fname=f"{st.session_state.model_name2save}",
+                )
+                print(f"Model saved as {fname}")
+                st.success(f"Model saved as {fname}")
+                st.session_state.model_name2save = ""
+                st.session_state.model_name2load = fname.split("/")[-1].split(".")[0]
+                st.session_state.save_model_bool = False
+                st.rerun()
+        with col2:
+            CE_DB = dbHandler4CompEvaluator(DB_NAME4NN)
+            num_models = CE_DB.get_num_of_models()
+            model_check = num_models > 0
+            if st.button(
+                "Load Model",
+                disabled=not model_check,
+                help=f"Load a model. Disabled if no models are available. Loading models from: {paths.get_path2NNmodels()}. Current number of models: {num_models}",
+            ):
+                st.session_state.load_model_bool = not st.session_state.load_model_bool
+        with col3:
+            if st.session_state.model_runner:
+                if st.button(
+                    "Evaluate components",
+                    help="Use current model to evaluate components and determine accepted/rejected components.",
+                ):
+                    # Get predictions for current session
+                    st.session_state.NNCE_predictions = (
+                        st.session_state.model_runner.predict_new_data(
+                            CTemp=st.session_state.CTemp,
+                            ASpat=st.session_state.ASpat,
+                            dim4spatial=st.session_state.dim4spatial,
+                        )
+                    )
+
+                    # Update accepted/rejected based on predictions
+                    st.session_state.NNCE_accepted = set(
+                        np.where(st.session_state.NNCE_predictions["predictions"] == 1)[
+                            0
+                        ]
+                    )
+                    st.session_state.NNCE_rejected = set(
+                        np.where(st.session_state.NNCE_predictions["predictions"] == 0)[
+                            0
+                        ]
+                    )
+
+                    st.session_state.eval_completed_bool = True
+        if st.session_state.eval_completed_bool:
+            was_in_training = selected_session in st.session_state.listExpNames
+            threshold_arbitrary = 0.5
+
+            binary_predictions = (
+                st.session_state.NNCE_predictions["predictions"].numpy()
+                > threshold_arbitrary
+            ).astype(int)
+
+            # Show results
+            st.success(
+                f"Evaluation complete! Found {len(st.session_state.NNCE_accepted)} accepted and {len(st.session_state.NNCE_rejected)} rejected components."
+            )
+            if st.button("Show Evaluation Results"):
+                st.session_state.show_eval_results_bool = (
+                    not st.session_state.show_eval_results_bool
+                )
+            if st.session_state.show_eval_results_bool:
+                st.markdown("#### Evaluation Results")
+                st.write(f"- Total components evaluated: {len(binary_predictions)}")
+                bools = sum(
+                    [
+                        bool(st.session_state.AL_SDISX_accepted),
+                        bool(st.session_state.NNCE_accepted),
+                    ],
+                )
+                cols = st.columns(bools)
+
+                if st.session_state.NNCE_accepted:
+                    cols[0].write(
+                        f"- Accepted (NN): {len(st.session_state.NNCE_accepted)}"
+                    )
+                    cols[0].write(
+                        f"- Rejected (NN): {len(st.session_state.NNCE_rejected)}"
+                    )
+                if st.session_state.AL_SDISX_accepted:
+                    AL_labels = np.zeros(len(binary_predictions))
+                    AL_labels[sorted(list(st.session_state.AL_SDISX_accepted))] = 1
+
+                    st.session_state.optimal_threshold = (
+                        st.session_state.model_runner.find_optimal_threshold(
+                            predictions=st.session_state.NNCE_predictions[
+                                "predictions"
+                            ].numpy(),
+                            labels2compare2=AL_labels,
+                        )
+                    )
+                    binary_predictions = (
+                        st.session_state.NNCE_predictions["predictions"].numpy()
+                        > st.session_state.optimal_threshold
+                    ).astype(int)
+                    # Get confusion matrix values
+                    tn, fp, fn, tp = confusion_matrix(
+                        AL_labels, binary_predictions
+                    ).ravel()
+
+                    # Calculate metrics
+                    total = len(binary_predictions)
+                    accuracy = ((tp + tn) / total) * 100
+                    precision = (tp / (tp + fp)) * 100 if (tp + fp) > 0 else 0
+                    recall = (tp / (tp + fn)) * 100 if (tp + fn) > 0 else 0
+                    specificity = (tn / (tn + fp)) * 100 if (tn + fp) > 0 else 0
+                    f1 = (
+                        2 * (precision * recall) / (precision + recall)
+                        if (precision + recall) > 0
+                        else 0
+                    )
+                    cols[1].write(
+                        f"Optimal Threshold: {st.session_state.optimal_threshold:.2f}"
+                    )
+                    cols[1].write(
+                        f"- Accepted (ISX): {len(st.session_state.AL_SDISX_accepted)}"
+                    )
+                    cols[1].write(
+                        f"- Rejected (ISX): {len(st.session_state.AL_SDISX_rejected)}"
+                    )
+                    cols[0].write("In comparison to ISX:")
+                    cols[0].write(f"- Accuracy: {accuracy:.2f}%")
+                    cols[0].write(f"- Precision: {precision:.2f}%")
+                    cols[0].write(f"- Recall: {recall:.2f}%")
+                    cols[0].write(f"- Specificity: {specificity:.2f}%")
+                    cols[0].write(f"- F1 Score: {f1:.2f}")
+
+                    fig, ax = fig_tools.create_plt_subplots(figsize=(6, 6))
+                    cm_display = np.array([[tp, fp], [fn, tn]])
+                    ax.imshow(cm_display, cmap="Blues")
+                    ax.set_xlabel("Predicted")
+                    ax.set_ylabel("Actual")
+                    ax.set_xticks([0, 1])
+                    ax.set_yticks([0, 1])
+                    ax.set_xticklabels(["Accepted", "Rejected"])
+                    ax.set_yticklabels(["Accepted", "Rejected"])
+                    ax.text(-0.3, -0.1, f"TP: {tp}", ha="center")
+                    ax.text(1.3, -0.1, f"FP: {fp}", ha="center")
+                    ax.text(-0.3, 0.9, f"FN: {fn}", ha="center")
+                    ax.text(1.3, 0.9, f"TN: {tn}", ha="center")
+                    cols[1].write("Confusion Matrix:")
+                    cols[1].pyplot(fig)
+                if was_in_training:
+                    st.write("- NOTE: This session was in the training set.")
+
+                cols = st.columns(2)
+                if st.session_state.optimal_threshold:
+                    threshold2use = st.session_state.optimal_threshold
+                else:
+                    threshold2use = threshold_arbitrary
+
+                # Show distribution of confidence scores
+                scores = st.session_state.NNCE_predictions["scores"]
+                fig, ax = fig_tools.create_plt_subplots(figsize=(8, 4))
+                ax.hist(scores, bins=20, edgecolor="black")
+                ax.axvline(
+                    x=threshold2use,
+                    color="r",
+                    linestyle="--",
+                    label="Threshold",
+                )
+                ax.set_xlabel("Confidence Score")
+                ax.set_ylabel("Count")
+                ax.set_title("Distribution of Model Confidence Scores")
+                ax.legend()
+                cols[0].pyplot(fig)
+
+                # Show confidence scores for each component
+                st.markdown("#### Component-wise Scores")
+                score_df = pd.DataFrame(
+                    {
+                        "Component": range(len(scores)),
+                        "Confidence": scores,
+                        "Prediction": [
+                            "Accepted" if p == 1 else "Rejected"
+                            for p in binary_predictions
+                        ],
+                    }
+                )
+                cols[1].dataframe(
+                    score_df.style.background_gradient(subset=["Confidence"])
+                )
+
+        if st.session_state.load_model_bool:
+            st.session_state.eval_completed_bool = False
+            metrics = [
+                ("Accuracy", "accuracy", "accuracy_std"),
+                ("Precision", "precision", "precision_std"),
+                ("Recall", "recall", "recall_std"),
+                ("F1 Score", "f1", "f1_std"),
+                ("AUC", "auc", "auc_std"),
+            ]
+
+            selected_model_key = st.selectbox(
+                "Select model",
+                options=list(CE_DB.get_model_dict().keys()),
+                key="select_model",
+                help=f"Select a model to load. Models are stored in: {paths.get_path2NNmodels()}",
+                format_func=lambda x: x.split("/")[-1],
+            )
+            st.session_state.selected_model_dict = CE_DB.select_model_from_db(
+                selected_model_key
+            )
+            st.session_state.listExpNames = st.session_state.selected_model_dict[
+                "listExpNames"
+            ]
+
+            model_cols = st.columns([1] * len(metrics))
+
+            for i, col in enumerate(model_cols):
+                col.write(metrics[i][0])
+                col.write(
+                    f"{st.session_state.selected_model_dict[metrics[i][1]]:.3f} ± {st.session_state.selected_model_dict[metrics[i][2]]:.3f}"
+                )
+
+        if st.session_state.selected_model_dict:
+            if st.button("Confirm Choice"):
+                model2load = st.session_state.selected_model_dict["model_path"]
+                # only load model, don't need metadata
+                st.session_state.model_runner, _ = GeneralModelRunner.load_model(
+                    model2load
+                )
+                st.session_state.model_name2load = model2load.split("/")[-1].split(".")[
+                    0
+                ]
+                st.session_state.nn_success_bool = True
+                st.session_state.load_model_bool = False
+                st.session_state.selected_model_dict = {}
+                st.rerun()
 
 
 def PlotSectionHandler():
@@ -324,7 +895,7 @@ def PlotSectionHandler():
     acceptString = f"{EMOJIS['check']} Accept"
     rejectString = f"{EMOJIS['x']} Reject"
     undecidedString = f"{EMOJIS['question']} Undecided"
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns((7, 1, 1, 1))
     with col1:
         num_components = st.session_state.ASpat.shape[-1]
         selected_index_input = st.number_input(
@@ -490,6 +1061,8 @@ def plot_ASpat_wDSimage():
         # st.write(f"Reshaping to {nDim}")
         selected_spatial_data = np.transpose(selected_spatial_data.reshape(nDim))
         square_bool = False
+
+    st.session_state.dim4spatial = nDim
     ax.imshow(selected_spatial_data.T, cmap=CMAP2USE, alpha=0.95, aspect="auto")
 
     if cno_bool:
@@ -629,9 +1202,15 @@ def plot_CTemp():
             st.write(f"**{name.upper()}**: {value}")
 
     markdown_ca2 = "Ca$^{2+}$"
-
+    status = (
+        "Accepted"
+        if st.session_state.selected_index in st.session_state.accepted
+        else "Rejected"
+        if st.session_state.selected_index in st.session_state.rejected
+        else "Undecided"
+    )
     st.subheader(
-        f"{markdown_ca2} Signal for Cell {st.session_state.selected_index:03d}"
+        f"{markdown_ca2} Signal for Cell {st.session_state.selected_index:03d} ({status})"
     )
 
     col1, col2, col3 = st.columns(3)
@@ -1009,7 +1588,7 @@ def ExportMenuSetup(selected_session: str):
         if export_comp_selection_button:
             with st.spinner("Exporting Component Selection..."):
                 try:
-                    json_file_name = os.path.join(selected_session, JSON_FNAME)
+                    json_file_name = os.path.join(selected_session, ACC_REJ_JSON_FNAME)
                     saveNloadUtils.savedict2file(
                         dict_to_save=dict2export,
                         dict_name="Component Selection",
@@ -1028,7 +1607,10 @@ def ExportMenuSetup(selected_session: str):
         if export_pks_button:
             with st.spinner("Exporting Peaks Dictionary..."):
                 try:
-                    json_file_name = os.path.join(selected_session, PKS_FNAME)
+                    session_name = selected_session.split("/")[-1]
+                    json_file_name = os.path.join(
+                        selected_session, f"{session_name}{PKS_FNAME}"
+                    )
                     saveNloadUtils.savedict2file(
                         dict_to_save=st.session_state.pksDict,
                         dict_name="Peaks Dictionary",
@@ -1058,13 +1640,50 @@ def _refresh_per_session_change():
     st.session_state.CTemp = None
     st.session_state.ASpat = None
     st.session_state.DSimage_fname = None
-    st.session_state.cnmf_accepted = None
-    st.session_state.cnmf_rejected = None
+    st.session_state.CNMF_accepted = None
+    st.session_state.CNMF_rejected = None
+    st.session_state.AL_SDISX_accepted = set()
+    st.session_state.AL_SDISX_rejected = set()
+    st.session_state.AL_SDISX_undecided = set()
+    st.session_state.NNCE_accepted = set()
+    st.session_state.NNCE_rejected = set()
+    st.session_state.NNCE_predictions = None
+    st.session_state.eval_completed_bool = False
+    st.session_state.PREV_JSON_accepted = set()
+    st.session_state.PREV_JSON_rejected = set()
+    st.session_state.PREV_JSON_undecided = set()
+    st.session_state.use_PREV_JSON_checkbox_result = False
+    st.session_state.use_AL_SDISX_checkbox_result = False
+    st.session_state.use_CNMF_CE_checkbox_result = False
+    st.session_state.use_NNCE_checkbox_result = False
+    st.session_state.show_eval_results_bool = False
+
+
+def _refresh_NN_settings():
+    st.session_state.model_runner = None
+    st.session_state.model_name2load = None
+    st.session_state.nn_success_bool = False
+    st.session_state.feature_extractor = None
+    st.session_state.features_vector = None
+    st.session_state.save_model_bool = False
+    st.session_state.load_model_bool = False
+    st.session_state.selected_model_dict = {}
+    st.session_state.run_train_model_bool = False
+    st.session_state.listExpNames = []
+    st.session_state.CTempList = []
+    st.session_state.ASPatList = []
+    st.session_state.dim4spatialList = []
+    st.session_state.labelList = []
+    st.session_state.eval_completed_bool = False
+    st.session_state.NNCE_accepted = set()
+    st.session_state.NNCE_rejected = set()
+    st.session_state.NNCE_predictions = None
+    st.session_state.show_eval_results_bool = False
 
 
 def refresh_page():
     _refresh_per_session_change()
-
+    _refresh_NN_settings()
     st.session_state.paths = []
     st.session_state["path_search"] = ""
     st.session_state.selected_session = None
@@ -1104,8 +1723,12 @@ def main():
         _refresh_per_session_change()
 
     if selected_session:
-        print("--importing segDict")
-        get_segDict(selected_session)
+        col1, col2 = st.columns(2)
+        with col1:
+            print("--importing segDict")
+            get_segDict(selected_session)
+        with col2:
+            NNsectionHandler(selected_session)
 
     if st.session_state.prev_session != selected_session:
         print(
