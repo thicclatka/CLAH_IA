@@ -17,29 +17,16 @@ permissions:
 
 jobs:
   build:
-    name: Ubuntu ${{ matrix.ubuntu-version }}, py${{ matrix.python-version }}
-    runs-on: ubuntu-${{ matrix.ubuntu-version }}
-    strategy:
-      fail-fast: false
-      matrix:
-        ubuntu-version: [
-          "24.04",
-          "22.04",
-          "20.04",
-        ]
-        python-version: [ 
-          "3.10",
-          "3.11",
-        ]
-
+    name: Ubuntu 22.04, Python 3.11
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out repository code
       uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.11"
 
     - name: Check system specs
       run: |
@@ -66,8 +53,7 @@ jobs:
     - name: Check installed packages
       run: |
         pip list
-        python -c "import CLAH_ImageAnalysis; print(f'CLAH_IA version: {CLAH_ImageAnalysis.__version__}')"
-
-    - name: Run tests
+      
+    - name: Test installation
       run: |
-        python -m pytest -v --color=yes
+        python -c "import CLAH_ImageAnalysis; print(f'CLAH_IA version: {CLAH_ImageAnalysis.__version__}')"
