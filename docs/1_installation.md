@@ -19,61 +19,31 @@
 - [scikit-cuda (required if using GPU)](https://github.com/lebedov/scikit-cuda)
 - [SQLJobScheduler](https://github.com/thicclatka/SQLJobScheduler)
 
-## Step-by-Step Installation
+## Installation
 
-### 1. Install CaImAn
+### Development Mode (Recommended)
 
 ```bash
-# Clone CaImAn repository (using CLAH fork)
-git clone git@github.com:thicclatka/CaImAn.git
+# Clone CLAH Image Analysis repository
+git clone git@github.com:thicclatka/CLAH_IA.git
 
-# Navigate to CaImAn directory
-cd /path/to/CaImAn/
+# cd to CLAH IA directory
+cd /path/to/CLAH_IA
 
-# Create and activate conda environment
+# create conda environment
 conda env create -f environment.yml -n caiman
 conda activate caiman
 
-# Install CaImAn
-pip install -e .  # Use -e for editable mode, but this is optional
-```
-
-### 2. Install [scikit-cuda](https://github.com/lebedov/scikit-cuda) (needed for GPU, otherwise optional)
-
-```bash
-conda activate caiman
-
-# install version on github, not pypi
-pip install git+https://github.com/lebedov/scikit-cuda
-```
-
-### 3. Install [ROICaT](https://github.com/RichieHakim/ROICaT)
-
-```bash
-conda activate caiman
-pip install roicat[all]==1.3.6
-pip install git+https://github.com/RichieHakim/roiextractors
-```
-
-### 4. Install [SQLJobScheduler](https://github.com/thicclatka/SQLJobScheduler) (optional)
-
-```bash
-conda activate caiman
-pip install git+https://github.com/thicclatka/SQLJobScheduler
-```
-
-### 5. Install CLAH Image Analysis
-
-```bash
-conda activate caiman
-
-# to actively develop
-# Clone CLAH Image Analysis repository
-git clone https://github.com/thicclatka/CLAH_IA.git
-
 # Install package
-pip install -e /path/to/CLAH_IA  # -e is optional here as well
+pip install -e "/path/to/CLAH_IA[all]"
+```
 
-# to use as a library
+### Library Mode
+
+```bash
+# to use as a library without GPU support
 pip install git+https://github.com/thicclatka/CLAH_IA
+
+# to use as a library with GPU support
+pip install git+https://github.com/thicclatka/CLAH_IA[all]
 ```
