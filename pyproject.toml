@@ -9,7 +9,7 @@ description = "Suite of Python programs used for 2-photon calcium imaging analys
 authors = [{ name = "Alex Hurowitz" }]
 readme = "README.md"
 keywords = ["2-photon", "miniscope", "1-photon", "calcium imaging", "analysis"]
-requires-python = "==3.11.11"
+requires-python = ">=3.11"
 
 dependencies = [
   "aenum",
