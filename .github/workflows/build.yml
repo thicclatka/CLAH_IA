@@ -17,29 +17,74 @@ permissions:
 
 jobs:
   build:
-    name: Ubuntu 22.04, Python 3.11
-    runs-on: ubuntu-22.04
+    name: ${{ matrix.os }}, Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11"]
+
     steps:
     - name: Check out repository code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/Library/Caches/pip
+          %LOCALAPPDATA%\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Cache built package
+      uses: actions/cache@v4
+      with:
+        path: |
+          ./dist
+          ./build
+          *.egg-info
+        key: ${{ runner.os }}-build-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-build-
 
     - name: Check system specs
       run: |
-        echo "CPU info (lscpu):"
-        lscpu
-        echo "Memory info (free -h):"
-        free -h
-        echo "Disk info (df -h):"
-        df -h
-        echo "Network info (ip a):"
-        ip a
-        echo "OS info (uname -a):"
-        uname -a
+        echo "CPU info:"
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          wmic cpu get name
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          sysctl -n machdep.cpu.brand_string
+        else
+          lscpu
+        fi
+        echo "Memory info:"
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /Value
+        else
+          free -h
+        fi
+        echo "Disk info:"
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          wmic logicaldisk get size,freespace,caption
+        else
+          df -h
+        fi
+        echo "OS info:"
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          systeminfo | findstr /B /C:"OS"
+        else
+          uname -a
+        fi
 
     - name: Install dependencies
       run: |
