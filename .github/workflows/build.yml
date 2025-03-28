@@ -93,7 +93,7 @@ jobs:
 
     - name: Check installed packages
       run: |
-        uv pip --system list
+        uv pip list --system
       
     - name: Test installation
       run: |
