@@ -290,9 +290,9 @@ def setup_page_config(
     print()
 
     print(f"Setting page config for {app_name}")
-    img_dir = Path(paths.get_directory_of_repo_from_file(), "AppDesktopSettings")
-    png_path = Path(img_dir, f"{app_abbrv}_icon.png")
-    icon_path = Path(img_dir, f"{app_abbrv}_icon.ico")
+    img_dir = Path(paths.get_directory_of_repo_from_file(), "docs/images")
+    png_path = Path(img_dir, "png", f"{app_abbrv}_icon.png")
+    icon_path = Path(img_dir, "ico", f"{app_abbrv}_icon.ico")
     for p, name in zip(
         [img_dir, png_path, icon_path], ["img_dir", "png_path", "icon_path"]
     ):

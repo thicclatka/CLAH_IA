@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=MoCoGUI
-Comment=Run M2SD GUI
-Exec=zsh -i -c "MOCOGUI"
-Icon=/mnt/EnvsDrive/scripts_dev/_HL_Scripts/CLAH_IA/AppDesktopSettings/M2SD_icon.svg
-Terminal=true
-Categories=Development;
