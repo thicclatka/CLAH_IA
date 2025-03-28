@@ -19,8 +19,3 @@ CLAH Image Analysis provides tools for:
 - [Structure for path names](3_structure-folder-path-names.md)
 - [CLIs](CLIs/tifStackFunc.md)
 - [GUIs](GUIs/MOCOGUI.md)
-
-## Test of Automatic Deployment
-
-TESTING TESTING TESTING
-TESTING AGAIN
