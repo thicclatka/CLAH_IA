@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
-        python-version: ["3.10", "3.11"]
+        os: [ubuntu-24.04, ubuntu-22.04, windows-latest, macos-latest]
+        python-version: ["3.11"]
 
     steps:
     - name: Check out repository code
@@ -34,6 +34,45 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
+
+    - name: Check specs of the machine -- Linux
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## print the command inputs to the workflow
+        echo "CPU info (lscpu):"
+        lscpu
+        echo "Memory info (free -h):"
+        free -h
+        echo "Disk info (df -h):"
+        df -h
+        echo "Network info (ip a):"
+        ip a
+        echo "OS info (uname -a):"
+        uname -a
+
+    - name: Check specs of the machine -- Windows
+      if: startsWith(matrix.os, 'windows')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## just do a generic check on system info
+        ## print the command inputs to the workflow
+        echo "System info (systeminfo):"
+        systeminfo
+
+    - name: Check specs of the machine -- MacOS
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## print the command inputs to the workflow
+        echo "CPU info (sysctl -n machdep.cpu.brand_string):"
+        sysctl -n machdep.cpu.brand_string
+        echo "Memory info (sysctl -n hw.memsize):"
+        sysctl -n hw.memsize
+        echo "Disk info (df -h):"
+        df -h
+        echo "OS info (uname -a):"
+        uname -a
 
     - name: Cache pip packages
       uses: actions/cache@v4
@@ -46,6 +85,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
     - name: Cache built package
       uses: actions/cache@v4
       with:
@@ -53,43 +97,9 @@ jobs:
           ./dist
           ./build
           *.egg-info
-        key: ${{ runner.os }}-build-${{ github.sha }}
+        key: ${{ runner.os }}-build-${{ hashFiles('pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-build-
-
-    - name: Check system specs
-      run: |
-        echo "CPU info:"
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          wmic cpu get name
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          sysctl -n machdep.cpu.brand_string
-        else
-          lscpu
-        fi
-        echo "Memory info:"
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /Value
-        else
-          free -h
-        fi
-        echo "Disk info:"
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          wmic logicaldisk get size,freespace,caption
-        else
-          df -h
-        fi
-        echo "OS info:"
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          systeminfo | findstr /B /C:"OS"
-        else
-          uname -a
-        fi
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
 
     - name: Install base package
       run: |
