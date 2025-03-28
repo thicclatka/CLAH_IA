@@ -79,17 +79,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Cache built package
-      uses: actions/cache@v4
-      with:
-        path: |
-          ./dist
-          ./build
-          *.egg-info
-        key: ${{ runner.os }}-build-${{ hashFiles('pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-build-
-
     - name: Install base package
       run: |
         pip install -v -e .
