@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-22.04, windows-latest, macos-latest]
-        python-version: ["3.11"]
+        python-version: ["3.11.11"]
 
     steps:
     - name: Check out repository code
@@ -73,17 +73,6 @@ jobs:
         df -h
         echo "OS info (uname -a):"
         uname -a
-
-    - name: Cache pip packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/pip
-          ~/Library/Caches/pip
-          %LOCALAPPDATA%\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
 
     - name: Install dependencies
       run: |
