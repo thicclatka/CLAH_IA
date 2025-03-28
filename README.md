@@ -1,7 +1,7 @@
 # Calcium Imaging Analysis Pipeline for 2-Photon Microscopy (1-Photon in progress)
 
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://thicclatka.github.io/CLAH_IA)
-[![Python 3.x](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![build for base install](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml/badge.svg)](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml)
 
@@ -26,3 +26,9 @@ CLAH Image Analysis provides tools for:
 - [Structure for path names](docs/3_structure-folder-path-names.md)
 - [CLIs](docs/CLIs/tifStackFunc.md)
 - [GUIs](docs/GUIs/MOCOGUI.md)
+
+## TODO
+
+[ ] Flesh out start up & set up scripts
+[ ] Add GUI/WA details to Documentation
+[ ] Change segDict_WA to FastAPI + typescript from streamlit

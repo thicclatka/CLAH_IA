@@ -1,0 +1,20 @@
+{
+  "M2SD_WA": {
+    "description": "CLAH M2SD App (via Streamlit)",
+    "gui_path": "CLAH_ImageAnalysis/GUI/M2SD_WA.py",
+    "port": 8503,
+    "base_url": "m2sd"
+  },
+  "SD_WA": {
+    "description": "CLAH Segmentation Dictionary App (via Streamlit)",
+    "gui_path": "CLAH_ImageAnalysis/GUI/segDictWA.py",
+    "port": 8504,
+    "base_url": "segdict"
+  },
+  "CROPPER": {
+    "description": "CLAH Cropper App (via Streamlit)",
+    "gui_path": "CLAH_ImageAnalysis/GUI/Cropper_WA.py",
+    "port": 8501,
+    "base_url": "cropper"
+  }
+}

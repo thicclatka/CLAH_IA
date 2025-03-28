@@ -1,5 +1,7 @@
 # Installation Guide
 
+Can be used as a library on all OS's, but to properly use the package entirely, best to use on a Ubuntu machine with a GPU.
+
 ## Prerequisites
 
 - [Anaconda](https://docs.anaconda.com/)
