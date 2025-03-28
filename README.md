@@ -29,6 +29,6 @@ CLAH Image Analysis provides tools for:
 
 ## TODO
 
-[ ] Flesh out start up & set up scripts
-[ ] Add GUI/WA details to Documentation
-[ ] Change segDict_WA to FastAPI + typescript from streamlit
+- [ ] Flesh out start up & set up scripts
+- [ ] Add GUI/WA details to Documentation
+- [ ] Change segDict_WA to FastAPI + typescript from streamlit
