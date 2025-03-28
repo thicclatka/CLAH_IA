@@ -30,8 +30,8 @@ theme:
     - content.code.annotate
     - toc.integrate
     - navigation.footer
-  favicon: images/CLAH_logo.png
-  logo: images/CLAH_logo.png
+  favicon: images/png/CLAH_logo.png
+  logo: images/png/CLAH_logo.png
   icon:
     repo: fontawesome/brands/github
 
