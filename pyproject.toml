@@ -49,13 +49,13 @@ where = ["."]
 
 [project.optional-dependencies]
 base = [
-  "git+https://github.com/thicclatka/CaImAn.git",
+  "caiman @ git+https://github.com/thicclatka/CaImAn.git",
   "roicat==1.3.6",
-  "git+https://github.com/RichieHakim/roiextractors.git",
+  "roiextractors @ git+https://github.com/RichieHakim/roiextractors.git",
 ]
 gpu = [
-  "git+https://github.com/lebedov/scikit-cuda.git",
-  "git+https://github.com/thicclatka/SQLJobScheduler.git",
+  "scikit-cuda @ git+https://github.com/lebedov/scikit-cuda.git",
+  "sqljobscheduler @ git+https://github.com/thicclatka/SQLJobScheduler.git",
 ]
 all = ["CLAH_ImageAnalysis[base]", "CLAH_ImageAnalysis[gpu]"]
 nogpu = ["CLAH_ImageAnalysis[base]"]
