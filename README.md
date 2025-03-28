@@ -3,6 +3,7 @@
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://thicclatka.github.io/CLAH_IA)
 [![Python 3.x](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![build for base install](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml/badge.svg)](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml)
 
 A comprehensive suite of Python programs for 2-photon calcium imaging analysis, with support for 1-photon imaging in progress. Best to use on a local server, with a GPU for faster processing and data stored on a drive(s) separate from the root mount.
 

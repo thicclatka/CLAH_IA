@@ -1,0 +1,87 @@
+name: build
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'description'     
+        required: false                     
+        default: '' 
+        
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Ubuntu ${{ matrix.ubuntu-version }}, py${{ matrix.python-version }}
+    runs-on: ubuntu-${{ matrix.ubuntu-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu-version: [
+          "24.04",
+          "22.04",
+          "20.04",
+        ]
+        python-version: [ 
+          "3.10",
+          "3.11",
+          "3.12",
+        ]
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up conda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniconda-version: latest
+        activate-environment: caiman
+        auto-activate-base: true
+        auto-update-conda: false
+        remove-profiles: true
+        architecture: x64
+        clean-patched-environment-file: true
+        run-post: true
+
+    - name: Create conda environment from environment.yml
+      run: |
+        conda env create -f environment.yml -n caiman
+        conda activate caiman
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Check system specs
+      run: |
+        echo "CPU info (lscpu):"
+        lscpu
+        echo "Memory info (free -h):"
+        free -h
+        echo "Disk info (df -h):"
+        df -h
+        echo "Network info (ip a):"
+        ip a
+        echo "OS info (uname -a):"
+        uname -a
+
+    - name: Install base package
+      run: |
+        pip install -v -e .
+
+    - name: Check installed packages
+      run: |
+        pip list
+        python -c "import CLAH_ImageAnalysis; print(f'CLAH_IA version: {CLAH_ImageAnalysis.__version__}')"
+
+    - name: Run tests
+      run: |
+        pip install pytest
+        python -m pytest -v --color=yes
