@@ -8,6 +8,8 @@ dbs/
 *.dist
 *.vscode
 
+*.sh
+
 CNMF_params/
 
 ### Python ###
