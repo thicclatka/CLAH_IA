@@ -13,7 +13,7 @@ Can be used as a library on all OS's, but to properly use the package entirely, 
         - can use Windows Subsystem for Linux (WSL)
         - would recommend [Pop!_OS](https://system76.com/pop/download/) for NVIDIA drivers
         - use a non-Debian-based Linux distro at your own risk
-    - CUDA (required if using GPU)
+    - CUDA
         - [for Ubuntu (CUDA website)](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu)
         - [for Windows (CUDA website)](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html)
         - [for WSL (CUDA website)](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#wsl)
