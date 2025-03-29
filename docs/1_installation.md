@@ -6,6 +6,7 @@ Can be used as a library on all OS's, but to properly use the package entirely, 
 
 - [Anaconda](https://docs.anaconda.com/)
     - still testing on more lightweight python environment/package managers
+    - base install works with (uv)[https://github.com/astral-sh/uv]
 - [TMUX](https://github.com/tmux/tmux/wiki)
 - To use a GPU:
     - a machine running Ubuntu or Windows
