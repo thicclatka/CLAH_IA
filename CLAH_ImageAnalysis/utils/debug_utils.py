@@ -9,13 +9,14 @@ def raiseVE_wAllowables(
 
     Parameters:
         input (str | int | float): The input value to check.
-        allowed_values (tuple): The allowed values.
+        allowed_values (tuple | set | list): The allowed values.
         var_type (str): The type of the variable.
-
-    Raises:
-        ValueError: If the input is not in the allowed values.
     """
-
+    assert isinstance(allowed_values, (tuple, set, list)), (
+        "allowed_values must be tuple, set, or list"
+    )
+    assert isinstance(var_type, str), "var_type must be a string"
+    assert len(allowed_values) > 0, "allowed_values cannot be empty"
     if input not in allowed_values:
         raise ValueError(
             f"Unrecognized {var_type} ({input}). Expected one of {list(allowed_values)}"

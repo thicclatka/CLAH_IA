@@ -39,11 +39,19 @@ def check_color_format(color: str | tuple) -> str:
     Check if a color is in hex or RGB format.
 
     Parameters:
-        color (str or tuple): The color to check.
+        color (str | tuple): The color to check.
 
     Returns:
         str: The format of the color ("hex", "rgb", or "unknown").
     """
+    assert color is not None, "Color cannot be None"
+    assert isinstance(color, (str, tuple)), "Color must be string or tuple"
+
+    if isinstance(color, tuple):
+        assert len(color) in [3, 4], "RGB(A) tuple must have 3 or 4 values"
+        assert all(isinstance(v, (int, float)) for v in color), (
+            "RGB values must be numbers"
+        )
 
     if isinstance(color, str) and re.match("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color):
         return "hex"

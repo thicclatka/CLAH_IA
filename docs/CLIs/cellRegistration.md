@@ -54,7 +54,7 @@ options:
 ### Output
 
 - csv with cluster info for all subjects (/path/to/\_MS_dir/~GroupData/ClusterInfo_all.csv)
-  - csv with cluster info averages by group (/path/to/\_MS_dir/~GroupData/ClusterInfo_means.csv)
+- csv with cluster info averages by group (/path/to/\_MS_dir/~GroupData/ClusterInfo_means.csv)
 
 ### CLI
 
@@ -78,3 +78,4 @@ options:
   -4p FORPRES, --forPres FORPRES
                         Whether to export .svg for figures in addition to the usual
                         png output. Default is False.
+```

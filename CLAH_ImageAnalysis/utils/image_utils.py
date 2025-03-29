@@ -1,23 +1,28 @@
 import numpy as np
 import cv2
+import os
 from skimage.transform import resize
 from CLAH_ImageAnalysis.utils import fig_tools
 from CLAH_ImageAnalysis.utils import text_dict
 
 
 def read_image(path_to_image: str) -> np.ndarray:
-    """Read an image from the given path using rasterio.
+    """
+    Read an image from a file.
 
     Parameters:
-        image_path (str): The path to the image file.
+        path_to_image (str): The path to the image file.
 
     Returns:
         np.ndarray: The image as a numpy array.
     """
-
     import rasterio
     from rasterio.errors import NotGeoreferencedWarning
     import warnings
+
+    assert isinstance(path_to_image, str), "Path must be a string"
+    assert path_to_image.strip(), "Path cannot be empty"
+    assert os.path.exists(path_to_image), f"Image file not found: {path_to_image}"
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
