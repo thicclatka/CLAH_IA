@@ -422,6 +422,9 @@ def create_txtfiles4db(avoidORscan: Literal["avoid", "scan"] | None = None) -> N
                 break
             else:
                 print("Path does not exist. Check your spelling and try again.")
+            print(f"Current entries in {things2add}:")
+            for thing in things2add:
+                print_wFrame(thing.strip())
     elif avoidORscan == "avoid":
         while True:
             print(
@@ -433,7 +436,10 @@ def create_txtfiles4db(avoidORscan: Literal["avoid", "scan"] | None = None) -> N
                     things2add = [""]
                 break
             else:
-                print("Path does not exist. Check your spelling and try again.")
+                things2add.append(path_temp)
+            print(f"Current entries in {things2add}:")
+            for thing in things2add:
+                print_wFrame(thing.strip())
 
     things2add.sort()
 

@@ -8,8 +8,7 @@ from CLAH_ImageAnalysis.utils import text_formatting
 
 def load_template(systemd_services_dir: Path, template_name: str) -> str:
     """Load a template file from the templates directory"""
-    repo_dir = paths.get_directory_of_repo_from_file()
-    template_path = Path(repo_dir, "Systemd", "templates", template_name)
+    template_path = Path(systemd_services_dir, "templates", template_name)
     with open(template_path, "r") as f:
         return f.read()
 
@@ -33,6 +32,9 @@ def create_service_files(service_user: str):
     ]
     print(text_formatting.create_multiline_string(str2print))
 
+    db_path = paths.get_path2dbs()
+    db_path.mkdir(parents=True, exist_ok=True)
+
     db_utils.get_search_roots()
     db_utils.get_things2avoid()
 
@@ -47,8 +49,8 @@ def create_service_files(service_user: str):
         apps = json.load(f)
 
     # provide full path to gui_path
-    for app in apps.keys():
-        apps[app]["gui_path"] = f"{repo_dir}/{apps[app]['gui_path']}"
+    # for app in apps.keys():
+    #     apps[app]["gui_path"] = f"{repo_dir}/{apps[app]['gui_path']}"
 
     # Create output directory if it doesn't exist
     output_dir = Path(repo_dir, "SystemdServices")
@@ -67,8 +69,9 @@ def create_service_files(service_user: str):
             clah_path=repo_dir,
             app_name=app_name,
             gui_path=app_settings["gui_path"],
-            port=app_settings["default_port"],
+            port=app_settings["port"],
             base_url=app_settings["base_url"],
+            env_name=paths.get_python_env(),
         )
 
         with open(run_script_path, "w") as f:
@@ -91,7 +94,9 @@ def create_service_files(service_user: str):
         created_services.append(
             {
                 "name": app_name.lower(),
-                "port": app_settings["default_port"],
+                "shell_name": f"run{app_name.upper()}.sh",
+                "port": app_settings["port"],
+                "st_app_name": app_settings["base_url"],
                 "service_path": service_path,
             }
         )
@@ -102,7 +107,7 @@ def create_service_files(service_user: str):
     print("Services user set to:", service_user)
     print("\nTo install the services:")
     print("1. Copy the service files to systemd directory:")
-    print(f"   sudo cp {output_dir}/*.service /etc/systemd/system/")
+    print(f"   sudo cp {output_dir}/services/*.service /etc/systemd/system/")
 
     print("\n2. Reload systemd daemon to log changes:")
     print("   sudo systemctl daemon-reload")
@@ -110,7 +115,9 @@ def create_service_files(service_user: str):
     print("\n3. Make run scripts executable and enable and start each service:")
     for service in created_services:
         print(f"For {service['name']}:")
-        print("    sudo chmod +x run{service['name']}.sh")
+        print(
+            f"   chmod +x {systemd_services_dir}/shell_scripts/{service['shell_name']}"
+        )
         print(f"   sudo systemctl enable {service['name']}")
         print(f"   sudo systemctl start {service['name']}")
         print()
@@ -121,7 +128,9 @@ def create_service_files(service_user: str):
 
     print("\nPorts assigned:")
     for service in created_services:
-        print(f"   {service['name']}: {service['service_path']}")
+        print(
+            f"   {service['name']}: app name:port = {service['st_app_name']}:{service['port']}"
+        )
 
 
 def main():

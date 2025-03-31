@@ -1,15 +1,11 @@
 *.db
 dbs/
-*.service
 .old/
-
 *.DS_Store
-*.vscode/
-*.dist
 *.vscode
-
-*.sh
-
+NNmodels/
+services/
+shell_scripts/
 CNMF_params/
 
 ### Python ###
