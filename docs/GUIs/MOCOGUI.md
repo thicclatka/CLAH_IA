@@ -6,26 +6,24 @@ The M2SD Web App provides a streamlined interface for running motion correction 
 
 ### Requirements
 
-- configured SQLJobScheduler
-    - [ADD LINK HERE] to send email notifications
+- configured [SQLJobScheduler](https://github.com/thicclatka/SQLJobScheduler)
 - System service setup (via systemd)
 - a port available for web access
-
 
 ### Key Features
 
 - **Path Search & Selection**: Easily search and select data paths from a SQLite database cache
 - **Session Processing**: Choose to process all sessions or select specific ones
 - **Main Options**:
-  - Motion Correction (MC)
-  - Segmentation (SG)
-  - Overwrite existing files
+    - Motion Correction (MC)
+    - Segmentation (SG)
+    - Overwrite existing files
 - **Advanced Settings**:
-  - Concatenate files
-  - Compute metrics
-  - Export post-segmentation residuals
-  - Handle separate channels
-  - Motion correction iterations
+    - Concatenate files
+    - Compute metrics
+    - Export post-segmentation residuals
+    - Handle separate channels
+    - Motion correction iterations
 
 ### Job Scheduling System
 
