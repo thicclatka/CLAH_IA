@@ -234,6 +234,7 @@ class segDict_Txt(Enum):
     IDX_GODO = "idx_components"
     RSR = "R"
     S_DECONV = "S"
+    S_DECONV_ALL = "S_all"
     YRA = "YrA"
     SNR_COMP = "SNR_comp"
     R_VALUES = "r_values"

@@ -115,6 +115,10 @@ def init_session_state():
         st.session_state.CTemp = None
     if "ASpat" not in st.session_state:
         st.session_state.ASpat = None
+    if "SDeconv" not in st.session_state:
+        st.session_state.SDeconv = None
+    if "show_sdeconv" not in st.session_state:
+        st.session_state.show_sdeconv = False
     if "DSimage_fname" not in st.session_state:
         st.session_state.DSimage_fname = None
     if "ASPatList" not in st.session_state:
@@ -220,14 +224,15 @@ def create_paths_db() -> tuple[int, int]:
 
 def get_segDict(selected_session: str):
     def _get_AL_from_SDISX(segDict_fname: str):
-        CTempnew, ASpatnew, accepted_labels = saveNloadUtils.load_segDict(
+        CTempnew, ASpatnew, SDeconvnew, accepted_labels = saveNloadUtils.load_segDict(
             filename=segDict_fname,
             C_all=True,
             A_all=True,
+            S_all=True,
             accepted_labels=True,
             print_prev_bool=False,
         )
-        return CTempnew, ASpatnew, accepted_labels
+        return CTempnew, ASpatnew, SDeconvnew, accepted_labels
 
     ss2print = "/".join(selected_session.split("/")[-2:])
     st.subheader(ss2print)
@@ -244,8 +249,14 @@ def get_segDict(selected_session: str):
     print(f"Loaded segDict: {st.session_state.segDict_fname}")
 
     if st.session_state.CTemp is None or st.session_state.ASpat is None:
-        st.session_state.CTemp, st.session_state.ASpat = saveNloadUtils.load_segDict(
-            st.session_state.segDict_fname, C=True, A=True, print_prev_bool=False
+        st.session_state.CTemp, st.session_state.ASpat, st.session_state.SDeconv = (
+            saveNloadUtils.load_segDict(
+                st.session_state.segDict_fname,
+                C=True,
+                A=True,
+                S=True,
+                print_prev_bool=False,
+            )
         )
         st.session_state.ASpat = st.session_state.ASpat.toarray()
 
@@ -284,7 +295,9 @@ def get_segDict(selected_session: str):
 
     if st.session_state.loaded_AL_fromSDISX is None:
         try:
-            _, _, _ = _get_AL_from_SDISX(st.session_state.segDict_fname)
+            _, _, _, accepted_labels = _get_AL_from_SDISX(
+                st.session_state.segDict_fname
+            )
             st.session_state.loaded_AL_fromSDISX = True
         except Exception as e:
             print(f"No accepted labels found in segDict resetting to default: {e}")
@@ -292,11 +305,12 @@ def get_segDict(selected_session: str):
 
     if st.session_state.loaded_AL_fromSDISX:
         st.write("|-- Loaded accepted labels found within segDict (from ISX output)")
-        CTempnew, ASpatnew, accepted_labels = _get_AL_from_SDISX(
+        CTempnew, ASpatnew, SDeconvnew, accepted_labels = _get_AL_from_SDISX(
             st.session_state.segDict_fname
         )
         st.session_state.CTemp = CTempnew
         st.session_state.ASpat = ASpatnew.toarray()
+        st.session_state.SDeconv = SDeconvnew
         st.session_state.AL_SDISX_accepted = set(
             np.where(accepted_labels == "accepted")[0].astype(int)
         )
@@ -1329,13 +1343,15 @@ def plot_CTemp():
         "color": CMAPS[1](0.5),
         "linewidth": 0.5,
         "markersize": 2,
-        "fs": 8,
+        "fs": 10,
         "ymax": 1.1,
         "ymin": -0.4,
         "peak_color": color_dict()["violet"],
         "pre_peak": 50,
         "post_peak": 200,
         "figsize": (10, 3),
+        "sdeconv_color": color_dict()["orange"],
+        "sdeconv_width": 2,
     }
     # selection_made = st.session_state.selected_index != st.session_state.prev_index
 
@@ -1367,39 +1383,63 @@ def plot_CTemp():
         temp_data = st.session_state.temporal_data
         adj2bsl_data = st.session_state.adj2bsl_data
 
-    # st.write(f"Temp data: {temp_data}")
-    # st.write(f"Adj2bsl data: {adj2bsl_data}")
-    # st.write(f"Max of temp data: {np.max(temp_data)}")
-    # st.write(f"Max of adj2bsl data: {np.max(adj2bsl_data)}")
-    # st.write(f"Min of temp data: {np.min(temp_data)}")
-    # st.write(f"Min of adj2bsl data: {np.min(adj2bsl_data)}")
-
     st.session_state.data2use = (
         _normalize_data(temp_data)
         if not st.session_state.adj2bsl_bool
         else _normalize_data(adj2bsl_data)
     )
 
-    # st.write(f"Data used: {st.session_state.data2use}")
-
     figCTP = None
     figPkTrace = None
 
     figCTP, axCTP = fig_tools.create_plt_subplots(figsize=PLOTDICT["figsize"])
 
+    # Add checkbox for SDeconv plot
+    show_sdeconv = st.checkbox(
+        "Show Spikes (Deconvolution via OASIS)",
+        value=st.session_state.show_sdeconv,
+        key="show_sdeconv_checkbox",
+        help="Toggle whether to show the deconvolved signal on a secondary y-axis",
+    )
+    st.session_state.show_sdeconv = show_sdeconv
+
+    # Plot main signal
     axCTP.plot(
         st.session_state.data2use,
         color=PLOTDICT["color"],
-        linewidth=PLOTDICT["linewidth"],
+        linewidth=PLOTDICT["linewidth"] + 0.5,
+        label="Trace",
     )
-    # axCTP.set_title(
-    #     "No adjustment to Baseline"
-    #     if not st.session_state.adj2bsl_bool
-    #     else "Adjusted to Baseline"
-    # )
-    # axCTP.set_ylim(PLOTDICT["ymin"], PLOTDICT["ymax"])
-    axCTP.set_ylabel("Normalized to Max", fontsize=PLOTDICT["fs"])
+    # Color the y-axis label to match the plot color
+    axCTP.set_ylabel(
+        "Normalized to Max", fontsize=PLOTDICT["fs"], color=PLOTDICT["color"]
+    )
+    axCTP.tick_params(axis="y", labelcolor=PLOTDICT["color"])
     axCTP.set_xlabel("Time (frames)", fontsize=PLOTDICT["fs"])
+
+    # Plot SDeconv if checkbox is checked
+    if st.session_state.show_sdeconv and st.session_state.SDeconv is not None:
+        sdeconv_data = st.session_state.SDeconv[st.session_state.selected_index, :]
+
+        # Create secondary y-axis
+        ax2 = axCTP.twinx()
+        ax2.bar(
+            np.arange(sdeconv_data.shape[0]),
+            sdeconv_data,
+            width=PLOTDICT["sdeconv_width"],
+            color=PLOTDICT["sdeconv_color"],
+            label="Deconvolution",
+        )
+        # Color the y-axis label to match the plot color
+        ax2.set_ylabel(
+            "Spikes", fontsize=PLOTDICT["fs"], color=PLOTDICT["sdeconv_color"]
+        )
+        ax2.tick_params(axis="y", labelcolor=PLOTDICT["sdeconv_color"])
+
+        # # Add legend
+        # lines1, labels1 = axCTP.get_legend_handles_labels()
+        # lines2, labels2 = ax2.get_legend_handles_labels()
+        # axCTP.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     figPkTrace, axPkTrace = fig_tools.create_plt_subplots(figsize=PLOTDICT["figsize"])
     if st.session_state.peak_algorithm == "scipy":
@@ -1636,9 +1676,11 @@ def _refresh_per_session_change():
     st.session_state.adjust_labels_bool = False
     st.session_state.adj2bsl_bool = False
     st.session_state.smooth_bool = False
+    st.session_state.show_sdeconv = False
     st.session_state.pksDict = {}
     st.session_state.CTemp = None
     st.session_state.ASpat = None
+    st.session_state.SDeconv = None
     st.session_state.DSimage_fname = None
     st.session_state.CNMF_accepted = None
     st.session_state.CNMF_rejected = None
