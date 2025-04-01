@@ -21,6 +21,7 @@ moviepy
 mypy
 numpy>=1.26,<2.0.0
 numpydoc
+oasis-deconv
 opencv-python
 opencv-contrib-python
 pandas
