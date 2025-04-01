@@ -5,6 +5,8 @@ import zipfile
 import argparse
 import tifffile as tif
 import isx
+from oasis.functions import deconvolve
+
 
 # import easygui
 from scipy import sparse
@@ -96,7 +98,12 @@ class ISX_csv_converter:
 
         return cellset_file
 
-    def _create_CTemp(self) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+    def _create_CTemp(
+        self,
+    ) -> (
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        | tuple[None, None, None, None]
+    ):
         """Create array of cell time course data from CSV.
 
         Imports CSV data and extracts:
@@ -124,10 +131,25 @@ class ISX_csv_converter:
                 )
                 CTemp = np.transpose(C_as_CSV.iloc[1:, 1:].astype(float).values)
 
+                # Deconvolve each cell's time course
+                SDeconv = []
+                Cdenoised = []
+                for c in CTemp:
+                    # use non-negative values for deconvolution
+                    # c2use = (c - c.min()) + 1e-6
+                    cnew, s, b, g, lam = deconvolve(c, b_nonneg=True)
+                    SDeconv.append(s)
+                    Cdenoised.append(cnew)
+                SDeconv = np.array(SDeconv)
+                # use the deconvolved time course for the final CTemp
+                CTemp = np.array(Cdenoised)
+
                 CFrameTimes = np.array(C_as_CSV.iloc[1:, 0].astype(float).values)
             elif self._find_CNMFE_file(file_type="ISXD"):
                 utils.print_wFrame("Importing CTemp from ISXD", frame_num=1)
-                CTemp, _, accepted_labels, CFrameTimes = self._import_isx_cell_set()
+                CTemp, _, SDeconv, accepted_labels, CFrameTimes = (
+                    self._import_isx_cell_set()
+                )
 
             utils.print_wFrame(f"CTemp shape: {CTemp.shape}", frame_num=1)
             utils.print_wFrame(f"Cell number: {CTemp.shape[0]}", frame_num=2)
@@ -136,7 +158,7 @@ class ISX_csv_converter:
                 f"accepted_labels shape: {accepted_labels.shape[0]}", frame_num=1
             )
 
-            return CTemp, accepted_labels, CFrameTimes
+            return CTemp, SDeconv, accepted_labels, CFrameTimes
 
         except Exception as e:
             print(f"Error creating CTemp: {e}")
@@ -153,20 +175,31 @@ class ISX_csv_converter:
                 - accepted_labels (np.ndarray): Cell acceptance labels
                 - CFrameTimes (np.ndarray): Frame times (num_timepoints)
                 - ASpat (np.ndarray): Spatial components (num_cells x num_pixels)
+                - S (np.ndarray): Deconvolved spatial components (num_cells x num_timepoints)
         """
+
         cellset = isx.CellSet.read(self._find_CNMFE_file(file_type="ISXD"))
-        C, A, accepted_labels = [], [], []
+        C, A, S, accepted_labels = [], [], [], []
         for i in range(cellset.num_cells):
-            C.append(cellset.get_cell_trace_data(i))
+            trace = cellset.get_cell_trace_data(i)
             A.append(cellset.get_cell_image_data(i))
             accepted_labels.append(cellset.get_cell_status(i))
+
+            # deconvolve the time course
+            cnew, s, b, g, lam = deconvolve(trace, b_nonneg=True)
+
+            # use the deconvolved time course for the final CTemp
+            C.append(cnew)
+            S.append(s)
+
         C = np.array(C)
         A = np.array(A)
+        S = np.array(S)
         accepted_labels = np.array(accepted_labels, dtype="U")
 
         secs = round(cellset.timing.period.to_msecs(), -1) / 1000
         CFrameTimes = np.arange(0, secs * C.shape[1], secs)
-        return C, A, accepted_labels, CFrameTimes
+        return C, A, S, accepted_labels, CFrameTimes
 
     def _import_csvNremove_whitespace(self) -> pd.DataFrame:
         """Import CSV file and remove whitespace.
@@ -284,7 +317,7 @@ class ISX_csv_converter:
 
             elif self._find_CNMFE_file(file_type="ISXD"):
                 utils.print_wFrame("Importing A from ISXD", frame_num=1)
-                _, cellmap, _, _ = self._import_isx_cell_set()
+                _, cellmap, _, _, _ = self._import_isx_cell_set()
 
             # convert to sparse matrix
             ASpat = self._convert2sparse(cellmap)
@@ -342,15 +375,16 @@ class ISX_csv_converter:
                 - accepted_labels (np.ndarray): Component acceptance status
                 - CFrameTimes (np.ndarray): Frame times (n_timepoints)
         """
-        CTemp, accepted_labels, CFrameTimes = self._create_CTemp()
+        CTemp, SDeconv, accepted_labels, CFrameTimes = self._create_CTemp()
         # eventRate = self._create_eventRate(CTemp=CTemp)
         ASpat = self._create_ASpat()
 
-        return CTemp, ASpat, accepted_labels, CFrameTimes
+        return CTemp, SDeconv, ASpat, accepted_labels, CFrameTimes
 
     def _export_segDict(
         self,
         CTemp: np.ndarray | None,
+        SDeconv: np.ndarray | None,
         ASpat: sparse.csr_matrix | None,
         accepted_labels: np.ndarray | None,
         CFrameTimes: np.ndarray | None,
@@ -387,7 +421,9 @@ class ISX_csv_converter:
 
         segDict = {
             "C": CTemp[accepted_idx, :],
+            "S": SDeconv[accepted_idx, :],
             "C_all": CTemp,
+            "S_all": SDeconv,
             "A": ASpat[:, accepted_idx],
             "A_all": ASpat,
             "accepted_labels": accepted_labels,
@@ -552,7 +588,9 @@ class ISX_csv_converter:
                 os.chdir(self.current_folder)
                 print(f"Processing {self.current_folder}")
 
-                CTemp, ASpat, accepted_labels, CFrameTimes = self._extract_CnA()
+                CTemp, SDeconv, ASpat, accepted_labels, CFrameTimes = (
+                    self._extract_CnA()
+                )
 
                 if self.AvB_Check:
                     CtxtByCFrameTimes, FrzDict, CtxtOrder = (
@@ -565,6 +603,7 @@ class ISX_csv_converter:
 
                 self._export_segDict(
                     CTemp=CTemp,
+                    SDeconv=SDeconv,
                     ASpat=ASpat,
                     accepted_labels=accepted_labels,
                     CFrameTimes=CFrameTimes,
