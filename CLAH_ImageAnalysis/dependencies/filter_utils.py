@@ -6,6 +6,7 @@ from scipy.fft import fft2
 from scipy.fft import fftshift
 from scipy.fft import ifft2
 from scipy.fft import ifftshift
+from CLAH_ImageAnalysis.dependencies.normalization_utils import normalize_array
 
 
 def create_exponential_decay_filter(
@@ -178,22 +179,91 @@ def create_bandpass_filter(shape, low_cutoff_freq, high_cutoff_freq):
     return mask
 
 
-def apply_bandpass_filter(image, low_cutoff_freq, high_cutoff_freq):
+def apply_spatial_bandpass_filter(
+    image: np.ndarray, sigma_high: float, sigma_low: float
+) -> np.ndarray:
     """
-    Apply a bandpass filter to an image.
+    Apply a bandpass filter using spatial domain Gaussian blurring.
 
     Parameters:
-        image (np.ndarray): Image to filter.
-        low_cutoff_freq (float): Low cutoff frequency. Units are pixels^-1.
-        high_cutoff_freq (float): High cutoff frequency. Units are pixels^-1.
+        image (np.ndarray): Input image to filter
+        sigma_high (float): Standard deviation for high-pass Gaussian blur
+        sigma_low (float): Standard deviation for low-pass Gaussian blur
 
     Returns:
-        np.ndarray: Filtered image.
+        np.ndarray: Bandpass filtered image
     """
-    f = fft2(image)
-    fshift = fftshift(f)
-    mask = create_bandpass_filter(image.shape, low_cutoff_freq, high_cutoff_freq)
-    fshift_filtered = fshift * mask
-    f_ishift = ifftshift(fshift_filtered)
-    filtered_image = np.real(ifft2(f_ishift))
+    # Apply high-pass Gaussian blur
+    high_pass = cv2.GaussianBlur(image, (0, 0), sigma_high)
+    # Apply low-pass Gaussian blur
+    low_pass = cv2.GaussianBlur(image, (0, 0), sigma_low)
+    # Subtract to get bandpass
+    return high_pass - low_pass
+
+
+def compute_sigma_from_cutoff(cutoff_freq: float) -> float:
+    """
+    Compute sigma value from cutoff frequency using the formula:
+    σ = sqrt(2 * ln(2)) / (2 * π * λ)
+    where λ is the cutoff frequency in pixels^-1
+
+    Parameters:
+        cutoff_freq (float): Cutoff frequency in pixels^-1
+
+    Returns:
+        float: Computed sigma value
+    """
+    return np.sqrt(2 * np.log(2)) / (2 * np.pi * cutoff_freq)
+
+
+def apply_bandpass_filter(
+    image: np.ndarray,
+    low_cutoff_freq: float,
+    high_cutoff_freq: float,
+    use_spatial: bool = False,
+    sigma_high: float | None = None,
+    sigma_low: float | None = None,
+    normalize: bool = True,
+) -> np.ndarray:
+    """
+    Apply a bandpass filter to an image using either frequency domain (FFT) or spatial domain approach.
+
+    Parameters:
+        image (np.ndarray): Image to filter
+        low_cutoff_freq (float): Low cutoff frequency (pixels^-1)
+        high_cutoff_freq (float): High cutoff frequency (pixels^-1)
+        use_spatial (bool): Whether to use spatial domain approach instead of FFT. Default is False, which uses FFT. FFT is faster with a sharper frequency rolloff. Spatial domain leads to a smoother result (this is the method Inscopix uses).
+        sigma_high (float | None): Optional override for high-pass sigma value
+        sigma_low (float | None): Optional override for low-pass sigma value
+
+    Returns:
+        np.ndarray: Filtered image, normalized to uint16 range
+    """
+    if use_spatial:
+        # Compute sigma values from cutoff frequencies if not provided
+        sigma_high = (
+            compute_sigma_from_cutoff(high_cutoff_freq)
+            if sigma_high is None
+            else sigma_high
+        )
+        sigma_low = (
+            compute_sigma_from_cutoff(low_cutoff_freq)
+            if sigma_low is None
+            else sigma_low
+        )
+        filtered_image = apply_spatial_bandpass_filter(
+            image, sigma_high, sigma_low, normalize
+        )
+    else:
+        f = fft2(image)
+        fshift = fftshift(f)
+        mask = create_bandpass_filter(image.shape, low_cutoff_freq, high_cutoff_freq)
+        fshift_filtered = fshift * mask
+        f_ishift = ifftshift(fshift_filtered)
+        filtered_image = np.real(ifft2(f_ishift))
+        return filtered_image
+
+    if normalize:
+        # Normalize to uint16 range
+        filtered_image = normalize_array(filtered_image, dtype=np.uint16)
     return filtered_image

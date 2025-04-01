@@ -125,10 +125,7 @@ class MoCoPreprocessing(BC):
             np.ndarray: The processed frame.
         """
         frame_filtered = self.dep.filter_utils.apply_bandpass_filter(
-            frame, low_cutoff_freq, high_cutoff_freq
-        )
-        frame_filtered = self.dep.normalization_utils.normalize_array(
-            frame_filtered, dtype=np.uint16
+            frame, low_cutoff_freq, high_cutoff_freq, use_spatial=True, normalize=True
         )
         return img_as_uint(frame_filtered)
 
