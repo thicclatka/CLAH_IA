@@ -53,7 +53,7 @@ def create_service_files(service_user: str):
     #     apps[app]["gui_path"] = f"{repo_dir}/{apps[app]['gui_path']}"
 
     # Create output directory if it doesn't exist
-    output_dir = Path(repo_dir, "SystemdServices")
+    output_dir = Path(paths.get_config_dir_path(), "SystemdServices")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("Setting up service files...")
@@ -115,9 +115,7 @@ def create_service_files(service_user: str):
     print("\n3. Make run scripts executable and enable and start each service:")
     for service in created_services:
         print(f"For {service['name']}:")
-        print(
-            f"   chmod +x {systemd_services_dir}/shell_scripts/{service['shell_name']}"
-        )
+        print(f"   chmod +x {output_dir}/shell_scripts/{service['shell_name']}")
         print(f"   sudo systemctl enable {service['name']}")
         print(f"   sudo systemctl start {service['name']}")
         print()
