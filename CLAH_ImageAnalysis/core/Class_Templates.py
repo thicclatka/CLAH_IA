@@ -49,6 +49,7 @@ from typing import Any
 from rich import print as rprint
 from pathlib import Path
 import functools
+import sys
 # from contextlib import contextmanager
 
 # from functools import wraps
@@ -72,6 +73,15 @@ def get_project_version() -> str:
     except Exception as e:
         print(f"Warning: Could not read version from pyproject.toml: {e}")
         return "0.0.0"
+
+
+def extract_args_preParser(
+    parser_enum: Any, flag2find: str, clear_terminal: bool = True
+) -> Any:
+    """
+    Extracts specific flag arguments from the given arguments without needing to create a parser. i.e. "--from_sql" or "--help"
+    """
+    return flag2find in sys.argv
 
 
 def run_CLAH_script(

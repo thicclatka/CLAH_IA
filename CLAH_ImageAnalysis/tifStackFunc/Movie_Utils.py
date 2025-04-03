@@ -190,7 +190,7 @@ def save_movie(
 
 def add_caption_to_movie(
     movie: np.ndarray,
-    text: str,
+    text: str | None = None,
     num_frames: int = 100,
     bit_depth: type = np.uint8,
 ) -> object:
@@ -226,11 +226,12 @@ def add_caption_to_movie(
     color = (0, 0, np.iinfo(bit_depth).max)  # Red
     thickness = 1
 
-    # Add red text to first N frames
-    for frame_idx in range(min(num_frames, len(movie))):
-        cv2.putText(
-            movie_bgr[frame_idx], text, position, font, font_scale, color, thickness
-        )
+    if text is not None:
+        # Add red text to first N frames
+        for frame_idx in range(min(num_frames, len(movie))):
+            cv2.putText(
+                movie_bgr[frame_idx], text, position, font, font_scale, color, thickness
+            )
 
     # # convert to movie
     # movie_bgr = cm.movie(movie_bgr)

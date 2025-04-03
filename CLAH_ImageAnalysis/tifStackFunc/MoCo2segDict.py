@@ -39,6 +39,7 @@ python MoCo2segDict.py --path /path/to/data --motion_correct yes --segment yes
 """
 
 from CLAH_ImageAnalysis.core import run_CLAH_script
+from CLAH_ImageAnalysis.core import extract_args_preParser
 from CLAH_ImageAnalysis.tifStackFunc import M2SD_manager as M2SDM
 
 
@@ -273,19 +274,33 @@ class MoCo2segDict(M2SDM):
         self.stop_cluster(final=True)
 
 
-######################################################
-#  run script if called from command line
-######################################################
-if __name__ == "__main__":
+def main():
     import os
     import getpass
     from pathlib import Path
     from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
     from sqljobscheduler import LockFileUtils
 
-    sql_parser = LockFileUtils.lock_file_argparser()
+    def run_script(clear_terminal: bool = True):
+        run_CLAH_script(
+            MoCo2segDict,
+            parser_enum=TSF_enum.Parser4M2SD,
+            clear_terminal=clear_terminal,
+        )
 
-    if not sql_parser.from_sql:
+    help_flag = extract_args_preParser(
+        parser_enum=TSF_enum.Parser4M2SD, flag2find="--help"
+    ) or extract_args_preParser(parser_enum=TSF_enum.Parser4M2SD, flag2find="-h")
+
+    if help_flag:
+        run_script(clear_terminal=False)
+        exit()
+
+    sql_status = extract_args_preParser(
+        parser_enum=TSF_enum.Parser4M2SD, flag2find="--from_sql"
+    )
+
+    if not sql_status:
         LockFileUtils.gpu_lock_check_timer(duration=60)
 
     if not LockFileUtils.check_gpu_lock_file():
@@ -299,12 +314,15 @@ if __name__ == "__main__":
 
     try:
         # run parser, create instance of class, and run the script
-        run_CLAH_script(
-            MoCo2segDict,
-            parser_enum=TSF_enum.Parser4M2SD,
-        )
+        run_script()
+
+    finally:
         # remove GPU lock file
         LockFileUtils.remove_gpu_lock_file()
 
-    finally:
-        LockFileUtils.remove_gpu_lock_file()
+
+######################################################
+#  run script if called from command line
+######################################################
+if __name__ == "__main__":
+    main()

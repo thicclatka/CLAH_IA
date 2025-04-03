@@ -17,7 +17,7 @@ class CNMF_Utils(BC):
     on calcium imaging data.
 
     This class provides methods for initializing CNMF, refining component patches,
-    evaluating components, plotting contours, extracting DF/F values, and exporting
+    evaluating components, plotting contourimg_as_uint()s, extracting DF/F values, and exporting
     segmentation data.
 
     Attributes:
@@ -773,7 +773,7 @@ class CNMF_Utils(BC):
 
         self.fig_tools.save_figure(
             plt_figure=fig,
-            fig_name=f"{self.basename}_ASpat",
+            fig_name=f"{self.basename}_{self.file_tag['A']}",
         )
 
         # ASP_fname = self.text_lib["Folders"]["ASPAT_CHECK"]

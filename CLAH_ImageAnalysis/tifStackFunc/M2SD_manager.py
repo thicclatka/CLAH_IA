@@ -333,9 +333,10 @@ class M2SD_manager(BC):
                 notInclude=[
                     self.file_tag["SQZ"],
                     self.file_tag["EMC"],
-                    self.file_tag["CON_RES_MOV"],
-                    self.file_tag["NOISE_MOV"],
-                    self.file_tag["CDA_MOV"],
+                    self.file_tag["PS_CON_RES_MOV"],
+                    self.file_tag["PS_NOISE_MOV"],
+                    self.file_tag["PS_CDA_MOV"],
+                    self.file_tag["PS_CDA_BDF_MOV"],
                 ],
                 full_path=full_path,
             )
@@ -479,6 +480,7 @@ class M2SD_manager(BC):
 
         # find files
         ftags2search = [
+            "A",
             "SQZ",
             "EMC",
             "MMAP",
@@ -1570,102 +1572,115 @@ class M2SD_manager(BC):
         Parameters:
             downsample_ratio (float): The ratio by which to downsample the concatenated residual movie (default is 0.2).
         """
-        if self.export_postseg_residuals:
-            TKEEPER = self.time_utils.TimeKeeper()
-            # extract element size if not already done
-            # esp if segment is only done
-            if self.element_size_um is None and not self.latest_isxd:
-                if self.concatCheck:
-                    h52use = self.latest_h5[0]
-                else:
-                    h52use = self.latest_h5
-                self.element_size_um = self.H5U.extract_element_size(h52use)
-            else:
-                self.element_size_um = None
-
-            print("Finding Residuals of Post-Segmentation")
-            self.print_wFrm(
-                "Finding difference between original & denoised movie (reconstructed from CNMF)"
-            )
-            # load original movie, normalized & converted to 16-bit unsigned
-
-            fname2load = []
+        TKEEPER = self.time_utils.TimeKeeper()
+        # extract element size if not already done
+        # esp if segment is only done
+        if self.element_size_um is None and not self.latest_isxd:
             if self.concatCheck:
-                fname2load = self.fname_mmap_postproc
+                h52use = self.latest_h5[0]
             else:
-                fname2load = [
-                    os.path.join(self.folder_path, f) for f in self.fname_mmap_postproc
-                ]
+                h52use = self.latest_h5
+            self.element_size_um = self.H5U.extract_element_size(h52use)
+        else:
+            self.element_size_um = None
 
-            for idx, fname in enumerate(fname2load):
-                wCH = None
-                if "Ch2" in fname:
-                    wCH = "Ch2"
-                elif "Ch1" in fname:
-                    wCH = "Ch1"
-                wCH_tag = f"_{wCH}" if wCH is not None else ""
+        print("Finding Residuals of Post-Segmentation")
+        self.print_wFrm("Preparing reconstructed movie/residuals")
+        # load original movie, normalized & converted to 16-bit unsigned
 
-                m_els = movie_utils.load_movie(fname)
+        fname2load = []
+        if self.concatCheck:
+            fname2load = self.fname_mmap_postproc
+        else:
+            fname2load = [
+                os.path.join(self.folder_path, f) for f in self.fname_mmap_postproc
+            ]
 
-                # extract denoised movies, with & without background
-                denoised_noback = self._create_recontructed_movie()
-                denoised_wback = self._create_recontructed_movie(wBackground=True)
+        for idx, fname in enumerate(fname2load):
+            wCH = None
+            if "Ch2" in fname:
+                wCH = "Ch2"
+            elif "Ch1" in fname:
+                wCH = "Ch1"
+            wCH_tag = f"_{wCH}" if wCH is not None else ""
 
+            m_els = movie_utils.load_movie(fname)
+
+            # extract denoised movies, with & without background
+            denoised_noback = self._create_recontructed_movie()
+            denoised_wback = self._create_recontructed_movie(wBackground=True)
+
+            self.print_wFrm("Creating reconstructed movie (C dot A + b dot F)")
+            # normalize & convert to uint
+            CdotA_bDotF = movie_utils.add_caption_to_movie(
+                movie=movie_utils.normNconvert2uint(denoised_wback),
+                text=None,
+            )
+            movies2do = [(CdotA_bDotF, self.file_tag["PS_CDA_BDF_MOV"])]
+
+            if self.export_postseg_residuals:
+                self.print_wFrm("Creating reconstructed movie (C dot A)")
                 # normalize & convert to uint
                 # add caption to first 30 frames
                 CdotA = movie_utils.add_caption_to_movie(
                     movie=movie_utils.normNconvert2uint(denoised_noback),
                     text="Accepted Components",
                 )
+
+                self.print_wFrm("Creating residuals (C dot A vs non-segmented noise)")
+
                 # noncap_noise = full film - (C dot A + b dot f)
                 # add caption to first 30 frames
                 noncap_noise = movie_utils.add_caption_to_movie(
                     movie=movie_utils.normNconvert2uint(m_els - denoised_wback),
                     text="Non-segmented Noise",
                 )
+
                 # concatenate C dot A & noncap_noise
                 concatenated_residual_movie = movie_utils.concatenate_movies(
                     [CdotA, noncap_noise], axis=2, use_caiman=False
                 )
-                # movie_utils.process_and_play_movie(concatenated_movie, downsample_ratio)
 
-                # save residual movie
-                for movies2save in [
-                    # CdotA,
-                    # noncap_noise,
-                    concatenated_residual_movie,
-                ]:
-                    if movies2save is CdotA:
-                        moviefname = self.file_tag["CDA_MOV"] + wCH_tag
-                    elif movies2save is noncap_noise:
-                        moviefname = self.file_tag["NOISE_MOV"] + wCH_tag
-                    elif movies2save is concatenated_residual_movie:
-                        moviefname = self.file_tag["CON_RES_MOV"] + wCH_tag
-                    for ftype in [self.file_tag["AVI"], self.file_tag["H5"]]:
-                        if self.concatCheck:
-                            moviefname = os.path.join(self.output_pathByID, moviefname)
-                        else:
-                            moviefname = os.path.join(self.folder_path, moviefname)
-                        self._save_residual_movie(movies2save, moviefname, ftype)
-                        if (
-                            movies2save is concatenated_residual_movie
-                            and ftype == self.file_tag["AVI"]
-                        ):
-                            if not self.concatCheck:
-                                self.create_symlink4QL(
-                                    src=moviefname + self.file_tag["AVI"],
-                                    link_name=self.text_lib["QL_LNAMES"][
-                                        "RES_MOV_CCAT_AVI"
-                                    ],
-                                    fpath4link=self.folder_tools.get_dirname(
-                                        moviefname
-                                    ),
-                                )
-                TKEEPER.setEndNprintDuration()
-        else:
-            print(
-                "Skipping exporting post-segmentation residuals due to user input (export_postseg_residuals=False)"
-            )
+                movies2do.append(
+                    (concatenated_residual_movie, self.file_tag["PS_CON_RES_MOV"])
+                )
+            else:
+                noncap_noise = None
+                concatenated_residual_movie = None
+
+            print()
+
+            str2print = "Exporting reconstructed movie (C dot A + b dot F)"
+
+            if self.export_postseg_residuals:
+                str2print += (
+                    " and residuals post-segmentation (C dot A vs non-segmented noise)"
+                )
+            print(str2print)
+            # save residual movie
+            for movies2save, ftag in movies2do:
+                moviefname = ftag + wCH_tag
+                for ftype in [self.file_tag["AVI"], self.file_tag["H5"]]:
+                    if self.concatCheck:
+                        moviefname = os.path.join(self.output_pathByID, moviefname)
+                    else:
+                        moviefname = os.path.join(self.folder_path, moviefname)
+
+                    self._save_residual_movie(movies2save, moviefname, ftype)
+
+                    if (
+                        movies2save is concatenated_residual_movie
+                        and ftype == self.file_tag["AVI"]
+                    ):
+                        if not self.concatCheck:
+                            self.create_symlink4QL(
+                                src=moviefname + self.file_tag["AVI"],
+                                link_name=self.text_lib["QL_LNAMES"][
+                                    "RES_MOV_CCAT_AVI"
+                                ],
+                                fpath4link=self.folder_tools.get_dirname(moviefname),
+                            )
+            TKEEPER.setEndNprintDuration()
 
         print()
         # clear for memory

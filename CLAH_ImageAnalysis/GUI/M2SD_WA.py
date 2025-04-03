@@ -448,6 +448,7 @@ def main():
                     "motion_correct": motion_correct,
                     "segment": segment,
                     "email": email,
+                    "from_sql": True,
                 }
             )
         # setup run analysis button

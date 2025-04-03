@@ -104,7 +104,7 @@ class CNMF_PARAMS(Enum):
     NB_PATCH = (1, 1, "Number of background components per patch")
     GSIG = (
         4,
-        2,
+        3,
         "Expected half-size of neurons in pixels. Affects the width of a 2D gaussian kernel used to model neuron size",
     )
     GSIZ = (
@@ -172,7 +172,7 @@ class CNMF_PARAMS(Enum):
     SPIKE_MIN = (None, None, "Minimum spike size threshold")
     MIN_CORR = (
         0.85,
-        0.95,
+        0.8,
         "Minimum peak value from correlation image. Higher values mean more stringent filtering",
     )
     LOW_RANK_BACKGROUND = (
@@ -182,7 +182,7 @@ class CNMF_PARAMS(Enum):
     )
     MIN_PNR = (
         20,
-        15,
+        10,
         "Minimum peak to noise ratio from PNR image. Higher values mean more stringent filtering",
     )
     ONLY_INIT_PATCH = (False, False, "Whether to only run initialization on patches")
@@ -260,6 +260,11 @@ class Parser4M2SD(Enum):
     PARSER4 = "TSF"
     PARSER_FN = "Moco2segDict"
     ARG_DICT = {
+        ("from_sql", "fs"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Whether script is being run from SQL scheduler. Default is False.",
+        },
         ("motion_correct", "mc"): {
             "TYPE": "bool",
             "DEFAULT": False,

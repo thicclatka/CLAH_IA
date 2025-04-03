@@ -194,11 +194,12 @@ def apply_spatial_bandpass_filter(
         np.ndarray: Bandpass filtered image
     """
     # Apply high-pass Gaussian blur
-    high_pass = cv2.GaussianBlur(image, (0, 0), sigma_high)
+    high_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_high)
     # Apply low-pass Gaussian blur
-    low_pass = cv2.GaussianBlur(image, (0, 0), sigma_low)
-    # Subtract to get bandpass
-    return high_pass - low_pass
+    low_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_low)
+
+    # return low_pass - high_pass
+    return high_pass_img - low_pass_img
 
 
 def compute_sigma_from_cutoff(cutoff_freq: float) -> float:
@@ -251,9 +252,7 @@ def apply_bandpass_filter(
             if sigma_low is None
             else sigma_low
         )
-        filtered_image = apply_spatial_bandpass_filter(
-            image, sigma_high, sigma_low, normalize
-        )
+        filtered_image = apply_spatial_bandpass_filter(image, sigma_high, sigma_low)
     else:
         f = fft2(image)
         fshift = fftshift(f)
@@ -267,3 +266,36 @@ def apply_bandpass_filter(
         # Normalize to uint16 range
         filtered_image = normalize_array(filtered_image, dtype=np.uint16)
     return filtered_image
+
+
+def detect_and_fix_defective_pixels(
+    image: np.ndarray, threshold_std: float = 3.0
+) -> np.ndarray:
+    """
+    Detect and fix defective pixels (hot/dead pixels) in an image efficiently.
+
+    Parameters:
+        image (np.ndarray): Input grayscale image (uint8 or float).
+        threshold_std (float): Number of standard deviations for detection.
+
+    Returns:
+        np.ndarray: Image with defective pixels fixed.
+    """
+    # Ensure image is float for calculations
+    image = image.astype(np.float32)
+
+    # Compute local mean and standard deviation using a fast Gaussian filter
+    local_mean = cv2.GaussianBlur(image, (5, 5), 0)
+    local_sq_mean = cv2.GaussianBlur(image**2, (5, 5), 0)
+    local_std = np.sqrt(local_sq_mean - local_mean**2)
+
+    # Find defective pixels: pixels deviating too much from local mean
+    mask = np.abs(image - local_mean) > threshold_std * local_std
+
+    # Fix defective pixels using median filter (fast replacement)
+    median_filtered = cv2.medianBlur(image, 5)
+
+    # Replace only defective pixels
+    fixed_image = np.where(mask, median_filtered, image).astype(np.uint8)
+
+    return fixed_image

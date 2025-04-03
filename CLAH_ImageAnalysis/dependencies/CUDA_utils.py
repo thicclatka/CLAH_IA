@@ -63,7 +63,7 @@ class CUDA_utils:
             object: The results of the parallel execution.
         """
 
-        print_wFrame(f"See any warning messages/errors between dotted lines:")
+        print_wFrame("See any warning messages/errors between dotted lines:")
         section_breaker("dotted", mini=True)
 
         if a_sync:
