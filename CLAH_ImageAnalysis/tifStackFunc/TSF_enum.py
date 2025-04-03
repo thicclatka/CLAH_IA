@@ -104,7 +104,7 @@ class CNMF_PARAMS(Enum):
     NB_PATCH = (1, 1, "Number of background components per patch")
     GSIG = (
         4,
-        3,
+        4,
         "Expected half-size of neurons in pixels. Affects the width of a 2D gaussian kernel used to model neuron size",
     )
     GSIZ = (
@@ -130,12 +130,12 @@ class CNMF_PARAMS(Enum):
     )
     MIN_SNR = (
         4,
-        4,
+        3,
         "Minimum signal-to-noise ratio for accepting a component. Higher values mean more stringent filtering",
     )
     RVAL_THR = (
         0.8,
-        0.85,
+        0.8,
         "Threshold for correlation value used in component evaluation. Higher values mean more stringent filtering",
     )
     CNN_THR = (
@@ -151,11 +151,11 @@ class CNMF_PARAMS(Enum):
     FPS = (10, 10, "Imaging rate in frames per second")
     K = (
         15,
-        20,
+        17,
         "Number of components per patch. If you observe a high density of components, you can increase this value",
     )
-    RF = (25, 40, "Half-size of patches in pixels (e.g., 25 = 50x50)")
-    STRIDE = (8, 20, "Amount of overlap between patches in pixels")
+    RF = (25, 30, "Half-size of patches in pixels (e.g., 25 = 50x50)")
+    STRIDE = (8, 10, "Amount of overlap between patches in pixels")
     MEMORY_FACT = (
         1,
         1,
@@ -182,7 +182,7 @@ class CNMF_PARAMS(Enum):
     )
     MIN_PNR = (
         20,
-        10,
+        8,
         "Minimum peak to noise ratio from PNR image. Higher values mean more stringent filtering",
     )
     ONLY_INIT_PATCH = (False, False, "Whether to only run initialization on patches")

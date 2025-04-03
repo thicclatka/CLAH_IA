@@ -198,8 +198,8 @@ def apply_spatial_bandpass_filter(
     # Apply low-pass Gaussian blur
     low_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_low)
 
-    # return low_pass - high_pass
-    return high_pass_img - low_pass_img
+    return low_pass_img - high_pass_img
+    # return high_pass_img - low_pass_img
 
 
 def compute_sigma_from_cutoff(cutoff_freq: float) -> float:
@@ -252,7 +252,9 @@ def apply_bandpass_filter(
             if sigma_low is None
             else sigma_low
         )
-        filtered_image = apply_spatial_bandpass_filter(image, sigma_high, sigma_low)
+        filtered_image = apply_spatial_bandpass_filter(
+            image=image, sigma_high=sigma_high, sigma_low=sigma_low
+        )
     else:
         f = fft2(image)
         fshift = fftshift(f)
@@ -260,7 +262,6 @@ def apply_bandpass_filter(
         fshift_filtered = fshift * mask
         f_ishift = ifftshift(fshift_filtered)
         filtered_image = np.real(ifft2(f_ishift))
-        return filtered_image
 
     if normalize:
         # Normalize to uint16 range

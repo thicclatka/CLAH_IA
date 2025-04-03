@@ -135,7 +135,11 @@ class MoCoPreprocessing(BC):
             np.ndarray: The processed frame.
         """
         frame_filtered = filter_utils.apply_bandpass_filter(
-            frame, low_cutoff_freq, high_cutoff_freq, use_spatial=True, normalize=False
+            image=frame,
+            low_cutoff_freq=low_cutoff_freq,
+            high_cutoff_freq=high_cutoff_freq,
+            use_spatial=True,
+            normalize=False,
         )
         return frame_filtered
 
@@ -186,7 +190,7 @@ class MoCoPreprocessing(BC):
         apply_CLAHE: bool = True,
         fix_defective_pixels: bool = False,
         low_cutoff_freq: float = 0.005,
-        high_cutoff_freq: float = 0.5,
+        high_cutoff_freq: float = 0.2,
         window_size: int = 3,
         gSig_filt: tuple = (2, 2),
         CLAHE_clip_limit: float = 2.0,
@@ -389,7 +393,7 @@ class MoCoPreprocessing(BC):
         # mean subtraction & global min subtraction
         pbar = tqdm(range(len(filtered_arr)), desc="Subtracting mean & global min")
         for i in pbar:
-            filtered_arr[i, :, :] = filtered_arr[i, :, :] - filtered_arr[i, :, :].mean()
+            # filtered_arr[i, :, :] = filtered_arr[i, :, :] - filtered_arr[i, :, :].mean()
             filtered_arr[i, :, :] = filtered_arr[i, :, :] - global_min
             max_val = filtered_arr[i, :, :].max()
             min_val = filtered_arr[i, :, :].min()
@@ -423,11 +427,6 @@ class MoCoPreprocessing(BC):
         for frame in pbar:
             frame2use = frame.copy()
 
-            # apply median blur filter
-            frame2use = MoCoPreprocessing._apply_median_blur_filter(
-                frame2use, params["window_size"]
-            )
-
             if params["fix_defective_pixels"]:
                 frame2use = MoCoPreprocessing._fix_defective_pixels(frame2use)
 
@@ -436,6 +435,11 @@ class MoCoPreprocessing(BC):
                 frame2use = MoCoPreprocessing._apply_bandpass_filter(
                     frame2use, params["low_cutoff_freq"], params["high_cutoff_freq"]
                 )
+
+            # apply median blur filter
+            frame2use = MoCoPreprocessing._apply_median_blur_filter(
+                frame2use, params["window_size"]
+            )
 
             # apply high-pass filter (Caiman based)
             if params["apply_high_pass"]:
