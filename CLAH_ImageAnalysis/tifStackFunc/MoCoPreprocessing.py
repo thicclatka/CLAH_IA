@@ -120,8 +120,8 @@ class MoCoPreprocessing(BC):
     @staticmethod
     def _apply_bandpass_filter(
         frame: np.ndarray,
-        low_cutoff_freq: float,
-        high_cutoff_freq: float,
+        low_cutoff_freq: float | None = None,
+        high_cutoff_freq: float | None = None,
     ) -> np.ndarray:
         """
         Applies a bandpass filter to a frame.
@@ -187,9 +187,10 @@ class MoCoPreprocessing(BC):
         temporal_downsample: int = 1,
         apply_bandpass: bool = True,
         apply_high_pass: bool = False,
-        apply_CLAHE: bool = True,
+        apply_CLAHE: bool = False,
         fix_defective_pixels: bool = False,
-        low_cutoff_freq: float = 0.005,
+        # low_cutoff_freq: float = 0.005,
+        low_cutoff_freq: float | None = None,
         high_cutoff_freq: float = 0.2,
         window_size: int = 3,
         gSig_filt: tuple = (2, 2),
@@ -267,8 +268,10 @@ class MoCoPreprocessing(BC):
         # resize to square, round pixels to nearest multiple of 50
         # also downsamples given the size of the image
 
+        wcrop_str = ""
         if apply_crop:
             sample_frame = sample_frame[top:bottom, left:right]
+            wcrop_str = "; with cropping applied"
 
         final_output = self.utils.image_utils.resize_to_square(
             sample_frame, round_to=50
@@ -279,6 +282,11 @@ class MoCoPreprocessing(BC):
         frames2use = total_frames
 
         frame_range = range(0, total_frames, frame_step)
+
+        print(
+            f"Movie shape (before preprocessing{wcrop_str}): {(total_frames, *sample_frame.shape)}"
+        )
+        print(f"Movie shape (after preprocessing): {(total_frames, *final_shape)}")
 
         movie2use = []
         pbar = tqdm(frame_range, desc="Extracting movie for preprocessing")
@@ -322,6 +330,7 @@ class MoCoPreprocessing(BC):
 
         worker_params = {
             "apply_crop": apply_crop,
+            "crop_coords": (top, bottom, left, right),
             "top": top if apply_crop else None,
             "bottom": bottom if apply_crop else None,
             "left": left if apply_crop else None,
@@ -418,7 +427,7 @@ class MoCoPreprocessing(BC):
         filtered_frames = []
         pbar = tqdm(
             movieBatch,
-            desc=f"Processing batch {batchID}",
+            desc=f"Processing batch {batchID:02d}",
             position=batchID + 1,
             leave=False,
             total=len(movieBatch),
@@ -426,6 +435,10 @@ class MoCoPreprocessing(BC):
         )
         for frame in pbar:
             frame2use = frame.copy()
+
+            if params["apply_crop"]:
+                top, bottom, left, right = params["crop_coords"]
+                frame2use = frame2use[top:bottom, left:right]
 
             if params["fix_defective_pixels"]:
                 frame2use = MoCoPreprocessing._fix_defective_pixels(frame2use)

@@ -180,7 +180,7 @@ def create_bandpass_filter(shape, low_cutoff_freq, high_cutoff_freq):
 
 
 def apply_spatial_bandpass_filter(
-    image: np.ndarray, sigma_high: float, sigma_low: float
+    image: np.ndarray, sigma_high: float | None, sigma_low: float | None
 ) -> np.ndarray:
     """
     Apply a bandpass filter using spatial domain Gaussian blurring.
@@ -193,16 +193,27 @@ def apply_spatial_bandpass_filter(
     Returns:
         np.ndarray: Bandpass filtered image
     """
-    # Apply high-pass Gaussian blur
-    high_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_high)
-    # Apply low-pass Gaussian blur
-    low_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_low)
+    high_pass_img = None
+    low_pass_img = None
+    if sigma_high is not None:
+        # Apply high-pass Gaussian blur
+        high_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_high)
+    if sigma_low is not None:
+        # Apply low-pass Gaussian blur
+        low_pass_img = cv2.GaussianBlur(image, (0, 0), sigma_low)
 
-    return low_pass_img - high_pass_img
-    # return high_pass_img - low_pass_img
+    processed_img = None
+    if high_pass_img is not None and low_pass_img is not None:
+        processed_img = low_pass_img - high_pass_img
+    elif high_pass_img is not None:
+        processed_img = high_pass_img
+    elif low_pass_img is not None:
+        processed_img = image - low_pass_img
+
+    return processed_img
 
 
-def compute_sigma_from_cutoff(cutoff_freq: float) -> float:
+def compute_sigma_from_cutoff(cutoff_freq: float | None) -> float | None:
     """
     Compute sigma value from cutoff frequency using the formula:
     σ = sqrt(2 * ln(2)) / (2 * π * λ)
@@ -214,6 +225,8 @@ def compute_sigma_from_cutoff(cutoff_freq: float) -> float:
     Returns:
         float: Computed sigma value
     """
+    if cutoff_freq is None:
+        return None
     return np.sqrt(2 * np.log(2)) / (2 * np.pi * cutoff_freq)
 
 
