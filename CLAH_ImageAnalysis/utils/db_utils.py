@@ -177,7 +177,7 @@ def existing_paths_check(existing_paths: set[str], dirpath: str, root: str) -> b
 
 
 def add_paths2all_paths(
-    all_paths: set[str], dirpath: str, root: str, goUPoneDIR: bool = True
+    all_paths: set[str], dirpath: str, goUPoneDIR: bool = True
 ) -> set[str]:
     """
     Add a path to the all_paths set.
@@ -260,7 +260,8 @@ def find_paths4dbCreation(
                     pbar.set_postfix_str(f"Current: {dirpath}")
                     if file_check_func(filenames):
                         all_paths = add_paths2all_paths(
-                            all_paths, dirpath=dirpath, root=root
+                            all_paths,
+                            dirpath=dirpath,
                         )
     # new_paths = list(all_paths - existing_paths)
     return db_path2use, all_paths, existing_paths
