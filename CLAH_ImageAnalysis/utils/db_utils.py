@@ -69,8 +69,14 @@ def get_existing_pathsORsessions(db_name: str, get_paths: bool = True) -> set[st
     if db_path2use.exists():
         conn = sqlite3.connect(db_path2use)
         c = conn.cursor()
-        c.execute(f"SELECT {'path' if get_paths else 'session'} FROM paths")
-        existing_pathsORsessions = set(row[0] for row in c.fetchall())
+
+        # Check if table exists first
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='paths'")
+        table_exists = c.fetchone() is not None
+
+        if table_exists:
+            c.execute(f"SELECT {'path' if get_paths else 'session'} FROM paths")
+            existing_pathsORsessions = set(row[0] for row in c.fetchall())
         conn.close()
     return existing_pathsORsessions
 
