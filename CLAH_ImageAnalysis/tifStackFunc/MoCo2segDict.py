@@ -301,24 +301,21 @@ def main():
     )
 
     if not sql_status:
+        # run script as cli
         LockFileUtils.gpu_lock_check_timer(duration=60)
-
-    if not LockFileUtils.check_gpu_lock_file():
-        print("Creating GPU lock file for this run")
-        LockFileUtils.create_gpu_lock_file(
+        ctype = "cli"
+        with LockFileUtils.run_script_Wgpu_lock(
             user=getpass.getuser(),
             script=Path(__file__).name,
             pid=int(os.getpid()),
-            ctype="cli",
-        )
-
-    try:
-        # run parser, create instance of class, and run the script
+            ctype=ctype,
+            logging_bool=False,
+        ):
+            run_script()
+    else:
+        print("Running script from a SQL based task")
+        # run script as sql, gpu lock is handled by sqljobscheduler
         run_script()
-
-    finally:
-        # remove GPU lock file
-        LockFileUtils.remove_gpu_lock_file()
 
 
 ######################################################
