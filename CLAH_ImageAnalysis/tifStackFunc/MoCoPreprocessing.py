@@ -187,7 +187,7 @@ class MoCoPreprocessing(BC):
         temporal_downsample: int = 1,
         apply_bandpass: bool = True,
         apply_high_pass: bool = False,
-        apply_CLAHE: bool = False,
+        apply_CLAHE: bool = True,
         fix_defective_pixels: bool = False,
         # low_cutoff_freq: float = 0.005,
         low_cutoff_freq: float | None = None,
@@ -237,6 +237,8 @@ class MoCoPreprocessing(BC):
             left, top, right, bottom = (
                 self.utils.image_utils.extract_LRTB_from_crop_coords(crop_coords)
             )
+        else:
+            top, bottom, left, right = None, None, None, None
 
         bool_list = [
             ("DEFECTIVE PIXEL FIX", fix_defective_pixels),
@@ -331,10 +333,6 @@ class MoCoPreprocessing(BC):
         worker_params = {
             "apply_crop": apply_crop,
             "crop_coords": (top, bottom, left, right),
-            "top": top if apply_crop else None,
-            "bottom": bottom if apply_crop else None,
-            "left": left if apply_crop else None,
-            "right": right if apply_crop else None,
             "fix_defective_pixels": fix_defective_pixels,
             "apply_bandpass": apply_bandpass,
             "low_cutoff_freq": low_cutoff_freq,
