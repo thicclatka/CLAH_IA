@@ -25,13 +25,13 @@ class GPIOfrTimes_Txt(Enum):
     EXLED_KEY = "exledTimes"
 
 
-def getGPIOfrTimes(folder_path: list | str = []):
+def getGPIOfrTimes(folder_path: list | str = [], downsample: int = 1):
     """
     Get the GPIO frame times from the CSV file (_gpio.csv) in the specified folder_path.
     """
     folder_path = utils.path_selector(folder_path)
     gpio_fname, gpio_table = importGPIO(folder_path)
-    FRdict = parseGPIO(gpio_table)
+    FRdict = parseGPIO(gpio_table, downsample)
 
     return FRdict, gpio_fname
 
@@ -56,7 +56,7 @@ def importGPIO(folder_path: list | str = []) -> tuple[str, pd.DataFrame]:
     return gpio_fname.split(gpio_ftag)[0], gpio_table
 
 
-def parseGPIO(gpio_table: pd.DataFrame) -> dict:
+def parseGPIO(gpio_table: pd.DataFrame, downsample: int = 1) -> dict:
     """
     Parse the GPIO data from the GPIO CSV file.
     """
@@ -83,7 +83,7 @@ def parseGPIO(gpio_table: pd.DataFrame) -> dict:
 
     FrTimes = frame_data.loc[
         frame_data[GPIOtxt["VAL_KEY"]] == 1, GPIOtxt["TIME_KEY"]
-    ].values[::2]
+    ].values[::downsample]
 
     # FrTimes = np.insert(FrTimes[:-2], 0, 0)
     FrTimes = FrTimes[:-1] - FrTimes[0]

@@ -4,6 +4,7 @@ import os
 from skimage.transform import resize
 from CLAH_ImageAnalysis.utils import fig_tools
 from CLAH_ImageAnalysis.utils import text_dict
+from scipy.interpolate import interp1d
 
 
 def read_image(path_to_image: str) -> np.ndarray:
@@ -302,3 +303,75 @@ def find_near_square_dims(length: int) -> tuple[int, int]:
             best_w = w
 
     return best_h, best_w
+
+
+def get_frame_timestamp_from_movie(movie_path: str) -> tuple[np.ndarray, float]:
+    """
+    Get the frame timestamp from a movie file.
+    """
+
+    cap = cv2.VideoCapture(movie_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    frame_times = np.zeros(total_frames)
+    frame_idx = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        frame_times[frame_idx] = timestamp
+        frame_idx += 1
+
+    cap.release()
+    return frame_times, fps
+
+
+def sync_N_downsample_timestamps(
+    high_freq_timestamps: np.ndarray,
+    low_freq_timestamps: np.ndarray,
+    sync_pulses: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Sync and downsample timestamps from high-frequency to low-frequency.
+    """
+    # Find the closest timestamps in low_freq_timestamps to sync_pulses
+    frame_mapping = []
+    time_mapping = []
+
+    for i in range(len(sync_pulses) - 1):
+        start_time = sync_pulses[i]
+        end_time = sync_pulses[i + 1]
+
+        mask_high_freq = (high_freq_timestamps >= start_time) & (
+            high_freq_timestamps <= end_time
+        )
+        mask_low_freq = (low_freq_timestamps >= start_time) & (
+            low_freq_timestamps <= end_time
+        )
+
+        high_indices = np.where(mask_high_freq)[0]
+        low_indices = np.where(mask_low_freq)[0]
+
+        interp_func = interp1d(
+            high_freq_timestamps[high_indices],
+            high_indices,
+            kind="linear",
+            fill_value="extrapolate",
+        )
+        # Map low frequency timestamps to high frequency indices
+        for low_idx, low_time in zip(low_indices, low_freq_timestamps[mask_low_freq]):
+            # Get the interpolated high frequency index
+            high_idx = interp_func(low_time)
+
+            # Store the mapping
+            frame_mapping.append(high_idx)
+            time_mapping.append(high_freq_timestamps[int(round(high_idx))])
+
+    frame_mapping = np.array(frame_mapping)
+    time_mapping = np.array(time_mapping)
+
+    return frame_mapping, time_mapping
