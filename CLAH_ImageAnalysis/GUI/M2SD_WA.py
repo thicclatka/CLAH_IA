@@ -111,6 +111,7 @@ def create_parameter_vars():
                 if param_info["DEFAULT"] is not None
                 else multiprocessing.cpu_count()
             )
+    param_vars["from_sql"] = True
     return param_vars
 
 
@@ -448,6 +449,7 @@ def main():
                     "motion_correct": motion_correct,
                     "segment": segment,
                     "email": email,
+                    "from_sql": True,
                 }
             )
         # setup run analysis button

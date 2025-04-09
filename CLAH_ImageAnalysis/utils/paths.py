@@ -46,6 +46,16 @@ def get_code_dir_path(dir_name: str) -> Path:
     return Path(root_dir, dir_name)
 
 
+def get_config_dir_path() -> Path:
+    """
+    Get the path to the config directory
+    """
+    home_dir = Path.home()
+    config_dir = Path(home_dir, ".clah_ia")
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
 def get_path2dbs() -> Path:
     """
     Get the path to the databases
@@ -53,8 +63,9 @@ def get_path2dbs() -> Path:
     Returns:
         Path: Path to the databases, which is usually at repo_dir/dbs
     """
-    repo_dir = get_directory_of_repo_from_file()
-    path2dbs = Path(repo_dir, "dbs")
+    config_dir = get_config_dir_path()
+    path2dbs = Path(config_dir, "dbs")
+    path2dbs.mkdir(parents=True, exist_ok=True)
     return path2dbs
 
 
@@ -63,12 +74,11 @@ def get_path2NNmodels() -> Path:
     Get the path to the neural network models (.pth files)
 
     Returns:
-        Path: Path to the neural network models, which is usually at repo_dir/NNmodels
+        Path: Path to the neural network models, which is usually at config_dir/NNmodels
     """
-    repo_dir = get_directory_of_repo_from_file()
-    path2NNmodels = Path(repo_dir, "NNmodels")
-    if not path2NNmodels.exists():
-        path2NNmodels.mkdir(parents=True, exist_ok=True)
+    config_dir = get_config_dir_path()
+    path2NNmodels = Path(config_dir, "NNmodels")
+    path2NNmodels.mkdir(parents=True, exist_ok=True)
     return path2NNmodels
 
 

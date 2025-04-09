@@ -104,7 +104,7 @@ class CNMF_PARAMS(Enum):
     NB_PATCH = (1, 1, "Number of background components per patch")
     GSIG = (
         4,
-        2,
+        4,
         "Expected half-size of neurons in pixels. Affects the width of a 2D gaussian kernel used to model neuron size",
     )
     GSIZ = (
@@ -130,12 +130,12 @@ class CNMF_PARAMS(Enum):
     )
     MIN_SNR = (
         4,
-        4,
+        3,
         "Minimum signal-to-noise ratio for accepting a component. Higher values mean more stringent filtering",
     )
     RVAL_THR = (
         0.8,
-        0.85,
+        0.8,
         "Threshold for correlation value used in component evaluation. Higher values mean more stringent filtering",
     )
     CNN_THR = (
@@ -151,11 +151,11 @@ class CNMF_PARAMS(Enum):
     FPS = (10, 10, "Imaging rate in frames per second")
     K = (
         15,
-        20,
+        17,
         "Number of components per patch. If you observe a high density of components, you can increase this value",
     )
-    RF = (25, 40, "Half-size of patches in pixels (e.g., 25 = 50x50)")
-    STRIDE = (8, 20, "Amount of overlap between patches in pixels")
+    RF = (25, 30, "Half-size of patches in pixels (e.g., 25 = 50x50)")
+    STRIDE = (8, 10, "Amount of overlap between patches in pixels")
     MEMORY_FACT = (
         1,
         1,
@@ -172,7 +172,7 @@ class CNMF_PARAMS(Enum):
     SPIKE_MIN = (None, None, "Minimum spike size threshold")
     MIN_CORR = (
         0.85,
-        0.95,
+        0.8,
         "Minimum peak value from correlation image. Higher values mean more stringent filtering",
     )
     LOW_RANK_BACKGROUND = (
@@ -182,7 +182,7 @@ class CNMF_PARAMS(Enum):
     )
     MIN_PNR = (
         20,
-        15,
+        8,
         "Minimum peak to noise ratio from PNR image. Higher values mean more stringent filtering",
     )
     ONLY_INIT_PATCH = (False, False, "Whether to only run initialization on patches")
@@ -234,6 +234,7 @@ class segDict_Txt(Enum):
     IDX_GODO = "idx_components"
     RSR = "R"
     S_DECONV = "S"
+    S_DECONV_ALL = "S_all"
     YRA = "YrA"
     SNR_COMP = "SNR_comp"
     R_VALUES = "r_values"
@@ -259,6 +260,11 @@ class Parser4M2SD(Enum):
     PARSER4 = "TSF"
     PARSER_FN = "Moco2segDict"
     ARG_DICT = {
+        ("from_sql", "fs"): {
+            "TYPE": "bool",
+            "DEFAULT": False,
+            "HELP": "Whether script is being run from SQL scheduler. Default is False.",
+        },
         ("motion_correct", "mc"): {
             "TYPE": "bool",
             "DEFAULT": False,

@@ -39,6 +39,7 @@ python MoCo2segDict.py --path /path/to/data --motion_correct yes --segment yes
 """
 
 from CLAH_ImageAnalysis.core import run_CLAH_script
+from CLAH_ImageAnalysis.core import extract_args_preParser
 from CLAH_ImageAnalysis.tifStackFunc import M2SD_manager as M2SDM
 
 
@@ -273,38 +274,52 @@ class MoCo2segDict(M2SDM):
         self.stop_cluster(final=True)
 
 
-######################################################
-#  run script if called from command line
-######################################################
-if __name__ == "__main__":
+def main():
     import os
     import getpass
     from pathlib import Path
     from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
     from sqljobscheduler import LockFileUtils
 
-    sql_parser = LockFileUtils.lock_file_argparser()
-
-    if not sql_parser.from_sql:
-        LockFileUtils.gpu_lock_check_timer(duration=60)
-
-    if not LockFileUtils.check_gpu_lock_file():
-        print("Creating GPU lock file for this run")
-        LockFileUtils.create_gpu_lock_file(
-            user=getpass.getuser(),
-            script=Path(__file__).name,
-            pid=int(os.getpid()),
-            ctype="cli",
-        )
-
-    try:
-        # run parser, create instance of class, and run the script
+    def run_script(clear_terminal: bool = True):
         run_CLAH_script(
             MoCo2segDict,
             parser_enum=TSF_enum.Parser4M2SD,
+            clear_terminal=clear_terminal,
         )
-        # remove GPU lock file
-        LockFileUtils.remove_gpu_lock_file()
 
-    finally:
-        LockFileUtils.remove_gpu_lock_file()
+    help_flag = extract_args_preParser(
+        parser_enum=TSF_enum.Parser4M2SD, flag2find="--help"
+    ) or extract_args_preParser(parser_enum=TSF_enum.Parser4M2SD, flag2find="-h")
+
+    if help_flag:
+        run_script(clear_terminal=False)
+        exit()
+
+    sql_status = extract_args_preParser(
+        parser_enum=TSF_enum.Parser4M2SD, flag2find="--from_sql"
+    )
+
+    if not sql_status:
+        # run script as cli
+        LockFileUtils.gpu_lock_check_timer(duration=60)
+        ctype = "cli"
+        with LockFileUtils.run_script_Wgpu_lock(
+            user=getpass.getuser(),
+            script=Path(__file__).name,
+            pid=int(os.getpid()),
+            ctype=ctype,
+            logging_bool=False,
+        ):
+            run_script()
+    else:
+        print("Running script from a SQL based task")
+        # run script as sql, gpu lock is handled by sqljobscheduler
+        run_script()
+
+
+######################################################
+#  run script if called from command line
+######################################################
+if __name__ == "__main__":
+    main()

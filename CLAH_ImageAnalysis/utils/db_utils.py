@@ -69,8 +69,14 @@ def get_existing_pathsORsessions(db_name: str, get_paths: bool = True) -> set[st
     if db_path2use.exists():
         conn = sqlite3.connect(db_path2use)
         c = conn.cursor()
-        c.execute(f"SELECT {'path' if get_paths else 'session'} FROM paths")
-        existing_pathsORsessions = set(row[0] for row in c.fetchall())
+
+        # Check if table exists first
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='paths'")
+        table_exists = c.fetchone() is not None
+
+        if table_exists:
+            c.execute(f"SELECT {'path' if get_paths else 'session'} FROM paths")
+            existing_pathsORsessions = set(row[0] for row in c.fetchall())
         conn.close()
     return existing_pathsORsessions
 
@@ -171,7 +177,7 @@ def existing_paths_check(existing_paths: set[str], dirpath: str, root: str) -> b
 
 
 def add_paths2all_paths(
-    all_paths: set[str], dirpath: str, root: str, goUPoneDIR: bool = True
+    all_paths: set[str], dirpath: str, goUPoneDIR: bool = True
 ) -> set[str]:
     """
     Add a path to the all_paths set.
@@ -254,7 +260,8 @@ def find_paths4dbCreation(
                     pbar.set_postfix_str(f"Current: {dirpath}")
                     if file_check_func(filenames):
                         all_paths = add_paths2all_paths(
-                            all_paths, dirpath=dirpath, root=root
+                            all_paths,
+                            dirpath=dirpath,
                         )
     # new_paths = list(all_paths - existing_paths)
     return db_path2use, all_paths, existing_paths

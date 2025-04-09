@@ -32,3 +32,4 @@ CLAH Image Analysis provides tools for:
 - [ ] Flesh out start up & set up scripts
 - [ ] Add GUI/WA details to Documentation
 - [ ] Change segDict_WA to FastAPI + typescript from streamlit
+- [ ] Create docker file
