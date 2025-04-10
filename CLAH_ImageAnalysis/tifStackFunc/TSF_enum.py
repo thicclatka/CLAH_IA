@@ -1,6 +1,7 @@
 import os
 from enum import Enum
 from CLAH_ImageAnalysis import utils
+from CLAH_ImageAnalysis.dependencies import CUDA_utils
 
 # GLOBAL VAR of OPTS for CNMF_Params
 CNMF_OPTS = {
@@ -76,7 +77,11 @@ class MOCO_PARAMS(Enum):
         True,
         "Use patch-wise rigid registration. Patch-wise correction divides the frame into smaller patches and performs rigid alignment on each, allowing for more localized corrections",
     )
-    USE_CUDA = (True, True, "Use CUDA GPU acceleration. Default is True")
+    USE_CUDA = (
+        CUDA_utils.has_cuda(),
+        CUDA_utils.has_cuda(),
+        "Use CUDA GPU acceleration. Default is True if CUDA is available, False otherwise",
+    )
     GSIG_FILT = (
         None,
         None,
