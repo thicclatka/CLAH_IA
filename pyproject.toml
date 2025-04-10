@@ -49,7 +49,7 @@ where = ["."]
 [project.optional-dependencies]
 base = [
   "caiman @ git+https://github.com/thicclatka/CaImAn.git",
-  "roicat==1.3.6",
+  "roicat==1.4.8",
   "roiextractors @ git+https://github.com/RichieHakim/roiextractors.git",
 ]
 gpu = [
