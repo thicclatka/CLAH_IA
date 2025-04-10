@@ -142,6 +142,7 @@ dist
 # https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
 
 .yarn/*
+yarn.lock
 !.yarn/releases
 !.yarn/patches
 !.yarn/plugins

@@ -371,6 +371,7 @@ def text_dict(
             "IMG": ".tif",
             "IMU": ".imu",
             "ISXD": ".isxd",
+            "JPG": ".jpg",
             "JSON": ".json",
             "LAPD": "_lapDict",
             "MAT": ".mat",

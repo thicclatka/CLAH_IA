@@ -15,6 +15,7 @@ dependencies = [
   "aenum",
   "cairosvg",
   "easygui",
+  "fastapi",
   "h5py",
   "inquirer",
   "isx",
@@ -37,6 +38,7 @@ dependencies = [
   "toml",
   "tomli",
   "tqdm",
+  "uvicorn",
 ]
 
 [project.urls]
