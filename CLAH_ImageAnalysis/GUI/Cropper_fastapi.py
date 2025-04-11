@@ -10,9 +10,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from multiprocessing import cpu_count
+from concurrent.futures import ThreadPoolExecutor
 from CLAH_ImageAnalysis.utils import paths
 from CLAH_ImageAnalysis.utils import text_dict
+from tqdm import tqdm
 import io
+import base64
 
 app = FastAPI()
 
@@ -99,14 +103,88 @@ def get_frame(file_path: str, frame_idx: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def process_frame(args):
+    """Process a single frame and return the base64 encoded JPEG string"""
+    try:
+        movie, frame_idx = args
+        frame = movie.get_frame_data(frame_idx)
+        normalized_frame = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX).astype(
+            np.uint8
+        )
+        frame_rgb = cv2.cvtColor(normalized_frame, cv2.COLOR_GRAY2RGB)
+        _, buffer = cv2.imencode(file_tag["JPG"], frame_rgb)
+        # Convert to base64 string
+        return base64.b64encode(buffer.tobytes()).decode("utf-8")
+    except Exception as e:
+        print(f"Error processing frame {frame_idx}: {str(e)}")
+        return None
+
+
+@app.get("/api/import_movie/")
+def import_movie(file_path: str):
+    try:
+        # Load movie once
+        movie = isx.Movie.read(file_path)
+        total_frames = movie.timing.num_samples
+        total_frames2import = min(500, total_frames)  # Limit to first 500 frames
+
+        # Create tasks for parallel processing
+        tasks = [(movie, frame_idx) for frame_idx in range(total_frames2import)]
+
+        # Process frames in parallel using all available CPU cores
+        num_workers = cpu_count()
+        frames = []
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            # Use tqdm to show progress
+            for frame_data in tqdm(
+                executor.map(process_frame, tasks),
+                total=total_frames2import,
+                desc="Processing frames",
+            ):
+                if frame_data is not None:  # Only append valid frames
+                    frames.append(frame_data)
+
+        if not frames:
+            raise HTTPException(status_code=500, detail="Failed to process any frames")
+
+        return {"total_frames": total_frames2import, "frames": frames}
+    except Exception as e:
+        print(f"Error importing movie: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/export_crop_coords/")
 def export_crop_coords(file_path: str, coords: CropCoordinates):
     try:
-        crop_coords = [(coords.x1, coords.y1), (coords.x2, coords.y2)]
-        json_fname = os.path.join(os.path.dirname(file_path), "crop_dims.json")
-        with open(json_fname, "w") as f:
-            json.dump(crop_coords, f)
-        return {"message": "Crop coordinates exported successfully"}
+        # Get the directory of the ISXD file
+        target_dir = os.path.dirname(file_path)
+
+        # Check if directory exists and is writable
+        if not os.path.exists(target_dir):
+            raise HTTPException(
+                status_code=400, detail=f"Directory does not exist: {target_dir}"
+            )
+
+        if not os.access(target_dir, os.W_OK):
+            raise HTTPException(
+                status_code=403,
+                detail=f"No write permission in directory: {target_dir}",
+            )
+
+        # Create the output file path
+        json_fname = os.path.join(target_dir, "crop_dims.json")
+
+        # Try to write the file
+        try:
+            with open(json_fname, "w") as f:
+                json.dump([(coords.x1, coords.y1), (coords.x2, coords.y2)], f)
+        except IOError as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to write crop coordinates: {str(e)}"
+            )
+
+        return {"message": f"Crop coordinates exported successfully to {json_fname}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -128,11 +206,26 @@ def list_directory(directory: str):
         files = [
             entry
             for entry in files
-            if entry.endswith(file_tag["ISXD"])
-            and (file_tag["CNMFE"] not in entry or file_tag["CNMFE2"] not in entry)
+            if entry.endswith(file_tag["ISXD"]) and "cnmf" not in entry.lower()
         ]
 
-        return {"directories": directories, "files": files}
+        crop_dim_files = [
+            f for f in os.listdir(directory) if f.endswith("crop_dims.json")
+        ]
+        crop_dim_coords = []
+
+        if crop_dim_files:
+            try:
+                with open(os.path.join(directory, crop_dim_files[0]), "r") as f:
+                    crop_dim_coords = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error reading crop dimensions: {str(e)}")
+
+        return {
+            "directories": directories,
+            "files": files,
+            "crop_dim_coords": crop_dim_coords,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

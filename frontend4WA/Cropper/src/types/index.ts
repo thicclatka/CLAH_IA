@@ -3,15 +3,33 @@ export interface DirectoryEntry {
   isDirectory: boolean;
 }
 
-export interface DirectoryResponse {
-  directories: string[];
-  files: string[];
-}
-
 export interface DirectoryState {
   currentDir: string;
   directories: string[];
   files: string[];
+  crop_dim_coords: number[][];
   newDir: string;
-  error?: string;
+}
+
+export interface CropBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FileViewerProps {
+  filePath: string;
+  cropCoords?: number[][];
+}
+
+export interface MovieData {
+  total_frames: number;
+  frames: string[];
+}
+
+export interface DirectoryResponse {
+  directories: string[];
+  files: string[];
+  crop_dim_coords: number[][];
 }
