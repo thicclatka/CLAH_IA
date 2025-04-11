@@ -76,7 +76,7 @@ export const DirectoryListContainer = styled(Box)(({ theme }) => ({
     minHeight: "40px",
   },
   "& .MuiListItemText-primary": {
-    fontSize: "0.875rem", // body2 size
+    fontSize: "0.875rem",
   },
 }));
 

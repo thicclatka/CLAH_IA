@@ -1,19 +1,6 @@
-import { FC, ChangeEvent, useState } from "react";
+import { ChangeEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DirectoryState } from "../types";
-import FileViewer from "../components/FileViewer";
-import { styled } from "@mui/material/styles";
-import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Stack,
-} from "@mui/material";
 
 export const fetchDirectoryData = (currentDir: string) => {
   return useQuery({
@@ -95,20 +82,3 @@ export const loadDirectoryData = (currentDir: string) => {
     error,
   };
 };
-//   return (
-//       <RightColumn>
-//         {selectedFile && (
-//           <FileViewerContainer>
-//             <Typography variant="h6" gutterBottom>
-//               Selected File: {selectedFile.split("/").pop()}
-//             </Typography>
-//             <FileViewer
-//               filePath={selectedFile}
-//               cropCoords={directoryData?.crop_dim_coords}
-//             />
-//           </FileViewerContainer>
-//         )}
-//       </RightColumn>
-//     </DirectoryContainer>
-//   );
-// };
