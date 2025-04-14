@@ -1,13 +1,19 @@
 #! /bin/bash
 
 CLAH_PATH="{clah_path}"
+REPO_DIR="{repo_dir}"
+GUI_PATH="{gui_path}"
+APP_NAME="{app_name}"
+ENV_NAME="{env_name}"
+COMMAND="{command}"
+
+CAIMAN_OPTS="export MKL_NUM_THREADS=1 && export OPENBLAS_NUM_THREADS=1 && export VECLIB_MAXIMUM_THREADS=1"
 
 TMUX=/usr/bin/tmux
 TMUX_SOCKET_DIR="/tmp/tmux-$(id -u)"
 mkdir -p "$TMUX_SOCKET_DIR"
 chmod 700 "$TMUX_SOCKET_DIR"
 
-APP_NAME="{app_name}"
 TMUX_SERVER_FILE="$TMUX_SOCKET_DIR/$APP_NAME"
 
 $TMUX -S "$TMUX_SERVER_FILE" start-server
@@ -15,9 +21,9 @@ $TMUX -S "$TMUX_SERVER_FILE" start-server
 # Create a new session
 $TMUX -S "$TMUX_SERVER_FILE" new-session -d -s "$APP_NAME"
 
-$TMUX -S "$TMUX_SERVER_FILE" send-keys -t "$APP_NAME" "conda activate {env_name} && export MKL_NUM_THREADS=1 && export OPENBLAS_NUM_THREADS=1 && export VECLIB_MAXIMUM_THREADS=1" Enter
+$TMUX -S "$TMUX_SERVER_FILE" send-keys -t "$APP_NAME" "conda activate $ENV_NAME && $CAIMAN_OPTS" Enter
 sleep 0.5
 
-$TMUX -S "$TMUX_SERVER_FILE" send-keys -t "$APP_NAME" "streamlit run $CLAH_PATH/{gui_path} --server.baseUrlPath {base_url} --server.port {port}" Enter
+$TMUX -S "$TMUX_SERVER_FILE" send-keys -t "$APP_NAME" "$COMMAND" Enter
 
 tail -f /dev/null
