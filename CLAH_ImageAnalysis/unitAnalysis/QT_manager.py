@@ -381,8 +381,11 @@ class QT_manager(BC):
             [self.file_tag["SD"], self.file_tag["PKL"]]
         )
         self.C_Temporal, self.A_Spatial = self.load_segDict(
-            self.latest_file_segDict, C=True, A=True
+            self.latest_file_segDict,
+            C=True,
+            A=True,
         )
+        self.A_Spatial = self.A_Spatial.toarray()
 
         # print("Creating image of cell numbers overlayed onto downsampled image")
         # self.plotting.plot_cellNum_overDSImage(
