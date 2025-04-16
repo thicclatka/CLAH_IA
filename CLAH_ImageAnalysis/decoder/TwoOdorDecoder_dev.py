@@ -16,8 +16,6 @@ class TwoOdorDecoder(BC):
         sess2process: list,
         num_folds: int,
         null_repeats: int,
-        useZscore: bool,
-        decoder_type: Literal["SVC", "GBM", "LSTM"],
         cost_param: float,
         kernel_type: str,
         gamma: float | Literal["auto", "scale"],
@@ -35,8 +33,6 @@ class TwoOdorDecoder(BC):
             sess2process,
             num_folds,
             null_repeats,
-            useZscore,
-            decoder_type,
             cost_param,
             kernel_type,
             gamma,
@@ -62,10 +58,9 @@ class TwoOdorDecoder(BC):
         """
         self.importCSSnTBDnSD()
         self.findOdorTimes()
-        self.findTrialEpochs()
-        self.DecodeTrialEpochs()
+        self.findOdorEpochs()
+        self.DecodeOdorEpochs()
         self.plotResults()
-        pass
 
     def static_class_var_init(
         self,
@@ -73,8 +68,6 @@ class TwoOdorDecoder(BC):
         sess2process: list,
         num_folds: int,
         null_repeats: int,
-        useZscore: bool,
-        decoder_type: Literal["SVC", "GBM", "LSTM"],
         cost_param: float,
         kernel_type: str,
         gamma: float | Literal["auto", "scale"],
@@ -113,130 +106,21 @@ class TwoOdorDecoder(BC):
         self.num_folds = num_folds
         self.num_fold4switch = None
         self.null_repeats = null_repeats
+        self.params4decoderSVC = {
+            "C": cost_param,
+            "kernel_type": kernel_type,
+            "gamma": gamma,
+            "weight": weight,
+        }
+        self.params4decoderLSTM = {
+            "n_estimators": n_estimators,
+            "max_depth": max_depth,
+            "learning_rate": learning_rate,
+        }
 
-        self.decoder_type = decoder_type
-        self.params4decoder = None
-
-        self.useZscore = useZscore
-
-        # SVC parameters needed separately for easier access for condition check later
-        self.parse_cost_param = None
-
-        if decoder_type is None:
-            self._select_decoder_type()
-        elif decoder_type == "SVC":
-            # if cost param is not set in parser, it will be found via hyperparameter tuning (calc_CostParam)
-            # & then decoded
-            self.parse_cost_param = float(cost_param)
-
-            if isinstance(gamma, float) and gamma > 0 or gamma in ["auto", "scale"]:
-                gamma = gamma
-            else:
-                self.rprint(
-                    "\nGamma parameter must be 'auto', 'scale', or a positive float. Setting to default value: 'scale'."
-                )
-                gamma = "scale"
-
-            self.params4decoder = {
-                "C": self.parse_cost_param,
-                "kernel_type": kernel_type,
-                "gamma": gamma,
-                "weight": weight,
-            }
-        elif decoder_type == "GBM":
-            self.params4decoder = {
-                "n_estimators": n_estimators,
-                "max_depth": max_depth,
-                "learning_rate": learning_rate,
-            }
+        self.parse_cost_param = float(cost_param) if cost_param is not None else None
 
         self.FigPath = "Figures/Decoder"
-
-    def _select_decoder_type(self) -> None:
-        def _get_positive_float(
-            prompt: str, default: float = None, str_opts: list = []
-        ) -> float | str | None:
-            invalid_str = "Invalid input. Please enter a positive float."
-            if str_opts is not None:
-                invalid_str = f"Invalid input. Please enter a positive float or one of the following options: {', '.join(str_opts)}"
-            while True:
-                user_input = input(prompt).strip()
-                if user_input == "":
-                    return default
-                if isinstance(user_input, str) and str_opts and user_input in str_opts:
-                    return user_input
-                try:
-                    value = float(user_input)
-                    if value > 0:
-                        return value
-                    else:
-                        print(invalid_str)
-                except ValueError:
-                    print(invalid_str)
-
-        decoder_type = (
-            input("Select decoder type (options: SVC, GBM, LSTM): ").strip().upper()
-        )
-
-        if decoder_type not in ["SVC", "GBM", "LSTM"]:
-            self.rprint("Invalid decoder type. Please select from the given options.")
-            self._select_decoder_type()
-
-        self.decoder_type = decoder_type
-
-        print(f"Selected decoder type: {decoder_type}")
-        self.print_wFrm(
-            "Input parameters for the selected decoder type. Press Enter to use default values."
-        )
-        if decoder_type == "SVC":
-            C = _get_positive_float(
-                "Enter cost parameter for the SVM (float: > 0) [default: None]: ",
-                default=None,
-            )
-
-            kernel_type = input(
-                "Enter kernel type (options: 'linear', 'rbf', 'poly', 'sigmoid') [default: 'rbf']: "
-            ).strip()
-            kernel_type = kernel_type if kernel_type else "rbf"
-
-            gamma = _get_positive_float(
-                "Enter gamma value (options: 'auto', 'scale', or a positive float) [default: 'scale']: ",
-                default="scale",
-                str_opts=["auto", "scale"],
-            )
-
-            weight = input(
-                "Enter class weight (options: 'balanced', None, or a dictionary) [default: 'balanced']: "
-            ).strip()
-            weight = weight if weight else "balanced"
-            if weight == "None":
-                weight = None
-
-            self.params4decoder = {
-                "C": C,
-                "kernel_type": kernel_type,
-                "gamma": gamma,
-                "weight": weight,
-            }
-
-        elif decoder_type == "GBM":
-            n_estimators = _get_positive_float(
-                "Enter number of estimators (int: > 0) [default: 100]: ",
-                default=100,
-            )
-            max_depth = _get_positive_float(
-                "Enter max depth (int: > 0) [default: 3]: ", default=3
-            )
-            learning_rate = _get_positive_float(
-                "Enter learning rate (float: 0 to 1) [default: 0.1]: ",
-                default=0.1,
-            )
-
-            self.params4decoder = {
-                "n_estimators": n_estimators,
-                "max_depth": max_depth,
-                "learning_rate": learning_rate,
-            }
 
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
         """
@@ -254,11 +138,11 @@ class TwoOdorDecoder(BC):
         self.TBD = None
         self.SD = None
         self.OdorTimes = None
-        self.TrialEpochs = None
-        if self.parse_cost_param is not None and self.decoder_type == "SVC":
-            self.cost_param = self.parse_cost_param
+        self.OdorEpochs = None
+        if self.parse_cost_param is not None:
+            self.params4decoderSVC["C"] = self.parse_cost_param
         else:
-            self.cost_param = None
+            self.params4decoderSVC["C"] = None
         self.Labels = {
             "ODORS": [],
             "ODORSwSWITCH": [],
@@ -286,17 +170,17 @@ class TwoOdorDecoder(BC):
         ## extract lapCue from CSS
         self.lapCue = self.CSS["lapCue"]
 
-        # extract C & zscore it
+        # extract C
         self.C_Temp = self.SD["C"]
+        self.zC_Temp = []
+        for idx in range(self.C_Temp.shape[0]):
+            Ca_arr = self.PKS_UTILS.zScoreCa(self.C_Temp[idx, :])
+            self.zC_Temp.append(Ca_arr)
 
-        if self.useZscore:
-            self.print_wFrm("Z-scoring Temporal Data", frame_num=1)
-            self.zC_Temp = []
-            for idx in range(self.C_Temp.shape[0]):
-                Ca_arr = self.PKS_UTILS.zScoreCa(self.C_Temp[idx, :])
-                self.zC_Temp.append(Ca_arr)
+        self.zC_Temp = np.array(self.zC_Temp)
 
-            self.zC_Temp = np.array(self.zC_Temp)
+        # extract PosRates
+        self.PCLappedSess = self.CSS["PCLappedSess"]
 
         self.print_done_small_proc()
 
@@ -336,10 +220,14 @@ class TwoOdorDecoder(BC):
         self.rprint("Finding Odor Times and labels:")
 
         lapTypeArr = self.lapCue["lap"]["TypeArr"].astype(int)
+        # unique_codes = np.unique(lapTypeArr)
         lapTypeName = self.lapCue["lap"]["lapTypeName"]
+        lapTimes = self.TBD["lap"]["Time"]
+        # code_to_index = {code: idx for idx, code in enumerate(unique_codes)}
+        # laptype_indices = np.array([code_to_index[code] for code in lapTypeArr])
         switch_lap = _find_switch_lap(lapTypeArr, lapTypeName)
 
-        all_odor_times = np.array([]).reshape(0, 3)
+        all_odor_times = np.array([]).reshape(0, 4)
 
         # create an array such that:
         # 0th column is time
@@ -351,6 +239,9 @@ class TwoOdorDecoder(BC):
             cueTimes = self.TBD["cueEvents"][f"cue{odor}"]["start"]["Time"]
             cueLaps = self.lapCue[f"CUE{odor}"]["Lap"].astype(int)
             cueTypes = lapTypeArr[cueLaps]
+
+            lapStartIdx = np.searchsorted(lapTimes, cueTimes) - 1
+            lapStart = lapTimes[lapStartIdx]
             # Times, laps, types all should have same shape
             num_trials = cueTimes.shape[0]
             # create odor labels
@@ -358,21 +249,23 @@ class TwoOdorDecoder(BC):
             # switch labels are odor + switch (1, 2 for odor presents at location 1, 2, 3, 4 for switch laps)
             switch_labels = odor_labels.copy()
             switch_labels[cueTypes == switch_lap] = odor + 2
-            odor_times = np.column_stack((cueTimes, odor_labels, switch_labels))
+            odor_times = np.column_stack(
+                (cueTimes, lapStart, odor_labels, switch_labels)
+            )
             all_odor_times = np.vstack((all_odor_times, odor_times))
 
         # sort by time
         indices = np.argsort(all_odor_times[:, 0])
         self.OdorTimes = all_odor_times[indices]
 
-        odor_labels, odor_counts = np.unique(self.OdorTimes[:, 1], return_counts=True)
+        odor_labels, odor_counts = np.unique(self.OdorTimes[:, -2], return_counts=True)
         switch_labels, switch_counts = np.unique(
-            self.OdorTimes[:, 2], return_counts=True
+            self.OdorTimes[:, -1], return_counts=True
         )
 
         for lab, count in [(odor_labels, odor_counts), (switch_labels, switch_counts)]:
             label_count_pairs = [f"{int(lb)}: {c}" for lb, c in zip(lab, count)]
-            formatted_str = ", ".join(label_count_pairs)
+            formatted_str = " / ".join(label_count_pairs)
             if lab.size == 2:
                 self.print_wFrm(f"Odor Labels & Counts: {formatted_str}")
             elif lab.size == 4:
@@ -380,17 +273,9 @@ class TwoOdorDecoder(BC):
 
         self.print_done_small_proc()
 
-    def findTrialEpochs(self) -> None:
+    def findOdorEpochs(self) -> None:
         """
-        Organizes times and labels by trial epochs.
-
-        This method finds trial epochs based on cue start times and organizes the data accordingly.
-        It calculates the trial start and end times based on the pre-cue and post-cue times.
-        It then finds the indices of frames that fall within the trial epoch and extracts the corresponding data.
-        The extracted data is stored in the TrialEpochs array along with the corresponding odor labels and switch labels.
-
-        Returns:
-            None
+        Organizes times and labels by trial epochs and extracts peak values and times.
         """
         self.rprint("Organizing Times & Labels by trial epochs:")
         self.print_wFrm(
@@ -398,19 +283,31 @@ class TwoOdorDecoder(BC):
         )
         adjFrTimes = np.array(self.TBD["adjFrTimes"])
 
-        # Trial epochs needs shape of cells x time x trials
-        self.TrialEpochs = np.full(
+        # Initialize arrays
+        self.OdorEpochs = np.full(
             (self.C_Temp.shape[0], self.trial_dur, self.OdorTimes.shape[0]),
             np.nan,
         )
+        self.OdorPeaksNTimes = np.full(
+            (
+                self.OdorTimes.shape[0],
+                self.C_Temp.shape[0] * 2,
+            ),  # multiple of 2 for interleaved values
+            np.nan,
+        )
+        self.Labels = {
+            "ODORS": np.full(self.OdorTimes.shape[0], np.nan),
+            "ODORSwSWITCH": np.full(self.OdorTimes.shape[0], np.nan),
+        }
 
-        # set which Temporal to use
-        CTEMP2USE = self.C_Temp if not self.useZscore else self.zC_Temp
+        # use z-scored C_Temp
+        CTEMP2USE = self.zC_Temp.copy()
 
         for idx, ot in enumerate(self.OdorTimes):
             cue_start_time = ot[0]
-            odor_label = ot[1]
-            switch_label = ot[2]
+            lap_start_time = ot[1]
+            odor_label = ot[2]
+            switch_label = ot[3]
 
             trial_start = int(cue_start_time - self.pre_cue_time)
             trial_end = int(cue_start_time + self.post_cue_time)
@@ -419,11 +316,34 @@ class TwoOdorDecoder(BC):
             trial_indices = np.where(
                 (adjFrTimes >= trial_start) & (adjFrTimes <= trial_end)
             )[0]
+            post_cue_indices = np.where(
+                (adjFrTimes > cue_start_time) & (adjFrTimes <= trial_end)
+            )[0]
+
             if trial_indices.shape[0] == self.trial_dur:
+                # Get trial data
                 trial_data = CTEMP2USE[:, trial_indices]
-                self.TrialEpochs[:, :, idx] = trial_data
-                self.Labels["ODORS"].append(odor_label)
-                self.Labels["ODORSwSWITCH"].append(switch_label)
+                self.OdorEpochs[:, :, idx] = trial_data
+
+                # Get post-cue data for peak detection
+                post_cue_data = CTEMP2USE[:, post_cue_indices]
+                post_time_data = adjFrTimes[post_cue_indices]
+
+                # Find peaks and times
+                max_peak_val = np.max(post_cue_data, axis=1)
+                max_peak_idx = np.argmax(post_cue_data, axis=1)
+                max_peak_time = (
+                    post_time_data[max_peak_idx] - lap_start_time
+                )  # Relative to lap start
+
+                # Store interleaved peaks and times
+                self.OdorPeaksNTimes[idx] = np.column_stack(
+                    (max_peak_val, max_peak_time)
+                ).reshape(-1)
+
+                # Store labels
+                self.Labels["ODORS"][idx] = odor_label
+                self.Labels["ODORSwSWITCH"][idx] = switch_label
 
         # check # of switchs labels to set num_fold4switch
         switch_labels, counts = np.unique(
@@ -439,7 +359,9 @@ class TwoOdorDecoder(BC):
         self.print_wFrm(output_str)
         self.print_done_small_proc()
 
-    def DecodeTrialEpochs(self) -> None:
+        self.print_done_small_proc()
+
+    def DecodeOdorEpochs(self) -> None:
         """
         Decodes the trial epochs using a specified cost parameter and labels.
 
@@ -467,7 +389,7 @@ class TwoOdorDecoder(BC):
             """
             # see params4decoder in self.static_class_var_init for SVC and GBM parameters
             accuracy, conf_matrices = GeneralDecoder.run_Decoder(
-                data_arr=self.TrialEpochs,
+                data_arr=self.OdorEpochs,
                 label_arr=np.array(label),
                 num_folds=folds,
                 decoder_type=self.decoder_type,
@@ -519,7 +441,7 @@ class TwoOdorDecoder(BC):
             )
 
             self.cost_param = GeneralDecoder.calc_CostParam(
-                self.TrialEpochs,
+                self.OdorEpochs,
                 np.array(self.Labels["ODORS"]),
                 num_folds=self.num_folds,
                 kernel_type=self.params4decoder["kernel_type"],
@@ -863,4 +785,4 @@ class TwoOdorDecoder(BC):
 
 
 if __name__ == "__main__":
-    run_CLAH_script(TwoOdorDecoder, parser_enum=decoder_enum.Parser4TOD)
+    run_CLAH_script(TwoOdorDecoder, parser_enum=decoder_enum.Parser4TOD_DEV)

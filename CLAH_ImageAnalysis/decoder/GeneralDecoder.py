@@ -51,7 +51,14 @@ class GeneralDecoder:
                 t.set_description(f"Evaluating C: {C:.4f}")
                 fold_accuracies = []
                 fold_accuracies, _ = GeneralDecoder.run_Decoder(
-                    data_arr, label_arr, num_folds, "SVC", C, kernel_type, gamma, weight
+                    data_arr=data_arr,
+                    label_arr=label_arr,
+                    num_folds=num_folds,
+                    decoder_type="SVC",
+                    C=C,
+                    kernel_type=kernel_type,
+                    gamma=gamma,
+                    weight=weight,
                 )
                 accu2check = np.max(np.mean(fold_accuracies, 1))
                 if accu2check >= best_accuracy:
