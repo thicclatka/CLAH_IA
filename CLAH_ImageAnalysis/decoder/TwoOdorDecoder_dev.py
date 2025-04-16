@@ -359,8 +359,6 @@ class TwoOdorDecoder(BC):
         self.print_wFrm(output_str)
         self.print_done_small_proc()
 
-        self.print_done_small_proc()
-
     def DecodeOdorEpochs(self) -> None:
         """
         Decodes the trial epochs using a specified cost parameter and labels.
