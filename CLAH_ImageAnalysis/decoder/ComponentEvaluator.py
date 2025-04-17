@@ -43,18 +43,10 @@ class NNModel4BinaryClassification(nn.Module):
         layers = []
         prev_size = feature_size
 
-        # Add BatchNorm for input
-        layers.extend(
-            [
-                nn.BatchNorm1d(feature_size),
-            ]
-        )
-        # Add hidden layers
         for size, dropout in zip(layer_sizes, dropout_rates):
             layers.extend(
                 [
                     nn.Linear(prev_size, size),
-                    nn.BatchNorm1d(size),
                     nn.ReLU(),
                     nn.Dropout(dropout),
                 ]
@@ -262,9 +254,10 @@ class GeneralModelRunner:
                 batch_x = features_vector[indices]
                 batch_y = labels_vector[indices]
 
-                optimizer.zero_grad()
                 outputs = self.model(batch_x)
                 loss = criterion(outputs, batch_y)
+
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
