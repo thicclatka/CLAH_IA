@@ -78,7 +78,7 @@ class GeneralDecoder:
         data_arr: np.ndarray,
         label_arr: np.ndarray,
         num_folds: int,
-        decoder_type: Literal["SVC", "GBM", "LSTM", "NB"],
+        decoder_type: Literal["SVC", "GBM", "NB"],
         random_state: int = 14,
         **kwargs,
     ) -> tuple:
@@ -86,8 +86,8 @@ class GeneralDecoder:
         Run the decoder on the given data.
 
         Parameters:
-        - data_arr (ndarray): The input data array with shape (n_cells/pop, n_timepoints, n_trials).
-        - label_arr (ndarray): The label array with shape (n_trials,).
+        - data_arr (ndarray): The input data array with shape (X, features). X can be n_cells, trials, cue epochs, etc.
+        - label_arr (ndarray): The label array with shape (X,).
         - num_folds (int): The number of folds for cross-validation.
         - C (float): The cost parameter for the SVM model.
 
@@ -95,35 +95,23 @@ class GeneralDecoder:
         - accuracy (ndarray): The accuracy scores for each timepoint and fold.
         - conf_matrices (ndarray): The confusion matrices for each timepoint and fold.
         """
-        if data_arr.ndim != 3:
+        try:
+            if decoder_type == "SVC":
+                C = kwargs.get("C", 1.0)
+                kernel_type = kwargs.get("kernel_type", "rbf")
+                gamma = kwargs.get("gamma", "scale")
+                weight = kwargs.get("weight", None)
+                verbose = kwargs.get("verbose", False)
+            elif decoder_type == "GBM":
+                n_estimators = kwargs.get("n_estimators", 100)
+                max_depth = kwargs.get("max_depth", 3)
+                learning_rate = kwargs.get("learning_rate", 0.1)
+            elif decoder_type == "NB":
+                pass
+        except KeyError:
             raise ValueError(
-                "data_arr must be 3D array (n_cells/pop, n_timepoints, n_trials)!"
+                "Unsupported decoder_type. Must be 'SVC' or 'GBM' or 'NB'."
             )
-
-        if decoder_type == "SVC":
-            C = kwargs.get("C", 1.0)
-            kernel_type = kwargs.get("kernel_type", "rbf")
-            gamma = kwargs.get("gamma", "scale")
-            weight = kwargs.get("weight", None)
-            verbose = kwargs.get("verbose", False)
-        elif decoder_type == "GBM":
-            n_estimators = kwargs.get("n_estimators", 100)
-            max_depth = kwargs.get("max_depth", 3)
-            learning_rate = kwargs.get("learning_rate", 0.1)
-        elif decoder_type == "LSTM":
-            # transpose data to trials x timepoints x neurons
-            data4LSTM = data_arr.transpose(2, 1, 0)
-            accuracy, conf_matrices = GeneralDecoder.decode_via_LSTM(
-                data_arr=data4LSTM,
-                label_arr=label_arr,
-                num_folds=num_folds,
-                random_state=random_state,
-            )
-            return accuracy, conf_matrices
-        # elif decoder_type == "NB":
-        #     pass
-        else:
-            raise ValueError("Unsupported decoder_type. Must be 'SVC' or 'GBM'.")
 
         cv = StratifiedKFold(
             n_splits=num_folds, shuffle=True, random_state=random_state
@@ -131,59 +119,55 @@ class GeneralDecoder:
 
         accuracy = []
         conf_matrices = []
-        for idxTime in range(data_arr.shape[1]):
-            fold_accuracy = []
-            fold_conf_matrices = []
-            # get the data for the current timepoint
-            # tranpose such that shape is trials x neurons
-            X = data_arr[:, idxTime, :].T
+        fold_accuracy = []
+        fold_conf_matrices = []
 
-            for train, test in cv.split(X, label_arr):
-                XTrain = X[train, :]
-                YTrain = label_arr[train]
+        for train, test in cv.split(data_arr, label_arr):
+            XTrain = data_arr[train, :]
+            YTrain = label_arr[train]
 
-                XTest = X[test, :]
-                YTest = label_arr[test]
+            XTest = data_arr[test, :]
+            YTest = label_arr[test]
 
-                if decoder_type == "SVC":
-                    svmmodel = SVC(
-                        C=C,
-                        kernel=kernel_type,
-                        gamma=gamma,
-                        verbose=verbose,
-                        class_weight=weight,
-                        random_state=random_state,
-                    )
-                    svmmodel.fit(XTrain, YTrain)
+            if decoder_type == "SVC":
+                svmmodel = SVC(
+                    C=C,
+                    kernel=kernel_type,
+                    gamma=gamma,
+                    verbose=verbose,
+                    class_weight=weight,
+                    random_state=random_state,
+                )
+                svmmodel.fit(XTrain, YTrain)
 
-                    predictions = svmmodel.predict(XTest)
-                elif decoder_type == "GBM":
-                    gbmmodel = GradientBoostingClassifier(
-                        n_estimators=n_estimators,
-                        learning_rate=learning_rate,
-                        max_depth=max_depth,
-                        random_state=random_state,
-                    )
-                    gbmmodel.fit(XTrain, YTrain)
+                predictions = svmmodel.predict(XTest)
+            elif decoder_type == "GBM":
+                gbmmodel = GradientBoostingClassifier(
+                    n_estimators=n_estimators,
+                    learning_rate=learning_rate,
+                    max_depth=max_depth,
+                    random_state=random_state,
+                )
+                gbmmodel.fit(XTrain, YTrain)
 
-                    predictions = gbmmodel.predict(XTest)
-                elif decoder_type == "NB":
-                    nbmodel = GaussianNB()
-                    nbmodel.fit(XTrain, YTrain)
+                predictions = gbmmodel.predict(XTest)
+            elif decoder_type == "NB":
+                nbmodel = GaussianNB()
+                nbmodel.fit(XTrain, YTrain)
 
-                    predictions = nbmodel.predict(XTest)
+                predictions = nbmodel.predict(XTest)
 
-                # get accuracy for the current fold
-                acc = accuracy_score(YTest, predictions)
-                fold_accuracy.append(acc)
+            # get accuracy for the current fold
+            acc = accuracy_score(YTest, predictions)
+            fold_accuracy.append(acc)
 
-                # confusion matrix
-                cm = confusion_matrix(YTest, predictions)
-                fold_conf_matrices.append(cm)
+            # confusion matrix
+            cm = confusion_matrix(YTest, predictions)
+            fold_conf_matrices.append(cm)
 
-            # store the accuracy for the current timepoint
-            accuracy.append(fold_accuracy)
-            conf_matrices.append(fold_conf_matrices)
+        # store the accuracy for the current timepoint
+        accuracy.append(fold_accuracy)
+        conf_matrices.append(fold_conf_matrices)
 
         return np.array(accuracy), np.array(conf_matrices)
 
