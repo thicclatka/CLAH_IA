@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 from skimage.util import img_as_uint
 from skimage.util import img_as_ubyte
-# from scipy import stats
+from sklearn.preprocessing import MinMaxScaler
+from rich import print as rprint
+from CLAH_ImageAnalysis.utils import color_dict
 
 
 def normalize_array(
@@ -155,3 +157,41 @@ def zScore_signal(
     signal_Z = (signal - rolling_baseline) / rolling_std
 
     return signal_Z
+
+
+def feature_normalization(
+    array: np.ndarray,
+) -> np.ndarray:
+    """
+    Normalize an array to a range of 0 to 1.
+
+    Parameters:
+        array (np.ndarray): Input array to normalize. Should be a 2D array, where each row is a sample and each column is a feature. (samples x features)
+
+    Returns:
+        np.ndarray: Normalized array. Same shape as input array.
+    """
+    color_lib = color_dict()
+
+    if array.ndim != 2:
+        raise ValueError(
+            "Input array must be a 2D array, where each row is a sample and each column is a feature. (samples x features)"
+        )
+
+    scaler = MinMaxScaler()
+    normalized_array = scaler.fit_transform(array)
+
+    if np.any(np.isnan(normalized_array)):
+        rprint(
+            f"[bold {color_lib['red']}]Warning:[/bold {color_lib['red']}] NaN values in normalized array. Replacing with 0."
+        )
+        normalized_array = np.nan_to_num(normalized_array, nan=0.0)
+
+    return normalized_array
+
+
+def normalize_array_MINMAX(array: np.ndarray, adjustment: float = 0.0) -> np.ndarray:
+    """
+    Normalize an array to a range of 0 to 1.
+    """
+    return (array - np.min(array)) / (np.max(array) - np.min(array)) + adjustment

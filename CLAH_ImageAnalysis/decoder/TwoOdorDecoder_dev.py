@@ -1,17 +1,11 @@
 import numpy as np
-from scipy.stats import ttest_ind
 from typing import Literal
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import SpectralClustering
-from sklearn.linear_model import LinearRegression
+from matplotlib.colors import ListedColormap
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
 from CLAH_ImageAnalysis.decoder import decoder_enum
 from CLAH_ImageAnalysis.decoder import GeneralDecoder
 from CLAH_ImageAnalysis.unitAnalysis import pks_utils
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import umap
 
 
 class TwoOdorDecoder(BC):
@@ -102,6 +96,9 @@ class TwoOdorDecoder(BC):
             selection_made=sess2process,
         )
 
+        # needed to use fig_tools
+        BC.enable_fig_tools(self)
+
         self.PKS_UTILS = pks_utils()
 
         self.sampling_rate = 10  # 10 frames per second (10 Hz; 100 ms per frame)
@@ -131,6 +128,37 @@ class TwoOdorDecoder(BC):
         self.cost_param = cost_param
 
         self.FigPath = "Figures/Decoder"
+
+        self.random_state = 35
+
+        self.Label_Names = {
+            "ODORS": ["ODOR 1", "ODOR 2"],
+            "ODORSwSWITCH": ["O1L1", "O2L2", "O1L2", "O2L1"],
+        }
+
+        self.plot_params = {
+            "bar_alpha": 0.7,
+            "bar_width": 0.2,
+            "bar_offset": 0.1,
+            "hatch": "//",
+            "title_names_nice": ["Odors", "Odors + Switch"],
+            "fsize": {
+                "axis": 14,
+                "title": 18,
+            },
+            "cmap": "magma",
+            "cmap_categories": self.fig_tools.create_cmap4categories(num_categories=4),
+            # "cmap_categories": {
+            #     "ODORS": self.fig_tools.create_cmap4categories(num_categories=2),
+            #     "ODORSwSWITCH": self.fig_tools.create_cmap4categories(num_categories=4),
+            # },
+            "locator": {
+                "size": "3%",
+                "pad": 0.05,
+            },
+            "jitter": 0.02,
+            "marker_size": 50,
+        }
 
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
         """
@@ -240,25 +268,31 @@ class TwoOdorDecoder(BC):
         all_odor_times = np.array([]).reshape(0, 5)
 
         # create an array such that:
-        # 0th column is time
-        # 1st column is odor label
-        # 2nd column is switch label
-        for odor in range(1, 3):
+        # 0th column is cue time
+        # 1st column is lap start time
+        # 2nd column is lap number
+        # 3rd column is odor label (0 for odor 1, 1 for odor 2)
+        # 4th column is switch label (0 for odor 1, 1 for odor 2, 2 and 3 for switch laps for odor 1 and 2 respectively)
+        for odor in range(0, 2):
             # get Times, Laps, and Types for each odor
             # types should represent odor & switch
-            cueTimes = self.TBD["cueEvents"][f"cue{odor}"]["start"]["Time"]
-            cueLaps = self.lapCue[f"CUE{odor}"]["Lap"].astype(int)
+            cueTimes = self.TBD["cueEvents"][f"cue{odor + 1}"]["start"]["Time"]
+            cueLaps = self.lapCue[f"CUE{odor + 1}"]["Lap"].astype(int)
             cueTypes = lapTypeArr[cueLaps]
 
             lapStartIdx = np.searchsorted(lapTimes, cueTimes) - 1
             lapStart = lapTimes[lapStartIdx]
+
             # Times, laps, types all should have same shape
             num_trials = cueTimes.shape[0]
+
             # create odor labels
             odor_labels = odor * np.ones(num_trials)
-            # switch labels are odor + switch (1, 2 for odor presents at location 1, 2, 3, 4 for switch laps)
+
+            # create switch labels
             switch_labels = odor_labels.copy()
             switch_labels[cueTypes == switch_lap] = odor + 2
+
             odor_times = np.column_stack(
                 (cueTimes, lapStart, cueLaps, odor_labels, switch_labels)
             )
@@ -287,9 +321,14 @@ class TwoOdorDecoder(BC):
         """
         Organizes times and labels by trial epochs and extracts peak values and times.
         """
-        self.rprint("Organizing Times & Labels by trial epochs:")
+        self.rprint(
+            "Creating features array (OdorPeaksNTimes, (exposures x features)) and labels (Labels, (exposures,)):"
+        )
         self.print_wFrm(
-            f"{int(self.trial_dur / self.sampling_rate)} second windows: {self.pre_cue_time} sec pre-cue; {self.post_cue_time} sec post-cue"
+            f"Looking at {int(self.trial_dur / self.sampling_rate)} second windows: {self.pre_cue_time} sec pre-cue; {self.post_cue_time} sec post-cue"
+        )
+        self.print_wFrm(
+            "Finding peak value and time, relative to relative to lap start time within post-cue epoch period"
         )
         adjFrTimes = np.array(self.TBD["adjFrTimes"])
 
@@ -299,13 +338,6 @@ class TwoOdorDecoder(BC):
             np.nan,
         )
         self.OdorPeaksNTimes = np.full(
-            (
-                self.OdorTimes.shape[0],
-                self.C_Temp.shape[0] * 2,
-            ),  # multiple of 2 for interleaved values
-            np.nan,
-        )
-        self.normOdorPeaksNTimes = np.full(
             (
                 self.OdorTimes.shape[0],
                 self.C_Temp.shape[0] * 2,
@@ -354,15 +386,7 @@ class TwoOdorDecoder(BC):
                     post_time_data[max_peak_idx] - lap_start_time
                 )  # Relative to lap start
 
-                # normalize peak val
-                norm_peak_val = (max_peak_val - max_peak_val.min()) / (
-                    max_peak_val.max() - max_peak_val.min() + 1e-10
-                )
-
-                # Store interleaved peaks and times
-                self.normOdorPeaksNTimes[idx] = np.column_stack(
-                    (norm_peak_val, max_peak_time)
-                ).reshape(-1)
+                # Store interleaved RAW peaks and times
                 self.OdorPeaksNTimes[idx] = np.column_stack(
                     (max_peak_val, max_peak_time)
                 ).reshape(-1)
@@ -378,11 +402,17 @@ class TwoOdorDecoder(BC):
         if counts[3] < self.num_folds or counts[4] < self.num_folds:
             count_min = np.min(counts[3:])
             self.num_fold4switch = count_min
-            output_str = f"Switch labels are not balanced; setting cross-fold validation to {count_min}"
+            output_str = f"Only {count_min} switch laps found; setting cross-fold validation to {count_min}"
         else:
-            output_str = f"Switch labels are balanced; setting cross-fold validation to {self.num_folds}"
+            output_str = f"Enough switch laps found; setting cross-fold validation to {self.num_folds}"
             self.num_fold4switch = self.num_folds
         self.print_wFrm(output_str)
+
+        self.print_wFrm(
+            "Applying normalizing to features array (OdorPeaksNTimes -> normOdorPeaksNTimes)"
+        )
+        self.normOdorPeaksNTimes = self.dep.feature_normalization(self.OdorPeaksNTimes)
+
         self.print_done_small_proc()
 
     def findOdorClustering(self) -> None:
@@ -394,63 +424,46 @@ class TwoOdorDecoder(BC):
         """
         self.rprint("Finding odor clustering:")
 
-        # 1. Compute cosine similarity matrix
-        self.similarity_matrix = cosine_similarity(self.OdorPeaksNTimes)
-
-        # Transform similarity matrix to be non-negative [0, 1] range
-        # Cosine similarity ranges from -1 to 1. Shift and scale to 0 to 1.
-        if np.min(self.similarity_matrix) < 0:
-            self.similarity_matrix = (self.similarity_matrix + 1) / 2
-
-        # Ensure diagonal is 1 after transformation
-        np.fill_diagonal(self.similarity_matrix, 1)
+        # Compute similarity matrix
+        self.similarity_matrix = self.dep.calc_simMatrix(self.normOdorPeaksNTimes)
 
         self.cluster_labels = {}
         self.projection_weights = {}
         self.clustering_accuracy = {}
+        self.corrected_cluster_labels = {}
 
-        # 2. Perform spectral clustering
         for label_cat, n_clusters in [
-            ("ODORS", int(np.max(self.Labels["ODORS"]))),
-            ("ODORSwSWITCH", int(np.max(self.Labels["ODORSwSWITCH"]))),
+            ("ODORS", int(len(np.unique(self.Labels["ODORS"])))),
+            ("ODORSwSWITCH", int(len(np.unique(self.Labels["ODORSwSWITCH"])))),
         ]:
-            spectral = SpectralClustering(
-                n_clusters=n_clusters, affinity="precomputed", random_state=42
-            )
-            # Use the non-negative matrix for prediction
-            self.cluster_labels[label_cat] = spectral.fit_predict(
-                self.similarity_matrix
+            # Perform spectral clustering
+            self.cluster_labels[label_cat] = self.dep.SpectralClustering_fit2simMatrix(
+                similarity_matrix=self.similarity_matrix,
+                n_clusters=n_clusters,
+                random_state=self.random_state,
             )
 
-            # 3. Calculate average maps for each cluster
-            mean_map_val = []
-            for label in range(n_clusters):
-                mean_map = np.mean(
-                    self.OdorPeaksNTimes[self.cluster_labels[label_cat] == label],
-                    axis=0,
+            # Calculate accuracy & get row & col indices from linear_sum_assignment of confusion matrix
+            self.clustering_accuracy[label_cat] = (
+                self.dep.determineSpectralClustering_accuracy(
+                    true_labels=self.Labels[label_cat],
+                    cluster_labels=self.cluster_labels[label_cat],
                 )
-                mean_map_val.append(mean_map)
-
-            # 4. Project each trial onto the average maps
-            self.projection_weights[label_cat] = np.zeros(
-                (self.OdorPeaksNTimes.shape[0], n_clusters)
             )
-            for k in range(self.OdorPeaksNTimes.shape[0]):
-                # Multiple linear regression
-                X_k = self.OdorPeaksNTimes[k]
-                reg = LinearRegression().fit(np.column_stack(mean_map_val), X_k)
-                weights = reg.coef_
-                # Normalize to L2 norm
-                self.projection_weights[label_cat][k] = weights / np.linalg.norm(
-                    weights
-                )
 
-            # Calculate fraction of correct trials
-            correct_trials = np.sum(
-                self.cluster_labels[label_cat] == self.Labels[label_cat] - 1
-            )  # Assuming labels are 1 and 2
-            self.clustering_accuracy[label_cat] = correct_trials / len(
-                self.cluster_labels[label_cat]
+            # Map cluster labels to true labels
+            self.corrected_cluster_labels[label_cat] = (
+                self.dep.map_cluster_labels_to_true_labels(
+                    true_labels=self.Labels[label_cat],
+                    cluster_labels=self.cluster_labels[label_cat],
+                )
+            )
+
+            # Project each trial onto the average maps to get projection weights
+            # use corrected cluster labels so colormaps line up later
+            self.projection_weights[label_cat] = self.dep.determine_projection_weights(
+                feature_array=self.normOdorPeaksNTimes,
+                cluster_labels=self.corrected_cluster_labels[label_cat],
             )
 
         for label_cat, accu in self.clustering_accuracy.items():
@@ -490,6 +503,7 @@ class TwoOdorDecoder(BC):
                 label_arr=np.array(label),
                 num_folds=folds,
                 decoder_type=self.decoder_type,
+                random_state=self.random_state,
                 **(self.params4decoder if self.params4decoder is not None else {}),
             )
             return accuracy, conf_matrices
@@ -538,7 +552,7 @@ class TwoOdorDecoder(BC):
             )
 
             self.cost_param = GeneralDecoder.calc_CostParam(
-                data_arr=self.OdorPeaksNTimes,
+                data_arr=self.normOdorPeaksNTimes,
                 label_arr=np.array(self.Labels["ODORS"]),
                 num_folds=self.num_folds,
                 kernel_type=self.params4decoder["kernel_type"],
@@ -608,11 +622,6 @@ class TwoOdorDecoder(BC):
             None
         """
         self.rprint("Plotting results:")
-        # needed to use fig_tools
-        BC.enable_fig_tools(self)
-
-        # plot decoder accuracy over time w/in epoch
-        # self._plotSEM_Accuracy()
 
         self._plotBar_Accuracy()
 
@@ -627,149 +636,102 @@ class TwoOdorDecoder(BC):
 
         self.print_done_small_proc()
 
-    def _plotSEM_Accuracy(self) -> None:
-        """
-        Plots the standard error of the mean (SEM) for accuracy.
-
-        This method plots the SEM for accuracy based on the data stored in the `accuracy` and `null_accuracy` dictionaries.
-        It calculates the p-value using the t-test and adds it to the plot as well.
-
-        Returns:
-            None
-        """
-
-        def _calc_PVal_via_TTest(test, null):
-            """
-            Calculate the p-value using a t-test.
-
-            Parameters:
-            test (array-like): The test data.
-            null (array-like): The null data.
-
-            Returns:
-            float: The calculated p-value.
-            """
-            _, pvalue = ttest_ind(test, null)
-            return pvalue
-
-        fig, axis = self.fig_tools.create_plt_subplots()
-        x_ind = [
-            -self.pre_cue_time * self.sampling_rate,
-            self.post_cue_time * self.sampling_rate,
-        ]
-
-        odor_color = self.color_dict["blue"]
-        switch_color = self.color_dict["orange"]
-
-        self.print_wFrm("SEM plots for accuracy")
-        for key, accu in self.accuracy.items():
-            self.fig_tools.plot_SEM(
-                arr=accu,
-                ax=axis,
-                color=odor_color if key == "ODORS" else switch_color,
-                x_ind=x_ind,
-                label=key,
-            )
-
-        for key, naccu in self.null_accuracy.items():
-            self.fig_tools.plot_SEM(
-                arr=naccu,
-                ax=axis,
-                color=odor_color if key == "ODORS" else switch_color,
-                x_ind=x_ind,
-                linestyle=":",
-                label=f"{key} (null)",
-            )
-
-        self.print_wFrm("Determining significance")
-        pval = {key: None for key in self.accuracy.keys()}
-        pval_text = []
-        for key in self.accuracy.keys():
-            pval[key] = _calc_PVal_via_TTest(
-                np.mean(self.accuracy[key], axis=1),
-                np.mean(self.null_accuracy[key], axis=(1, 2)),
-            )
-            pval_text.append(r"$P_{{\mathrm{{{}}}}} = {:.2e}$".format(key, pval[key]))
-        pval_text = self.utils.create_multiline_string(pval_text)
-
-        tick_positions = range(
-            -self.pre_cue_time * self.sampling_rate,
-            (self.post_cue_time * self.sampling_rate) + 1,
-            self.sampling_rate,
-        )
-        tick_labels = [
-            str(tick / self.sampling_rate) for tick in tick_positions
-        ]  # Convert frame positions to seconds
-
-        # Set the new ticks and labels on the x-axis
-        axis.set_xticks(tick_positions)
-        axis.set_xticklabels(tick_labels)
-
-        axis.axvline(0, color="black", linewidth=0.25)
-        axis.set_xlabel("Time (s)")
-        axis.set_ylabel("Accuracy")
-        axis.set_ylim(0, 1)
-        title = [f"{self.folder_name}", f"Decoder: {self.decoder_type}"]
-        if self.params4decoder is not None:
-            title += [f"{key}: {value}" for key, value in self.params4decoder.items()]
-        title = self.utils.create_multiline_string(title)
-        axis.set_title(title)
-        self.fig_tools.add_text_box(
-            ax=axis,
-            text=pval_text,
-            transform=axis.transAxes,
-            fontsize=12,
-            va="top",
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-        )
-        axis.legend()
-
-        # self.print_wFrm("Saving figure")
-        self.fig_tools.save_figure(
-            fig, f"Decoder_Results_{self.decoder_type}", figure_save_path=self.FigPath
-        )
-
     def _plotBar_Accuracy(self) -> None:
         fig, axis = self.fig_tools.create_plt_subplots()
 
         odor_color = self.color_dict["blue"]
         switch_color = self.color_dict["orange"]
 
+        label_types = self.accuracy.keys()
+
         self.print_wFrm("Bar plots for accuracy")
-        for idx, (key, accu) in enumerate(self.accuracy.items()):
-            self.fig_tools.bar_plot(
-                ax=axis,
-                X=idx,
-                Y=np.mean(accu),
-                yerr=np.std(accu),
-                color=odor_color if key == "ODORS" else switch_color,
-                ylim=(0, 1),
-                label=key,
-            )
+        for idx, label_type in enumerate(label_types):
+            unique_labels = np.unique(self.Labels[label_type])
+            # Determine chance level based on number of categories
+            y_chance = 1 / len(unique_labels)
+            # Define start and end points for the chance line segment
+            xmin = idx - (4 * self.plot_params["bar_offset"])
+            xmax = idx + (4 * self.plot_params["bar_offset"])
 
-        for idx, (key, naccu) in enumerate(self.null_accuracy.items()):
-            mean_naccu_by_perm = np.mean(naccu, axis=1)
-            self.fig_tools.bar_plot(
-                ax=axis,
-                X=idx + 2,
-                Y=np.mean(mean_naccu_by_perm),
-                yerr=np.std(mean_naccu_by_perm),
-                color=odor_color if key == "ODORS" else switch_color,
+            color2use = odor_color if label_type == "ODORS" else switch_color
+
+            axis.axhline(
+                y=y_chance,
+                xmin=xmin,
+                xmax=xmax,
+                color="black",
                 linestyle=":",
-                ylim=(0, 1),
-                label=f"{key} (null)",
+                linewidth=2,
             )
 
-        axis.set_xticks([0, 1, 2, 3])
-        axis.set_xticklabels(["ODORS", "SW", "ODORS (null)", "SW (null)"])
+            accu2use = self.accuracy[label_type].T.squeeze()
+            null_accu2use = np.mean(self.null_accuracy[label_type], axis=0)
 
-        axis.set_ylabel("Accuracy")
+            self.fig_tools.create_sig_2samp_annotate(
+                ax=axis,
+                arr0=accu2use,
+                arr1=null_accu2use,
+                coords=(idx, 1.0),
+                paired=True,
+            )
 
-        title = [f"{self.folder_name}", f"Decoder: {self.decoder_type}"]
+            self.fig_tools.scatter_plot(
+                ax=axis,
+                X=idx - self.plot_params["bar_offset"],
+                Y=accu2use,
+                color=color2use,
+                s=self.plot_params["marker_size"],
+                jitter=self.plot_params["jitter"],
+            )
+
+            self.fig_tools.scatter_plot(
+                ax=axis,
+                X=idx + self.plot_params["bar_offset"],
+                Y=null_accu2use,
+                color=color2use,
+                s=self.plot_params["marker_size"],
+                jitter=self.plot_params["jitter"],
+            )
+
+            self.fig_tools.bar_plot(
+                ax=axis,
+                X=idx - self.plot_params["bar_offset"],
+                Y=np.mean(accu2use),
+                yerr=np.std(accu2use) / np.sqrt(len(accu2use)),
+                width=self.plot_params["bar_width"],
+                alpha=self.plot_params["bar_alpha"],
+                color=color2use,
+            )
+            self.fig_tools.bar_plot(
+                ax=axis,
+                X=idx + self.plot_params["bar_offset"],
+                Y=np.mean(null_accu2use),
+                yerr=np.std(null_accu2use) / np.sqrt(len(null_accu2use)),
+                color=color2use,
+                hatch=self.plot_params["hatch"],
+                width=self.plot_params["bar_width"],
+                alpha=self.plot_params["bar_alpha"],
+            )
+
+        axis.set_xticks([0, 1])
+        axis.set_xticklabels(
+            self.plot_params["title_names_nice"],
+            fontsize=self.plot_params["fsize"]["axis"],
+        )
+
+        axis.set_ylabel("Accuracy", fontsize=self.plot_params["fsize"]["axis"])
+
+        title = f"{self.folder_name}"
+        title_2ndLYR = [f"Decoder: {self.decoder_type}"]
         if self.params4decoder is not None:
-            title += [f"{key}: {value}" for key, value in self.params4decoder.items()]
-        title = self.utils.create_multiline_string(title)
-        axis.set_title(title)
+            title_2ndLYR += [
+                f"{key}: {value}" for key, value in self.params4decoder.items()
+            ]
+        title_2ndLYR = " | ".join(title_2ndLYR)
+        title_all = f"{title}\n{title_2ndLYR}"
+
+        # title = self.utils.create_multiline_string(title)
+        axis.set_title(title_all, fontsize=self.plot_params["fsize"]["title"])
 
         # axis.legend()
 
@@ -780,92 +742,130 @@ class TwoOdorDecoder(BC):
 
     def _plot_similarity_matrixWClustering(self) -> None:
         """
-        Plots the similarity matrix with clustering.
+        Plots the similarity matrix with clustering and projection weights.
+        Top row: Similarity matrix with label bars.
+        Bottom row: Projection weights (shorter height).
         """
-        fig, axis = self.fig_tools.create_plt_subplots(ncols=2, nrows=2, flatten=True)
+        # --- Setup Figure and GridSpec ---
+        fig, gs = self.fig_tools.create_plt_GridSpec(
+            nrows=2,
+            ncols=2,
+            figsize=(12, 8),
+            height_ratios=[3, 1],
+            width_ratios=[1, 1],
+        )
 
-        for idx, (ax, label_cat) in enumerate(zip(axis[:2], self.Labels.keys())):
+        # Create axes using the GridSpec
+        # length of all_axes is 4
+        # all_axes[0] is the top left axis
+        # all_axes[1] is the top right axis
+        # all_axes[2] is the bottom left axis
+        # all_axes[3] is the bottom right axis
+        all_axes = self.fig_tools.add_suplot_to_figViaGridSpec(fig=fig, gs=gs)
+
+        # Combine axes for easier looping if needed
+        top_axes = all_axes[:2]
+        bottom_axes = all_axes[2:]
+
+        self.print_wFrm("Plotting similarity matrix and weights")
+
+        cmap4labels = self.plot_params["cmap_categories"]
+
+        for idx, label_cat in enumerate(self.Labels.keys()):
+            ax_top = top_axes[idx]  # Axis for similarity heatmap
+            ax_bottom = bottom_axes[idx]  # Axis for weights plot
+
             # Get labels for the current category
-            true_label = self.Labels[label_cat]
-            pred_label = self.cluster_labels[label_cat]
+            # unique category labels should have same range of values for true and pred
+            true_label = self.Labels[label_cat].astype(int)
+            pred_label = self.corrected_cluster_labels[label_cat].astype(int)
 
-            # --- Color Mapping ---
-            # Combine true and predicted labels to find all unique possible labels
-            all_labels = np.unique(np.concatenate((true_label, pred_label)))
-            n_unique_total = len(all_labels)
+            # Determine which colormap to use based on the label category
+            if label_cat == "ODORS":
+                # Create a colormap using only the first 2 colors
+                cmap_to_use = ListedColormap(cmap4labels.colors[:2])
+            else:
+                # Use the full 4-color map for ODORSwSWITCH
+                cmap_to_use = cmap4labels
 
-            # Create ONE discrete colormap based on the total number of unique labels
-            cmap = plt.get_cmap(
-                "tab10", n_unique_total
-            )  # Use a suitable colormap like tab10
-
-            # Create ONE mapping from label value to 0-based index for the colormap
-            label_to_index_map = {label: i for i, label in enumerate(all_labels)}
-
-            # Map both true and predicted labels using the SAME map and cmap
-            true_label_indices = np.array(
-                [label_to_index_map[lab] for lab in true_label]
-            )
-            pred_label_indices = np.array(
-                [label_to_index_map[lab] for lab in pred_label]
-            )
-
-            # --- Plotting ---
-            # Plot main similarity matrix heatmap
-            # Note: Replaces self.fig_tools.plot_imshow to get the image object 'im'
+            # Plot similarity matrix
             im = self.fig_tools.plot_imshow(
                 fig=fig,
-                axis=ax,
+                axis=ax_top,
                 data2plot=self.similarity_matrix,
-                cmap="magma",
+                cmap=self.plot_params["cmap"],
                 return_im=True,
             )
-            # Create divider to add new axes (for the bars)
-            divider = make_axes_locatable(ax)
 
-            # Append axes to the top (for true labels) and left (for predicted labels)
-            ax_true_bar = divider.append_axes("top", size="3%", pad=0.05, sharex=ax)
-            ax_pred_bar = divider.append_axes("left", size="3%", pad=0.05, sharey=ax)
+            # Create locator
+            divider = self.fig_tools.makeAxesLocatable(ax_top)
 
-            # Plot color bars using imshow on the new axes
+            # Create axes for true and predicted labels
+            ax_true_bar = self.fig_tools.append_axes2locator(
+                locator=divider,
+                position="top",
+                size=self.plot_params["locator"]["size"],
+                pad=self.plot_params["locator"]["pad"],
+                sharex=ax_top,
+            )
+            ax_pred_bar = self.fig_tools.append_axes2locator(
+                locator=divider,
+                position="left",
+                size=self.plot_params["locator"]["size"],
+                pad=self.plot_params["locator"]["pad"],
+                sharey=ax_top,
+            )
+
+            # Plot true and predicted labels using the determined colormap
             ax_true_bar.imshow(
-                true_label_indices[np.newaxis, :], cmap=cmap, aspect="auto"
+                true_label[np.newaxis, :], cmap=cmap_to_use, aspect="auto"
             )
             ax_pred_bar.imshow(
-                pred_label_indices[:, np.newaxis], cmap=cmap, aspect="auto"
+                pred_label[:, np.newaxis], cmap=cmap_to_use, aspect="auto"
             )
 
-            # --- Cleanup ---
-            # Remove ticks and labels from the color bars
-            for ax_bar in [ax_true_bar, ax_pred_bar]:
+            # Cleanup for top plot
+            for ax_bar in [ax_true_bar, ax_pred_bar, ax_top]:
                 ax_bar.tick_params(axis="x", labelbottom=False, bottom=False)
                 ax_bar.tick_params(axis="y", labelleft=False, left=False)
 
-            # Optionally remove ticks from main heatmap as well
-            ax.tick_params(axis="x", labelbottom=False, bottom=False)
-            ax.tick_params(axis="y", labelleft=False, left=False)
-
-            # Add titles to identify the bars
             ax_true_bar.set_title("True")
             ax_pred_bar.set_ylabel("Pred", rotation=90, size="large")
 
-            # Add a colorbar for the main similarity matrix heatmap
-            cax = divider.append_axes("right", size="1%", pad=0.1)
-            fig.colorbar(
-                im,
-                cax=cax,
+            # Create color bar
+            cax = self.fig_tools.append_axes2locator(
+                locator=divider,
+                position="right",
+                size=self.plot_params["locator"]["size"],
+                pad=0.1,
             )
-            # Set title on main axis but push it higher using the 'y' parameter
-            ax.set_title(label_cat, y=1.1)  # Adjust the y value (e.g., 1.08) as needed
+            fig.colorbar(im, cax=cax)
 
-            ax4weights = axis[idx + 2]
+            # Set title for top plot, adjust y to avoid overlap with true labels
+            ax_top.set_title(self.plot_params["title_names_nice"][idx], y=1.1)
 
+            # Plot weights
+            # transpose to get shape to (n_clusters, n_odor_exposures)
             weights2use = self.projection_weights[label_cat].T
-            for weight, label in zip(weights2use, all_labels):
-                weight = (weight - np.min(weight)) / (np.max(weight) - np.min(weight))
-                ax4weights.plot(
-                    weight, color=cmap(label_to_index_map[label]), alpha=0.7
+
+            # Iterate through weights for each cluster/mean map
+            for weight_idx, weight_vec in enumerate(weights2use):
+                color = cmap4labels(weight_idx)
+                weight_plot = self.dep.normalize_array_MINMAX(weight_vec)
+                ax_bottom.plot(
+                    weight_plot, color=color, alpha=0.7, label=f"Weight {weight_idx}"
                 )
+
+            # Cleanup for bottom plot
+            ax_bottom.set_yticks([0, 1])  # Set Y-axis ticks to only 0 and 1
+            ax_bottom.set_ylabel("Weight")
+            ax_bottom.set_xlabel("Odor Exposure")
+            ax_bottom.spines["top"].set_visible(False)
+            ax_bottom.spines["right"].set_visible(False)
+
+        fig.suptitle(f"Similarity & Projection Weights - {self.folder_name}")
+        # Use constrained_layout or tight_layout with adjustments
+        self.fig_tools.tighten_layoutWspecific_axes(coords2tighten=[0, 0.03, 1, 0.95])
 
         self.fig_tools.save_figure(
             fig, "Similarity_Matrix", figure_save_path=self.FigPath
@@ -882,31 +882,22 @@ class TwoOdorDecoder(BC):
             ncols=n_cats, figsize=(6 * n_cats, 5), flatten=True
         )
 
+        self.print_wFrm("Finding distance matrix", frame_num=1)
         # UMAP works with distances (0 = close, high = far)
-        distance_matrix = 1 - self.similarity_matrix
-        # Ensure diagonal is 0
-        np.fill_diagonal(distance_matrix, 0)
-        # Symmetrize (should already be symmetric, but enforce)
-        distance_matrix = (distance_matrix + distance_matrix.T) / 2
-
-        # --- Run UMAP ---
-        reducer = umap.UMAP(
-            metric="precomputed", random_state=42, n_neighbors=15, min_dist=0.1
+        distance_matrix = self.dep.create_distance_matrix_from_similarity_matrix(
+            self.similarity_matrix
         )
-        embedding = reducer.fit_transform(distance_matrix)
 
-        self.Label_Names = {
-            "ODORS": ["ODOR 1", "ODOR 2"],
-            "ODORSwSWITCH": ["O1L1", "O2L2", "O1L2", "O2L1"],
-        }
+        self.print_wFrm("Finding UMAP embedding", frame_num=1)
+        # extract UMAP embedding
+        embedding = self.dep.UMAP_fit2distMatrix(distance_matrix)
 
-        for ax, label_cat in zip(axes, self.Labels.keys()):
-            true_label = self.Labels[label_cat]
-            unique_labels = np.unique(true_label)
-            n_unique = len(unique_labels)
-            cmap = plt.get_cmap("tab10", n_unique)
-            label_map = {label: i for i, label in enumerate(unique_labels)}
-            colors = [cmap(label_map[lab]) for lab in true_label]
+        for idx, (ax, label_cat) in enumerate(zip(axes, self.Labels.keys())):
+            cmap4labels = self.plot_params["cmap_categories"]
+            true_label = self.Labels[label_cat].astype(int)
+            unique_labels = np.unique(true_label).astype(int)
+
+            colors = [cmap4labels(int(lab)) for lab in true_label]
 
             # Scatter plot of the embedding
             scatter = ax.scatter(
@@ -914,28 +905,44 @@ class TwoOdorDecoder(BC):
             )
 
             # Create legend
-            legend_elements = [
-                plt.Line2D(
-                    [0],
-                    [0],
-                    marker="o",
-                    color="w",
-                    label=f"{self.Label_Names[label_cat][i]}",
-                    markerfacecolor=cmap(label_map[lab]),
-                    markersize=5,
-                )
-                for i, lab in enumerate(unique_labels)
-            ]
+            legend_elements = []
+            facecolor = [cmap4labels(lab) for lab in unique_labels]
+            label = self.Label_Names[label_cat]
+            edgecolor = facecolor
+            marker = ["o"] * len(facecolor)
+            legend_elements = self.fig_tools.create_legend_patch_fLoop(
+                facecolor=facecolor,
+                label=label,
+                edgecolor=edgecolor,
+                marker=marker,
+            )
             ax.legend(handles=legend_elements)
 
-            ax.set_title(f"UMAP Projection ({label_cat})")
-            ax.set_xlabel("UMAP 1")
-            ax.set_ylabel("UMAP 2")
+            ax.set_title(
+                f"{self.plot_params['title_names_nice'][idx]}\nAccuracy: {self.clustering_accuracy[label_cat]:.3f}",
+                fontsize=self.plot_params["fsize"]["title"],
+            )
+            ax.set_xlabel(
+                "UMAP 1",
+                fontsize=self.plot_params["fsize"]["axis"],
+                fontweight="bold",
+            )
+            ax.set_ylabel(
+                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
+            )
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
-        fig.suptitle(f"UMAP Projection based on Similarity - {self.folder_name}")
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
+            # Remove tick labels (numbers) and tick marks from axes
+            ax.tick_params(axis="x", labelbottom=False, bottom=False)
+            ax.tick_params(axis="y", labelleft=False, left=False)
+
+        fig.suptitle(
+            f"UMAP Projection - {self.folder_name}",
+            fontsize=self.plot_params["fsize"]["title"],
+        )
+
+        self.fig_tools.tighten_layoutWspecific_axes(coords2tighten=[0, 0, 1, 0.96])
 
         self.fig_tools.save_figure(
             fig, "UMAP_Projection", figure_save_path=self.FigPath
@@ -979,9 +986,9 @@ class TwoOdorDecoder(BC):
 
             # plot confusion matrix
             if aggregate_cm.shape[0] == 2:
-                group_labels = ["Od 1", "Od 2"]
+                group_labels = self.Label_Names["ODORS"]
             elif aggregate_cm.shape[0] == 4:
-                group_labels = ["Od 1", "Od2", "SW Od1", "SW Od2"]
+                group_labels = self.Label_Names["ODORSwSWITCH"]
             self.fig_tools.plot_confusion_matrix(
                 ax=ax_cm, cm=aggregate_cm, group_labels=group_labels
             )
@@ -1012,6 +1019,8 @@ class TwoOdorDecoder(BC):
                 Y=values,
                 ylim=(0, 1),
             )
+            # Explicitly set tick locations before setting labels to address UserWarning
+            ax_metrics.set_xticks(np.arange(len(metrics2bar)))
             ax_metrics.set_xticklabels(metrics2bar, rotation=45)
 
             textstr = [
