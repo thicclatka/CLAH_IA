@@ -58,8 +58,10 @@ class TwoOdorDecoder(BC):
         self.importCSSnTBDnSD()
         self.findOdorTimes()
         self.findOdorDetails()
+        self.extractLapsByType()
         self.findOdorClustering()
         self.DecodeOdorEpochs()
+        self.DecodeLaps_viaLSTM()
         self.plotResults()
 
     def static_class_var_init(
@@ -109,7 +111,7 @@ class TwoOdorDecoder(BC):
         self.decoder_type = "SVC"  # hardcoded for now
 
         self.num_folds = num_folds
-        self.num_fold4switch = None
+        self.num_folds4switch = None
         self.null_repeats = null_repeats
         self.params4decoderSVC = {
             "C": cost_param,
@@ -129,35 +131,45 @@ class TwoOdorDecoder(BC):
 
         self.FigPath = "Figures/Decoder"
 
-        self.random_state = 35
+        self.random_state = 11
 
         self.Label_Names = {
             "ODORS": ["ODOR 1", "ODOR 2"],
             "ODORSwSWITCH": ["O1L1", "O2L2", "O1L2", "O2L1"],
         }
 
+        self.LSTM_params = {
+            "seq_len": 20,
+            "epochs": 50,
+            "batch_size": 32,
+            "use_early_stopping": True,
+            "patience": 10,
+        }
+
         self.plot_params = {
-            "bar_alpha": 0.7,
-            "bar_width": 0.2,
-            "bar_offset": 0.1,
-            "hatch": "//",
-            "title_names_nice": ["Odors", "Odors + Switch"],
+            "bar": {
+                "alpha": 0.7,
+                "width": 0.2,
+                "offset": 0.1,
+                "hatch": "//",
+            },
+            "scatter": {
+                "alpha": 0.8,
+                "s_small": 20,
+                "s_large": 50,
+            },
+            "cat_names4plot": ["Odors", "Odors + Switch"],
             "fsize": {
                 "axis": 14,
                 "title": 18,
             },
             "cmap": "magma",
             "cmap_categories": self.fig_tools.create_cmap4categories(num_categories=4),
-            # "cmap_categories": {
-            #     "ODORS": self.fig_tools.create_cmap4categories(num_categories=2),
-            #     "ODORSwSWITCH": self.fig_tools.create_cmap4categories(num_categories=4),
-            # },
             "locator": {
                 "size": "3%",
                 "pad": 0.05,
             },
             "jitter": 0.02,
-            "marker_size": 50,
         }
 
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
@@ -316,6 +328,10 @@ class TwoOdorDecoder(BC):
                 self.print_wFrm(f"Odor with Switch Labels & Counts: {formatted_str}")
 
         self.print_done_small_proc()
+        self.lapTimes = lapTimes
+        self.lapTypeArr = lapTypeArr
+        self.lapTypeName = lapTypeName
+        self.adjFrTimes = np.array(self.TBD["adjFrTimes"])
 
     def findOdorDetails(self) -> None:
         """
@@ -330,7 +346,6 @@ class TwoOdorDecoder(BC):
         self.print_wFrm(
             "Finding peak value and time, relative to relative to lap start time within post-cue epoch period"
         )
-        adjFrTimes = np.array(self.TBD["adjFrTimes"])
 
         # Initialize arrays
         self.OdorEpochs = np.full(
@@ -364,10 +379,10 @@ class TwoOdorDecoder(BC):
 
             # find indices of frames that are within the trial epoch
             trial_indices = np.where(
-                (adjFrTimes >= trial_start) & (adjFrTimes <= trial_end)
+                (self.adjFrTimes >= trial_start) & (self.adjFrTimes <= trial_end)
             )[0]
             post_cue_indices = np.where(
-                (adjFrTimes > cue_start_time) & (adjFrTimes <= trial_end)
+                (self.adjFrTimes > cue_start_time) & (self.adjFrTimes <= trial_end)
             )[0]
 
             if trial_indices.shape[0] == self.trial_dur:
@@ -377,7 +392,7 @@ class TwoOdorDecoder(BC):
 
                 # Get post-cue data for peak detection
                 post_cue_data = CTEMP2USE[:, post_cue_indices]
-                post_time_data = adjFrTimes[post_cue_indices]
+                post_time_data = self.adjFrTimes[post_cue_indices]
 
                 # Find peaks and times
                 max_peak_val = np.max(post_cue_data, axis=1)
@@ -395,17 +410,17 @@ class TwoOdorDecoder(BC):
                 self.Labels["ODORS"][idx] = odor_label
                 self.Labels["ODORSwSWITCH"][idx] = switch_label
 
-        # check # of switchs labels to set num_fold4switch
+        # check # of switchs labels to set num_folds4switch
         switch_labels, counts = np.unique(
             self.Labels["ODORSwSWITCH"], return_counts=True
         )
         if counts[3] < self.num_folds or counts[4] < self.num_folds:
             count_min = np.min(counts[3:])
-            self.num_fold4switch = count_min
+            self.num_folds4switch = count_min
             output_str = f"Only {count_min} switch laps found; setting cross-fold validation to {count_min}"
         else:
             output_str = f"Enough switch laps found; setting cross-fold validation to {self.num_folds}"
-            self.num_fold4switch = self.num_folds
+            self.num_folds4switch = self.num_folds
         self.print_wFrm(output_str)
 
         self.print_wFrm(
@@ -414,6 +429,50 @@ class TwoOdorDecoder(BC):
         self.normOdorPeaksNTimes = self.dep.feature_normalization(self.OdorPeaksNTimes)
 
         self.print_done_small_proc()
+
+    def extractLapsByType(self) -> None:
+        """
+        Extracts laps by type from the lapTypeArr.
+        """
+        CTEMP2USE = self.C_Temp.copy()
+        for cell in range(CTEMP2USE.shape[0]):
+            CTEMP2USE[cell, :] = (CTEMP2USE[cell, :] - np.min(CTEMP2USE[cell, :])) / (
+                np.max(CTEMP2USE[cell, :]) - np.min(CTEMP2USE[cell, :])
+            )
+        self.lapsByType = {lName: [] for lName in self.lapTypeName}
+        for lidx, (lType, lTime) in enumerate(zip(self.lapTypeArr, self.lapTimes)):
+            lName = self.lapTypeName[lType - 1]
+            start_time = lTime
+
+            if lidx == len(self.lapTypeArr) - 2:
+                end_time = self.adjFrTimes[-1]
+            elif lidx == len(self.lapTypeArr) - 1:
+                continue
+            else:
+                end_time = self.lapTimes[lidx + 1]
+
+            lap_indices = np.where(
+                (self.adjFrTimes >= start_time) & (self.adjFrTimes <= end_time)
+            )[0]
+            lap_data = CTEMP2USE[:, lap_indices]
+            self.lapsByType[lName].append(lap_data)
+
+        seq_len = self.LSTM_params["seq_len"]
+        self.LSTM = {"train": [], "target": [], "labels": []}
+        for idx, lName in enumerate(self.lapTypeName):
+            curr_laps = self.lapsByType[lName]
+
+            for lap in curr_laps:
+                lapT = lap.T
+
+                for i in range(0, lapT.shape[0] - seq_len, seq_len):
+                    self.LSTM["train"].append(lapT[i : i + seq_len])
+                    self.LSTM["target"].append(lapT[i + seq_len])
+                    self.LSTM["labels"].append(lName)
+
+        self.X_LSTM = np.stack(self.LSTM["train"], axis=0)
+        self.y_LSTM = np.stack(self.LSTM["target"], axis=0)
+        self.labels_LSTM = np.array(self.LSTM["labels"])
 
     def findOdorClustering(self) -> None:
         """
@@ -516,9 +575,9 @@ class TwoOdorDecoder(BC):
             - key (str): The key to determine the fold count for. Should be either "ODORS" or "fold4switch".
 
             Returns:
-            - int: The fold count based on the given key. Returns `self.num_folds` if key is "ODORS", otherwise returns `self.num_fold4switch`.
+            - int: The fold count based on the given key. Returns `self.num_folds` if key is "ODORS", otherwise returns `self.num_folds4switch`.
             """
-            return self.num_folds if key == "ODORS" else self.num_fold4switch
+            return self.num_folds if key == "ODORS" else self.num_folds4switch
 
         def _print_acc_results(accu: np.ndarray, key: str, max_length: int) -> str:
             """
@@ -611,6 +670,21 @@ class TwoOdorDecoder(BC):
             _print_acc_results(np.mean(null_accu, 1), key, max_length)
         self.print_done_small_proc()
 
+    def DecodeLaps_viaLSTM(self) -> None:
+        """
+        Decodes the laps using LSTM.
+        """
+        print(self.LSTM_params)
+        mse, mae, r2 = GeneralDecoder.decode_via_LSTM_prediction(
+            X_lstm=self.X_LSTM,
+            y_lstm=self.y_LSTM,
+            sequence_labels=self.labels_LSTM,
+            num_folds=self.num_folds4switch,
+            random_state=self.random_state,
+            **self.LSTM_params,
+        )
+        pass
+
     def plotResults(self) -> None:
         """
         Plots the results of the decoder analysis.
@@ -650,8 +724,8 @@ class TwoOdorDecoder(BC):
             # Determine chance level based on number of categories
             y_chance = 1 / len(unique_labels)
             # Define start and end points for the chance line segment
-            xmin = idx - (4 * self.plot_params["bar_offset"])
-            xmax = idx + (4 * self.plot_params["bar_offset"])
+            xmin = idx - (4 * self.plot_params["bar"]["offset"])
+            xmax = idx + (4 * self.plot_params["bar"]["offset"])
 
             color2use = odor_color if label_type == "ODORS" else switch_color
 
@@ -677,45 +751,45 @@ class TwoOdorDecoder(BC):
 
             self.fig_tools.scatter_plot(
                 ax=axis,
-                X=idx - self.plot_params["bar_offset"],
+                X=idx - self.plot_params["bar"]["offset"],
                 Y=accu2use,
                 color=color2use,
-                s=self.plot_params["marker_size"],
+                s=self.plot_params["scatter"]["s_large"],
                 jitter=self.plot_params["jitter"],
             )
 
             self.fig_tools.scatter_plot(
                 ax=axis,
-                X=idx + self.plot_params["bar_offset"],
+                X=idx + self.plot_params["bar"]["offset"],
                 Y=null_accu2use,
                 color=color2use,
-                s=self.plot_params["marker_size"],
+                s=self.plot_params["scatter"]["s_large"],
                 jitter=self.plot_params["jitter"],
             )
 
             self.fig_tools.bar_plot(
                 ax=axis,
-                X=idx - self.plot_params["bar_offset"],
+                X=idx - self.plot_params["bar"]["offset"],
                 Y=np.mean(accu2use),
                 yerr=np.std(accu2use) / np.sqrt(len(accu2use)),
-                width=self.plot_params["bar_width"],
-                alpha=self.plot_params["bar_alpha"],
+                width=self.plot_params["bar"]["width"],
+                alpha=self.plot_params["bar"]["alpha"],
                 color=color2use,
             )
             self.fig_tools.bar_plot(
                 ax=axis,
-                X=idx + self.plot_params["bar_offset"],
+                X=idx + self.plot_params["bar"]["offset"],
                 Y=np.mean(null_accu2use),
                 yerr=np.std(null_accu2use) / np.sqrt(len(null_accu2use)),
                 color=color2use,
-                hatch=self.plot_params["hatch"],
-                width=self.plot_params["bar_width"],
-                alpha=self.plot_params["bar_alpha"],
+                hatch=self.plot_params["bar"]["hatch"],
+                width=self.plot_params["bar"]["width"],
+                alpha=self.plot_params["bar"]["alpha"],
             )
 
         axis.set_xticks([0, 1])
         axis.set_xticklabels(
-            self.plot_params["title_names_nice"],
+            self.plot_params["cat_names4plot"],
             fontsize=self.plot_params["fsize"]["axis"],
         )
 
@@ -842,7 +916,7 @@ class TwoOdorDecoder(BC):
             fig.colorbar(im, cax=cax)
 
             # Set title for top plot, adjust y to avoid overlap with true labels
-            ax_top.set_title(self.plot_params["title_names_nice"][idx], y=1.1)
+            ax_top.set_title(self.plot_params["cat_names4plot"][idx], y=1.1)
 
             # Plot weights
             # transpose to get shape to (n_clusters, n_odor_exposures)
@@ -900,8 +974,12 @@ class TwoOdorDecoder(BC):
             colors = [cmap4labels(int(lab)) for lab in true_label]
 
             # Scatter plot of the embedding
-            scatter = ax.scatter(
-                embedding[:, 0], embedding[:, 1], c=colors, s=15, alpha=0.7
+            ax.scatter(
+                embedding[:, 0],
+                embedding[:, 1],
+                c=colors,
+                s=self.plot_params["scatter"]["s_small"],
+                alpha=self.plot_params["scatter"]["alpha"],
             )
 
             # Create legend
@@ -919,7 +997,7 @@ class TwoOdorDecoder(BC):
             ax.legend(handles=legend_elements)
 
             ax.set_title(
-                f"{self.plot_params['title_names_nice'][idx]}\nAccuracy: {self.clustering_accuracy[label_cat]:.3f}",
+                f"{self.plot_params['cat_names4plot'][idx]}\nAccuracy: {self.clustering_accuracy[label_cat]:.3f}",
                 fontsize=self.plot_params["fsize"]["title"],
             )
             ax.set_xlabel(

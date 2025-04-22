@@ -109,6 +109,7 @@ def UMAP_fit2distMatrix(
     random_state: int = 42,
     n_neighbors: int = 15,
     min_dist: float = 0.1,
+    metric: str = "cosine",
 ) -> np.ndarray:
     """
     Fit a UMAP model to a distance matrix.
@@ -122,10 +123,12 @@ def UMAP_fit2distMatrix(
     Returns:
         np.ndarray: UMAP embedding of shape (n_samples, 2)
     """
+
     reducer = umap.UMAP(
         random_state=random_state,
         n_neighbors=n_neighbors,
         min_dist=min_dist,
+        metric=metric,
         n_jobs=1,  # disable parallel processing since random_state is set
     )
     embedding = reducer.fit_transform(distance_matrix)

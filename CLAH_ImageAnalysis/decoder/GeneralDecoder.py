@@ -1,17 +1,26 @@
 import numpy as np
-from typing import Literal
-from sklearn.model_selection import StratifiedKFold
+from typing import Literal, Tuple, Dict
+from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.naive_bayes import GaussianNB
 
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.utils import to_categorical
+
+try:
+    import tensorflow as tf
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout, Masking
+    from tensorflow.keras.utils import to_categorical
+    from tensorflow.keras.callbacks import EarlyStopping
+
+    TF_IMPORTED = True
+except ImportError:
+    TF_IMPORTED = False
+    print("\nWarning: TensorFlow not found. LSTM functionality will be unavailable.\n")
 
 
 class GeneralDecoder:
@@ -171,86 +180,86 @@ class GeneralDecoder:
 
         return np.array(accuracy), np.array(conf_matrices)
 
-    @staticmethod
-    def decode_via_LSTM(
-        data_arr: np.ndarray,
-        label_arr: np.ndarray,
-        num_folds: int,
-        random_state: int = 14,
-    ) -> tuple:
-        input_shape = (data_arr.shape[1], data_arr.shape[2])  # timepoints x neurons
-        num_classes = int(len(np.unique(label_arr)))
+    # @staticmethod
+    # def decode_via_LSTM(
+    #     data_arr: np.ndarray,
+    #     label_arr: np.ndarray,
+    #     num_folds: int,
+    #     random_state: int = 14,
+    # ) -> tuple:
+    #     input_shape = (data_arr.shape[1], data_arr.shape[2])  # timepoints x neurons
+    #     num_classes = int(len(np.unique(label_arr)))
 
-        cat_arr = to_categorical(label_arr - 1, num_classes=num_classes)
+    #     cat_arr = to_categorical(label_arr - 1, num_classes=num_classes)
 
-        accuracy = []
-        confusion_matrices = []
-        cv = StratifiedKFold(
-            n_splits=num_folds, shuffle=True, random_state=random_state
-        )
-        for idx, (train, test) in enumerate(
-            cv.split(np.zeros(len(label_arr)), label_arr)
-        ):
-            print(f"Fold: {idx + 1}")
-            XTrain = data_arr[train, :, :]
-            YTrain = cat_arr[train]
+    #     accuracy = []
+    #     confusion_matrices = []
+    #     cv = StratifiedKFold(
+    #         n_splits=num_folds, shuffle=True, random_state=random_state
+    #     )
+    #     for idx, (train, test) in enumerate(
+    #         cv.split(np.zeros(len(label_arr)), label_arr)
+    #     ):
+    #         print(f"Fold: {idx + 1}")
+    #         XTrain = data_arr[train, :, :]
+    #         YTrain = cat_arr[train]
 
-            XTest = data_arr[test, :, :]
-            YTest = cat_arr[test]
+    #         XTest = data_arr[test, :, :]
+    #         YTest = cat_arr[test]
 
-            model = GeneralDecoder._build_LSTM(input_shape, num_classes)
-            model.fit(
-                XTrain,
-                YTrain,
-                epochs=50,
-                batch_size=32,
-                validation_split=0.2,
-                verbose=0,
-            )
+    #         model = GeneralDecoder._build_LSTM(input_shape, num_classes)
+    #         model.fit(
+    #             XTrain,
+    #             YTrain,
+    #             epochs=50,
+    #             batch_size=32,
+    #             validation_split=0.2,
+    #             verbose=0,
+    #         )
 
-            predictions = model.predict(XTest)
-            YPred = np.argmax(predictions, axis=1)
-            YTrue = np.argmax(YTest, axis=1)
+    #         predictions = model.predict(XTest)
+    #         YPred = np.argmax(predictions, axis=1)
+    #         YTrue = np.argmax(YTest, axis=1)
 
-            accu = accuracy_score(YTrue, YPred)
-            accuracy.append(accu)
+    #         accu = accuracy_score(YTrue, YPred)
+    #         accuracy.append(accu)
 
-            cm = confusion_matrix(YTrue, YPred)
-            confusion_matrices.append(cm)
+    #         cm = confusion_matrix(YTrue, YPred)
+    #         confusion_matrices.append(cm)
 
-        return np.array(accuracy), np.array(confusion_matrices)
+    #     return np.array(accuracy), np.array(confusion_matrices)
 
-    @staticmethod
-    def _build_LSTM(
-        input_shape: tuple,
-        num_classes: int,
-        return_sequences: bool = True,
-        first_layer_units: int = 128,
-        second_layer_units: int = 64,
-        dropout: float = 0.5,
-        activation: str = "softmax",
-        optimizer: str = "adam",
-        loss="categorical_crossentropy",
-        metrics=["accuracy"],
-    ):
-        """
-        Build LSTM model.
-        """
-        model = Sequential()
-        model.add(
-            LSTM(
-                units=first_layer_units,
-                input_shape=input_shape,
-                return_sequences=return_sequences,
-            )
-        )
-        model.add(Dropout(rate=dropout))
-        model.add(LSTM(units=second_layer_units))
-        model.add(Dropout(rate=dropout))
-        model.add(Dense(units=num_classes, activation=activation))
+    # @staticmethod
+    # def _build_LSTM(
+    #     input_shape: tuple,
+    #     num_classes: int,
+    #     return_sequences: bool = True,
+    #     first_layer_units: int = 128,
+    #     second_layer_units: int = 64,
+    #     dropout: float = 0.5,
+    #     activation: str = "softmax",
+    #     optimizer: str = "adam",
+    #     loss="categorical_crossentropy",
+    #     metrics=["accuracy"],
+    # ):
+    #     """
+    #     Build LSTM model.
+    #     """
+    #     model = Sequential()
+    #     model.add(
+    #         LSTM(
+    #             units=first_layer_units,
+    #             input_shape=input_shape,
+    #             return_sequences=return_sequences,
+    #         )
+    #     )
+    #     model.add(Dropout(rate=dropout))
+    #     model.add(LSTM(units=second_layer_units))
+    #     model.add(Dropout(rate=dropout))
+    #     model.add(Dense(units=num_classes, activation=activation))
 
-        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-        return model
+    #     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+    #     return model
 
     @staticmethod
     def calculate_ConfusionMatrix_metrics(cm: np.ndarray) -> dict:
@@ -285,3 +294,206 @@ class GeneralDecoder:
             "recall": recall,
             "f1": f1,
         }
+
+    @staticmethod
+    def _build_LSTM_prediction(
+        input_shape: tuple, output_units: int, **kwargs
+    ) -> "tf.keras.models.Sequential":
+        """
+        Builds a simple LSTM model for sequence prediction (regression).
+
+        Args:
+            input_shape (tuple): Shape of the input sequences (seq_length, n_features).
+            output_units (int): Number of output units (should match n_features for predicting next step).
+            **kwargs: Optional hyperparameters for the model.
+                lstm1_units (int): Units in the first LSTM layer (default: 64).
+                lstm2_units (int): Units in the second LSTM layer (default: 32). If 0, layer is skipped.
+                dropout_rate (float): Dropout rate (default: 0.3).
+                optimizer (str): Keras optimizer name (default: 'adam').
+
+        Returns:
+            A compiled Keras Sequential model.
+
+        Raises:
+            ImportError: If TensorFlow/Keras is not installed.
+        """
+        if not TF_IMPORTED:
+            raise ImportError(
+                "TensorFlow/Keras is required for LSTM functionality but not found."
+            )
+
+        # Get hyperparameters from kwargs or use defaults
+        lstm1_units = kwargs.get("lstm1_units", 64)
+        lstm2_units = kwargs.get("lstm2_units", 32)  # Set to 0 to disable
+        dropout_rate = kwargs.get("dropout_rate", 0.3)
+        optimizer = kwargs.get("optimizer", "adam")
+
+        model = Sequential(name="LSTM_Predictor")
+        # Optional: Masking layer if using padding with a specific value (e.g., if 0 padding is bad)
+        # model.add(Masking(mask_value=0., input_shape=input_shape)) # If using masking
+        # model.add(LSTM(units=lstm1_units, input_shape=input_shape, return_sequences=lstm2_units > 0)) # Adjust input_shape if using Masking
+
+        # Simpler start without masking
+        model.add(
+            LSTM(
+                units=lstm1_units,
+                input_shape=input_shape,
+                return_sequences=lstm2_units > 0,
+            )
+        )
+        model.add(Dropout(rate=dropout_rate))
+
+        if lstm2_units > 0:
+            model.add(
+                LSTM(units=lstm2_units, return_sequences=False)
+            )  # Last LSTM before Dense should not return sequences
+            model.add(Dropout(rate=dropout_rate))
+
+        # Output layer for regression: linear activation, number of units = number of features to predict
+        model.add(Dense(units=output_units, activation="linear"))
+
+        # Compile for regression
+        model.compile(
+            optimizer=optimizer, loss="mean_squared_error", metrics=["mae"]
+        )  # Use MSE loss
+
+        # print(model.summary())  # Optional: Print model summary
+        return model
+
+    @staticmethod
+    def decode_via_LSTM_prediction(
+        X_lstm: np.ndarray,
+        y_lstm: np.ndarray,
+        sequence_labels: np.ndarray,
+        num_folds: int,
+        random_state: int = 14,
+        **kwargs,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Decodes sequences using LSTM for predicting the next time step across all features.
+        Performs cross-validation and returns performance metrics for each fold.
+
+        Args:
+            X_lstm: Input sequences, shape (n_sequences, seq_length, n_features).
+            y_lstm: Target values (next time step), shape (n_sequences, n_features).
+            sequence_labels: Labels indicating the origin (e.g., lap type) of each sequence, used for stratified splitting. Shape (n_sequences,).
+            num_folds: Number of folds for cross-validation.
+            random_state: Random state for reproducibility.
+            **kwargs: Optional keyword arguments passed to _build_LSTM_prediction and model.fit.Includes epochs (default: 50), batch_size (default: 32), verbose (default: 0), lstm1_units, lstm2_units, dropout_rate, optimizer, use_early_stopping (bool, default: False), patience (int, default: 5). # Add other relevant fit params
+
+        Returns:
+            A tuple containing:
+            - mse_scores (np.ndarray): Mean Squared Error on the test set for each fold.
+            - mae_scores (np.ndarray): Mean Absolute Error on the test set for each fold.
+            - r2_scores (np.ndarray): R-squared score on the test set for each fold.
+
+        Raises:
+            ImportError: If TensorFlow/Keras is not installed.
+            ValueError: If input array dimensions are incorrect.
+        """
+        if not TF_IMPORTED:
+            raise ImportError(
+                "TensorFlow/Keras is required for LSTM functionality but not found."
+            )
+
+        if X_lstm.ndim != 3 or y_lstm.ndim != 2:
+            raise ValueError(
+                f"Incorrect input dimensions. X_lstm should be 3D (sequences, timesteps, features), y_lstm should be 2D (sequences, features). Got X: {X_lstm.shape}, y: {y_lstm.shape}"
+            )
+        if X_lstm.shape[0] != y_lstm.shape[0]:
+            raise ValueError(
+                f"Number of sequences in X_lstm ({X_lstm.shape[0]}) and y_lstm ({y_lstm.shape[0]}) must match."
+            )
+        if X_lstm.shape[2] != y_lstm.shape[1]:
+            raise ValueError(
+                f"Number of features in X_lstm ({X_lstm.shape[2]}) and y_lstm ({y_lstm.shape[1]}) must match."
+            )
+        if X_lstm.shape[0] != len(sequence_labels):
+            raise ValueError(
+                f"Number of sequences in X_lstm ({X_lstm.shape[0]}) and sequence_labels ({len(sequence_labels)}) must match."
+            )
+
+        n_sequences = X_lstm.shape[0]
+        seq_length = X_lstm.shape[1]
+        n_features = X_lstm.shape[2]  # Also the number of output units
+        input_shape = (seq_length, n_features)
+
+        mse_scores = []
+        mae_scores = []
+        r2_scores = []
+
+        # Use StratifiedKFold if labels are provided and have more than one class
+        if sequence_labels is not None and len(np.unique(sequence_labels)) > 1:
+            print(
+                f"Using StratifiedKFold based on {len(np.unique(sequence_labels))} unique sequence labels."
+            )
+            cv = StratifiedKFold(
+                n_splits=num_folds, shuffle=True, random_state=random_state
+            )
+            split_iterator = cv.split(
+                np.zeros(n_sequences), sequence_labels
+            )  # Use labels for stratification
+        else:
+            if sequence_labels is None:
+                print("No sequence labels provided, using standard KFold.")
+            else:
+                print(
+                    f"Only {len(np.unique(sequence_labels))} unique sequence label found, using standard KFold."
+                )
+            cv = KFold(n_splits=num_folds, shuffle=True, random_state=random_state)
+            split_iterator = cv.split(np.zeros(n_sequences))  # Just split indices
+
+        # Training arguments from kwargs
+        epochs = kwargs.get("epochs", 50)
+        batch_size = kwargs.get("batch_size", 32)
+        verbose_fit = kwargs.get("verbose", 0)
+        use_early_stopping = kwargs.get("use_early_stopping", False)
+        patience = kwargs.get("patience", 5)
+
+        fold_num = 0
+        for train_idx, test_idx in tqdm(
+            split_iterator, total=num_folds, desc="LSTM Folds"
+        ):
+            fold_num += 1
+            XTrain, XTest = X_lstm[train_idx], X_lstm[test_idx]
+            YTrain, YTest = y_lstm[train_idx], y_lstm[test_idx]
+
+            model = GeneralDecoder._build_LSTM_prediction(
+                input_shape, n_features, **kwargs
+            )
+
+            callbacks = []
+            if use_early_stopping:
+                early_stop = EarlyStopping(
+                    monitor="val_loss",
+                    patience=patience,
+                    verbose=verbose_fit,
+                    restore_best_weights=True,
+                )
+                callbacks.append(early_stop)
+
+            history = model.fit(
+                XTrain,
+                YTrain,
+                epochs=epochs,
+                batch_size=batch_size,
+                validation_split=0.1 if use_early_stopping else None,
+                callbacks=callbacks,
+                verbose=verbose_fit,
+            )
+
+            loss, mae = model.evaluate(XTest, YTest, verbose=0)
+            mse_scores.append(loss)
+            mae_scores.append(mae)
+
+            y_pred = model.predict(XTest, verbose=0)
+            r2 = r2_score(YTest, y_pred, multioutput="variance_weighted")
+            r2_scores.append(r2)
+
+            # print(f"Fold {fold_num} Test MSE: {loss:.4f}, MAE: {mae:.4f}, R2: {r2:.4f}")
+
+        print("LSTM Cross-validation finished.")
+        print(f"MSE: {np.mean(mse_scores):.4f} ± {np.std(mse_scores):.4f}")
+        print(f"MAE: {np.mean(mae_scores):.4f} ± {np.std(mae_scores):.4f}")
+        print(f"R2: {np.mean(r2_scores):.4f} ± {np.std(r2_scores):.4f}")
+        return np.array(mse_scores), np.array(mae_scores), np.array(r2_scores)
