@@ -1,6 +1,8 @@
+import json
 import numpy as np
 from typing import Literal
 from matplotlib.colors import ListedColormap
+from scipy.stats import mannwhitneyu
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
 from CLAH_ImageAnalysis.decoder import decoder_enum
@@ -58,11 +60,14 @@ class TwoOdorDecoder(BC):
         self.importCSSnTBDnSD()
         self.findOdorTimes()
         self.findOdorDetails()
-        self.extractLapsByType()
+        # self.extractLapsByType()
+        self.findPosRateClustering()
         self.findOdorClustering()
         self.DecodeOdorEpochs()
-        self.DecodeLaps_viaLSTM()
+        # self.DecodeLaps_viaLSTM()
+        # self.DecodePosition()
         self.plotResults()
+        self.analyze_tuning_similarity_by_cell_type()
 
     def static_class_var_init(
         self,
@@ -163,8 +168,16 @@ class TwoOdorDecoder(BC):
                 "axis": 14,
                 "title": 18,
             },
-            "cmap": "magma",
-            "cmap_categories": self.fig_tools.create_cmap4categories(num_categories=4),
+            "cmap": {
+                "imshow": "magma",
+                "odors": self.fig_tools.create_cmap4categories(num_categories=4),
+                "posrates": self.fig_tools.create_cmap4categories(
+                    num_categories=5, cmap_name="tab10"
+                ),
+                "cellTypes": self.fig_tools.create_cmap4categories(
+                    num_categories=3, cmap_name="tab20"
+                ),
+            },
             "locator": {
                 "size": "3%",
                 "pad": 0.05,
@@ -189,6 +202,7 @@ class TwoOdorDecoder(BC):
         self.SD = None
         self.OdorTimes = None
         self.OdorEpochs = None
+        self.CueCellTableDict = None
         if self.parse_cost_param is not None:
             self.params4decoderSVC["C"] = self.parse_cost_param
         else:
@@ -216,6 +230,10 @@ class TwoOdorDecoder(BC):
 
         for file_type in file_types:
             self._import_file_type(file_type)
+
+        CCTD = self.findLatest(["CueCellTableDict"], path2check="Figures")
+        with open(CCTD, "rb") as f:
+            self.CueCellTableDict = json.load(f)
 
         ## extract lapCue from CSS
         self.lapCue = self.CSS["lapCue"]
@@ -474,6 +492,38 @@ class TwoOdorDecoder(BC):
         self.y_LSTM = np.stack(self.LSTM["target"], axis=0)
         self.labels_LSTM = np.array(self.LSTM["labels"])
 
+    def findPosRateClustering(self) -> None:
+        """
+        Creates a feature vector for position decoder.
+        """
+        print("Creating similarity matrices from spatial firing rate data")
+        self.simMat4PRClustering = {lName: None for lName in self.lapTypeName}
+        self.simMat4PRClustering["concat"] = []
+        FVconcat2simMat = []
+        for lidx in np.unique(self.lapTypeArr):
+            curr_lName = self.lapTypeName[lidx - 1]
+            # curr_posRateByLap = self.PCLappedSess[f"lapType{lidx}"]["ByLap"]["posRates"]
+            FV = self.PCLappedSess[f"lapType{lidx}"]["posRates"]
+            (N_cells, P_bins) = FV.shape
+            # --- Feature Scaling (Min-Max per cell/feature) on Downsampled FV ---
+            FV_scaled = np.zeros_like(FV)
+            for cell_idx in range(N_cells):
+                cell_data = FV[cell_idx, :]
+                min_val = np.min(cell_data)
+                max_val = np.max(cell_data)
+                range_val = max_val - min_val
+
+                if range_val > 0:
+                    FV_scaled[cell_idx, :] = (cell_data - min_val) / range_val
+                else:
+                    FV_scaled[cell_idx, :] = 0
+            simMat = self.dep.calc_simMatrix(FV_scaled)
+            self.simMat4PRClustering[curr_lName] = simMat
+            FVconcat2simMat.append(FV_scaled)
+        FVconcat2simMat = np.concatenate(FVconcat2simMat, axis=1)
+        self.simMat4PRClustering["concat"] = self.dep.calc_simMatrix(FVconcat2simMat)
+        self.print_done_small_proc()
+
     def findOdorClustering(self) -> None:
         """
         Performs clustering analysis following the paper's methodology:
@@ -557,7 +607,7 @@ class TwoOdorDecoder(BC):
 
             """
             # see params4decoder in self.static_class_var_init for SVC and GBM parameters
-            accuracy, conf_matrices = GeneralDecoder.run_Decoder(
+            accuracy, conf_matrices, _ = GeneralDecoder.run_Decoder(
                 data_arr=self.normOdorPeaksNTimes,
                 label_arr=np.array(label),
                 num_folds=folds,
@@ -685,6 +735,28 @@ class TwoOdorDecoder(BC):
         )
         pass
 
+    # def DecodePosition(self) -> None:
+    #     """
+    #     Decodes the position using LSTM.
+    #     """
+    #     self.rprint("Decoding position")
+    #     self.PositionDecoderResults = {lName: {} for lName in self.lapTypeName}
+    #     for lName in self.lapTypeName:
+    #         accu, conf_matrices, medae_scores = GeneralDecoder.run_Decoder(
+    #             data_arr=self.FV4PositionDecoder[lName]["features"],
+    #             label_arr=self.FV4PositionDecoder[lName]["labels"],
+    #             num_folds=self.num_folds4switch,
+    #             decoder_type="KNN",
+    #             n_neighbors=10,
+    #             metric="cosine",
+    #         )
+    #         self.PositionDecoderResults[lName] = {
+    #             "accu": accu,
+    #             "conf_matrices": conf_matrices,
+    #             "medae_scores": medae_scores,
+    #         }
+    #     self.print_done_small_proc()
+
     def plotResults(self) -> None:
         """
         Plots the results of the decoder analysis.
@@ -705,8 +777,11 @@ class TwoOdorDecoder(BC):
         # similarity matrix with clustering
         self._plot_similarity_matrixWClustering()
 
-        # UMAP projection plot
-        self._plot_umap_projection()
+        # UMAP projection plot based on odor details
+        self._plot_umap_projection4OdorDetails()
+
+        # UMAP projection plot based on posRates
+        self._plot_umap_projection4PosRates()
 
         self.print_done_small_proc()
 
@@ -843,7 +918,7 @@ class TwoOdorDecoder(BC):
 
         self.print_wFrm("Plotting similarity matrix and weights")
 
-        cmap4labels = self.plot_params["cmap_categories"]
+        cmap4labels = self.plot_params["cmap"]["odors"]
 
         for idx, label_cat in enumerate(self.Labels.keys()):
             ax_top = top_axes[idx]  # Axis for similarity heatmap
@@ -867,7 +942,7 @@ class TwoOdorDecoder(BC):
                 fig=fig,
                 axis=ax_top,
                 data2plot=self.similarity_matrix,
-                cmap=self.plot_params["cmap"],
+                cmap=self.plot_params["cmap"]["imshow"],
                 return_im=True,
             )
 
@@ -945,12 +1020,11 @@ class TwoOdorDecoder(BC):
             fig, "Similarity_Matrix", figure_save_path=self.FigPath
         )
 
-    def _plot_umap_projection(self) -> None:
+    def _plot_umap_projection4OdorDetails(self) -> None:
         """
-        Performs UMAP dimensionality reduction and plots the 2D embedding,
-        colored by true labels.
+        Performs UMAP dimensionality reduction based on similarity matrix made for Odor Details (OdorPeaksNTimes) and plots the 2D embedding with true labels coloring.
         """
-        self.print_wFrm("Plotting UMAP projection")
+        self.print_wFrm("Plotting UMAP projection based on odor peaks & times")
         n_cats = len(self.Labels.keys())
         fig, axes = self.fig_tools.create_plt_subplots(
             ncols=n_cats, figsize=(6 * n_cats, 5), flatten=True
@@ -967,7 +1041,7 @@ class TwoOdorDecoder(BC):
         embedding = self.dep.UMAP_fit2distMatrix(distance_matrix)
 
         for idx, (ax, label_cat) in enumerate(zip(axes, self.Labels.keys())):
-            cmap4labels = self.plot_params["cmap_categories"]
+            cmap4labels = self.plot_params["cmap"]["odors"]
             true_label = self.Labels[label_cat].astype(int)
             unique_labels = np.unique(true_label).astype(int)
 
@@ -1016,14 +1090,189 @@ class TwoOdorDecoder(BC):
             ax.tick_params(axis="y", labelleft=False, left=False)
 
         fig.suptitle(
-            f"UMAP Projection - {self.folder_name}",
+            f"UMAP Projection (Odor Details) - {self.folder_name}",
             fontsize=self.plot_params["fsize"]["title"],
         )
 
         self.fig_tools.tighten_layoutWspecific_axes(coords2tighten=[0, 0, 1, 0.96])
 
         self.fig_tools.save_figure(
-            fig, "UMAP_Projection", figure_save_path=self.FigPath
+            fig, "UMAP_Projection_OdorDetails", figure_save_path=self.FigPath
+        )
+
+    def _plot_umap_projection4PosRates(self) -> None:
+        """
+        Performs UMAP dimensionality reduction based on similarity matrix made for Position Rates (PCLappedSess) and plots the 2D embedding with true labels coloring.
+        """
+        self.print_wFrm("Plotting UMAP projection based on position rates")
+
+        self.print_wFrm("Finding distance matrix", frame_num=1)
+        distance_matrix = []
+        for lName in self.lapTypeName:
+            curr_simMat = self.simMat4PRClustering[lName]
+            curr_distMat = self.dep.create_distance_matrix_from_similarity_matrix(
+                curr_simMat
+            )
+            distance_matrix.append(curr_distMat)
+
+        dist4concat = self.dep.create_distance_matrix_from_similarity_matrix(
+            self.simMat4PRClustering["concat"]
+        )
+
+        self.print_wFrm("Finding UMAP embedding", frame_num=1)
+        embeddings = []
+        for distMat in distance_matrix:
+            embedding = self.dep.UMAP_fit2distMatrix(distMat)
+            embeddings.append(embedding)
+
+        embedding_concat = self.dep.UMAP_fit2distMatrix(dist4concat)
+
+        fig, ax = self.fig_tools.create_plt_subplots(
+            ncols=2, flatten=True, figsize=(12, 8)
+        )
+
+        ax4mult = ax[0]
+        ax4single = ax[1]
+
+        cmap4labels = self.plot_params["cmap"]["posrates"]
+
+        cmap4cellTypes = self.plot_params["cmap"]["cellTypes"]
+
+        colors = [cmap4labels(int(idx)) for idx in range(len(self.lapTypeName))]
+
+        colors4cellTypes = [cmap4cellTypes(int(idx)) for idx in range(3)]
+
+        cueEmbeds2use = []
+        for idx, embedding in enumerate(embeddings):
+            cue_idx = self.CueCellTableDict["CUE_IDX"]
+            place_idx = self.CueCellTableDict["PLACE_IDX"]
+            cue_embedding = embedding[cue_idx, :]
+            place_embedding = embedding[place_idx, :]
+            rest_embedding = embedding[
+                ~np.isin(np.arange(embedding.shape[0]), cue_idx)
+                & ~np.isin(np.arange(embedding.shape[0]), place_idx),
+                :,
+            ]
+            ax4mult.scatter(
+                cue_embedding[:, 0],
+                cue_embedding[:, 1],
+                c=colors[idx],
+                s=self.plot_params["scatter"]["s_small"] + 5,
+                alpha=self.plot_params["scatter"]["alpha"],
+                marker="*",
+            )
+            ax4mult.scatter(
+                place_embedding[:, 0],
+                place_embedding[:, 1],
+                c=colors[idx],
+                s=self.plot_params["scatter"]["s_small"],
+                alpha=self.plot_params["scatter"]["alpha"],
+                marker="+",
+            )
+            ax4mult.scatter(
+                rest_embedding[:, 0],
+                rest_embedding[:, 1],
+                c=colors[idx],
+                s=self.plot_params["scatter"]["s_small"],
+                alpha=self.plot_params["scatter"]["alpha"],
+                marker="o",
+            )
+            cueEmbeds2use.append(cue_embedding)
+
+        # for cell_idx in range(self.CueCellTableDict["CUE"]):
+        #     x_coords = [embedding[cell_idx, 0] for embedding in cueEmbeds2use]
+        #     y_coords = [embedding[cell_idx, 1] for embedding in cueEmbeds2use]
+        #     ax4mult.plot(
+        #         x_coords,
+        #         y_coords,
+        #         color="grey",  # Or another subtle color
+        #         linewidth=0.5,  # Make lines thin
+        #         # marker='o', # Optionally add small markers on the line vertices
+        #         # markersize=1
+        #     )
+
+        cue_embed_concat = embedding_concat[cue_idx, :]
+        place_embed_concat = embedding_concat[place_idx, :]
+        rest_embed_concat = embedding_concat[
+            ~np.isin(np.arange(embedding_concat.shape[0]), cue_idx)
+            & ~np.isin(np.arange(embedding_concat.shape[0]), place_idx),
+            :,
+        ]
+
+        ax4single.scatter(
+            cue_embed_concat[:, 0],
+            cue_embed_concat[:, 1],
+            c=colors4cellTypes[0],
+            s=self.plot_params["scatter"]["s_small"] + 5,
+            alpha=self.plot_params["scatter"]["alpha"],
+            marker="*",
+        )
+        ax4single.scatter(
+            place_embed_concat[:, 0],
+            place_embed_concat[:, 1],
+            c=colors4cellTypes[1],
+            s=self.plot_params["scatter"]["s_small"],
+            alpha=self.plot_params["scatter"]["alpha"],
+            marker="x",
+        )
+        ax4single.scatter(
+            rest_embed_concat[:, 0],
+            rest_embed_concat[:, 1],
+            c=colors4cellTypes[2],
+            s=self.plot_params["scatter"]["s_small"],
+            alpha=self.plot_params["scatter"]["alpha"],
+            marker="o",
+        )
+
+        # Create legend
+        legend_elements = []
+        facecolor = colors
+        legend_elements = self.fig_tools.create_legend_patch_fLoop(
+            facecolor=facecolor,
+            label=[lName for lName in self.lapTypeName],
+            edgecolor=facecolor,
+            marker=["o"] * len(facecolor),
+        )
+        ax4mult.legend(handles=legend_elements)
+
+        legend_elements4single = []
+        facecolor4single = colors4cellTypes
+        legend_elements4single = self.fig_tools.create_legend_patch_fLoop(
+            facecolor=facecolor4single,
+            label=["cue", "place", "NA"],
+            edgecolor=facecolor4single,
+            marker=["*", "x", "o"],
+        )
+        ax4single.legend(handles=legend_elements4single)
+
+        ax4mult.set_title(
+            "lapTypes separated", fontsize=self.plot_params["fsize"]["title"]
+        )
+        ax4single.set_title("concatenated", fontsize=self.plot_params["fsize"]["title"])
+
+        for a in [ax4mult, ax4single]:
+            a.set_xlabel(
+                "UMAP 1",
+                fontsize=self.plot_params["fsize"]["axis"],
+                fontweight="bold",
+            )
+            a.set_ylabel(
+                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
+            )
+            a.spines["top"].set_visible(False)
+            a.spines["right"].set_visible(False)
+
+            # Remove tick labels (numbers) and tick marks from axes
+            a.tick_params(axis="x", labelbottom=False, bottom=False)
+            a.tick_params(axis="y", labelleft=False, left=False)
+
+        fig.suptitle(
+            f"UMAP Projection (Position Rates) - {self.folder_name}",
+            fontsize=self.plot_params["fsize"]["title"],
+        )
+
+        self.fig_tools.save_figure(
+            fig, "UMAP_Projection_PosRates", figure_save_path=self.FigPath
         )
 
     def _plotConfusionMatrix(self) -> None:
@@ -1125,6 +1374,117 @@ class TwoOdorDecoder(BC):
         self.fig_tools.save_figure(
             fig, f"Confusion_Matrix_{self.decoder_type}", figure_save_path=self.FigPath
         )
+
+    def analyze_tuning_similarity_by_cell_type(self):
+        """
+        Calculates and compares the average spatial tuning similarity (from concatenated
+        tuning curves across lap types) within and between different cell types
+        (Cue, Place, NA).
+        """
+        self.rprint("Analyzing spatial tuning similarity by cell type:")
+
+        # --- 1. Get Data ---
+        sim_matrix = self.simMat4PRClustering.get("concat", None)
+        cell_dict = self.CueCellTableDict
+
+        if sim_matrix is None:
+            self.print_wFrm(
+                "Concatenated similarity matrix not found. Skipping analysis.",
+                frame_num=1,
+            )
+            return None  # Or raise an error
+
+        if not cell_dict:
+            self.print_wFrm(
+                "CueCellTableDict not found. Skipping analysis.", frame_num=1
+            )
+            return None
+
+        cue_indices = np.array(cell_dict.get("CUE_IDX", []))
+        place_indices = np.array(cell_dict.get("PLACE_IDX", []))
+        n_cells = sim_matrix.shape[0]
+        all_indices = np.arange(n_cells)
+        na_indices = np.setdiff1d(
+            all_indices, np.concatenate((cue_indices, place_indices))
+        )
+
+        self.print_wFrm(
+            f"Found {len(cue_indices)} Cue, {len(place_indices)} Place, {len(na_indices)} NA cells.",
+            frame_num=1,
+        )
+
+        results = {}
+
+        # --- 2. Define Helper to Get Similarities ---
+        def get_similarity_values(indices1, indices2, matrix):
+            """Extracts similarity values between two sets of indices."""
+            if len(indices1) == 0 or len(indices2) == 0:
+                return np.array([])  # Return empty array if no cells in one group
+
+            # Use np.ix_ for safe indexing even if indices are empty
+            sub_matrix = matrix[np.ix_(indices1, indices2)]
+
+            if np.array_equal(indices1, indices2):
+                # Within-group: get upper triangle excluding diagonal (k=1)
+                if sub_matrix.shape[0] < 2:
+                    return np.array([])  # Need at least 2 cells for pairwise similarity
+                vals = sub_matrix[np.triu_indices_from(sub_matrix, k=1)]
+            else:
+                # Between-group: get all values from the rectangular submatrix
+                vals = sub_matrix.flatten()
+            return vals[~np.isnan(vals)]  # Remove NaNs if any
+
+        # --- 3. Calculate Within-Group Similarities ---
+        sim_within_cue = get_similarity_values(cue_indices, cue_indices, sim_matrix)
+        sim_within_place = get_similarity_values(
+            place_indices, place_indices, sim_matrix
+        )
+        sim_within_na = get_similarity_values(na_indices, na_indices, sim_matrix)
+
+        results["Within_Cue_Sim"] = sim_within_cue
+        results["Within_Place_Sim"] = sim_within_place
+        results["Within_NA_Sim"] = sim_within_na
+
+        # --- 4. Calculate Between-Group Similarities ---
+        sim_cue_place = get_similarity_values(cue_indices, place_indices, sim_matrix)
+        sim_cue_na = get_similarity_values(cue_indices, na_indices, sim_matrix)
+        sim_place_na = get_similarity_values(place_indices, na_indices, sim_matrix)
+
+        results["Cue_Place_Sim"] = sim_cue_place
+        results["Cue_NA_Sim"] = sim_cue_na
+        results["Place_NA_Sim"] = sim_place_na
+
+        # --- 5. Report Mean Similarities ---
+        self.print_wFrm("Mean Similarities (Concatenated Tuning Curves):", frame_num=1)
+        print_stats = lambda name, data: self.print_wFrm(
+            f"  {name:<15}: {np.mean(data):.3f} +/- {np.std(data) / np.sqrt(len(data)):.3f} (n={len(data)})"
+            if len(data) > 0
+            else f"  {name:<15}: N/A (no pairs)",
+            frame_num=2,
+        )
+
+        print_stats("Within Cue", sim_within_cue)
+        print_stats("Within Place", sim_within_place)
+        print_stats("Within NA", sim_within_na)
+        print_stats("Cue vs Place", sim_cue_place)
+        print_stats("Cue vs NA", sim_cue_na)
+        print_stats("Place vs NA", sim_place_na)
+
+        # --- 6. (Optional) Statistical Comparisons ---
+        self.print_wFrm("Statistical Comparisons (Mann-Whitney U):", frame_num=1)
+        print_comparison = lambda name, data1, data2: self.print_wFrm(
+            f"  {name:<25}: p = {mannwhitneyu(data1, data2, alternative='two-sided').pvalue:.4f}"
+            if len(data1) > 0 and len(data2) > 0
+            else f"  {name:<25}: N/A (insufficient data)",
+            frame_num=2,
+        )
+
+        print_comparison("Within-Cue vs Cue-Place", sim_within_cue, sim_cue_place)
+        print_comparison("Within-Place vs Cue-Place", sim_within_place, sim_cue_place)
+        print_comparison("Within-Cue vs Within-Place", sim_within_cue, sim_within_place)
+        # Add more comparisons as needed (e.g., involving NA cells)
+
+        self.print_done_small_proc()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
 
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
@@ -59,7 +60,7 @@ class GeneralDecoder:
             for C in t:
                 t.set_description(f"Evaluating C: {C:.4f}")
                 fold_accuracies = []
-                fold_accuracies, _ = GeneralDecoder.run_Decoder(
+                fold_accuracies, _, _ = GeneralDecoder.run_Decoder(
                     data_arr=data_arr,
                     label_arr=label_arr,
                     num_folds=num_folds,
@@ -87,7 +88,7 @@ class GeneralDecoder:
         data_arr: np.ndarray,
         label_arr: np.ndarray,
         num_folds: int,
-        decoder_type: Literal["SVC", "GBM", "NB"],
+        decoder_type: Literal["SVC", "GBM", "NB", "KNN"],
         random_state: int = 14,
         **kwargs,
     ) -> tuple:
@@ -117,9 +118,18 @@ class GeneralDecoder:
                 learning_rate = kwargs.get("learning_rate", 0.1)
             elif decoder_type == "NB":
                 pass
-        except KeyError:
+            elif decoder_type == "KNN":
+                n_neighbors = kwargs.get("n_neighbors", 5)
+                weights = kwargs.get("weights", "uniform")
+                metric = kwargs.get("metric", "cosine")
+        except Exception as e:
             raise ValueError(
-                "Unsupported decoder_type. Must be 'SVC' or 'GBM' or 'NB'."
+                f"Error processing decoder parameters for {decoder_type}: {e}. Check kwargs: {kwargs}"
+            )
+
+        if decoder_type not in ["SVC", "GBM", "NB", "KNN"]:
+            raise ValueError(
+                "Unsupported decoder_type. Must be 'SVC', 'GBM', 'NB', or 'KNN'."
             )
 
         cv = StratifiedKFold(
@@ -128,8 +138,11 @@ class GeneralDecoder:
 
         accuracy = []
         conf_matrices = []
+        medae_scores = []  # List to store MedAE scores across "timepoints"
+
         fold_accuracy = []
         fold_conf_matrices = []
+        fold_medae = []  # List to store MedAE for each fold
 
         for train, test in cv.split(data_arr, label_arr):
             XTrain = data_arr[train, :]
@@ -165,6 +178,12 @@ class GeneralDecoder:
                 nbmodel.fit(XTrain, YTrain)
 
                 predictions = nbmodel.predict(XTest)
+            elif decoder_type == "KNN":
+                knn_model = KNeighborsClassifier(
+                    n_neighbors=n_neighbors, weights=weights, metric=metric
+                )
+                knn_model.fit(XTrain, YTrain)
+                predictions = knn_model.predict(XTest)
 
             # get accuracy for the current fold
             acc = accuracy_score(YTest, predictions)
@@ -174,11 +193,16 @@ class GeneralDecoder:
             cm = confusion_matrix(YTest, predictions)
             fold_conf_matrices.append(cm)
 
-        # store the accuracy for the current timepoint
+            medae = np.median(np.abs(YTest - predictions))
+            fold_medae.append(medae)
+
+        # store the results for the current "timepoint"
         accuracy.append(fold_accuracy)
         conf_matrices.append(fold_conf_matrices)
+        medae_scores.append(fold_medae)
 
-        return np.array(accuracy), np.array(conf_matrices)
+        # Return numpy arrays for all metrics
+        return np.array(accuracy), np.array(conf_matrices), np.array(medae_scores)
 
     # @staticmethod
     # def decode_via_LSTM(
