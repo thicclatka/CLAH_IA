@@ -670,28 +670,33 @@ class CCF_Plotter(BC):
         type_order = ["CUE1", "CUE2", "BOTH", "TONE", "LED", "PLACE"]
 
         list_idc = []
-        for list_ind in [cue1, cue2, both_cues, led, tone, place]:
+        list_ind2check = [cue1, cue2, both_cues, led, tone, place]
+        for list_ind in list_ind2check:
             if list_ind is not None:
                 list_idc.append(list_ind)
-        cues2process = list(self.cue_types_set)
-        cues2process.sort()
-        cues2process = [cue for cue in type_order if cue in cues2process]
-
+        types2process = [
+            cue
+            for c_idx, cue in enumerate(type_order)
+            if list_ind2check[c_idx] is not None
+        ]
         fig, axes = self.fig_tools.create_plt_subplots(
-            nrows=len(cues2process), flatten=True
+            nrows=len(types2process), flatten=True
         )
 
         cts2plot = {}
-        for cell_idc in list_idc:
+        for cell_type, cell_idc in zip(types2process, list_idc):
+            if cell_type not in cts2plot.keys():
+                cts2plot[cell_type] = {}
             for cell in cell_idc:
                 cell2use = f"Cell_{cell}"
                 for cueType in self.dict_to_plot[cell2use].keys():
-                    if cueType not in cts2plot.keys():
-                        cts2plot[cueType] = []
-                    cts2plot[cueType].append(
+                    if cueType not in cts2plot[cell_type].keys():
+                        cts2plot[cell_type][cueType] = []
+                    cts2plot[cell_type][cueType].append(
                         np.nanmean(self.dict_to_plot[cell2use][cueType], axis=1)
                     )
         pass
+        # TODO: start plotting average CTS by cell type on 4/28/25
 
     def _cT_cA_plotSaver(
         self, fig: object, fname: str, suptitle: list = [], extra_txt: list = []
