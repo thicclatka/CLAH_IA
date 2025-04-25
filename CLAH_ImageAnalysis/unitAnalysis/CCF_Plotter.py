@@ -57,9 +57,16 @@ class CCF_Plotter(BC):
         self.title_fs = 18
         self.stitle_fs = 20
 
-        self.pcMarker = "+"
-        self.ccMarker = "*"
-        self.mcMarker = "x"
+        self.Markers = {
+            "PC": "+",
+            "CC": "*",
+            "MC": "x",
+            "CUE1": "1",
+            "CUE2": "2",
+            "CUE": "C",
+            "TONE": "T",
+            "LED": "L",
+        }
 
         self.cue_cell_color = self.fig_tools.hex_to_rgba(
             self.color_dict["red"], wAlpha=False
@@ -96,8 +103,8 @@ class CCF_Plotter(BC):
 
         # define cell categories & respective markers
         cellCategories = [
-            ("CUE", "Cue Cells", self.ccMarker),
-            ("PLACE", "Place Cells", self.pcMarker),
+            ("CUE", "Cue Cells", self.Markers["CC"]),
+            ("PLACE", "Place Cells", self.Markers["PC"]),
             ("START", "Start Cells", ""),
             ("NON", "NA Cells", ""),
         ]
@@ -105,7 +112,7 @@ class CCF_Plotter(BC):
         self.mossyCheck = False
         if "MOSSY" in CueCellTable.keys():
             self.mossyCheck = True
-            cellCategories.append(("MOSSY", "Mossy Cells", self.mcMarker))
+            cellCategories.append(("MOSSY", "Mossy Cells", self.Markers["MC"]))
 
         proportions = []
         labels = []
@@ -114,7 +121,7 @@ class CCF_Plotter(BC):
             prop = CueCellTable[f"{key}_prop"]
             proportions.append(prop)
             marker_text = f" ({marker})" if marker else ""
-            labels.append(f"{label}{marker_text} - {prop*100:.1f}%")
+            labels.append(f"{label}{marker_text} - {prop * 100:.1f}%")
 
         wedges, _, autotexts = ax.pie(
             proportions,
@@ -145,26 +152,63 @@ class CCF_Plotter(BC):
             forPres=self.forPres,
         )
 
-    def _get_cell_str_with_marker(self, cell: str) -> str:
+    def _get_cell_str_with_marker(self, cell: str, latex: bool = False) -> str:
         """
-        Get the cell string with the appropriate marker.
+        Get the cell string with appropriate markers, formatted for Matplotlib's mathtext.
 
         Parameters:
-            cell (str): The cell string.
+            cell (str): The cell string (e.g., "Cell_1").
 
         Returns:
-            str: The cell string with the appropriate marker.
+            str: The formatted cell string (e.g., r"Cell 1$\mathregular{^{\\ast12}}$").
         """
-        # cell is of form "Cell_#"
         cell_num = int(cell.split("_")[-1])
-        cell_str = cell.replace("_", " ")
-        if cell_num in self.CueCellTable["PLACE_IDX"]:
-            cell_str += self.pcMarker
-        elif cell_num in self.CueCellTable["CUE_IDX"]:
-            cell_str += self.ccMarker
-        elif self.mossyCheck and cell_num in self.CueCellTable["MOSSY_IDX"]:
-            cell_str += self.mcMarker
-        return cell_str
+        base_cell_str = cell.replace("_", " ")
+
+        marker_str = ""
+
+        is_cue_cell = cell_num in self.CueCellTable.get("CUE_IDX", [])
+        is_place_cell = cell_num in self.CueCellTable.get("PLACE_IDX", [])
+        is_mossy_cell = self.mossyCheck and cell_num in self.CueCellTable.get(
+            "MOSSY_IDX", []
+        )
+
+        superscript_markers = []
+        if is_cue_cell:  # Only add numeric/letter superscripts if it's a CUE cell
+            if "CUE1" in self.CueCellTable and cell_num in self.CueCellTable.get(
+                "CUE1_IDX", []
+            ):
+                superscript_markers.append("1")
+            if "CUE2" in self.CueCellTable and cell_num in self.CueCellTable.get(
+                "CUE2_IDX", []
+            ):
+                superscript_markers.append("2")
+            if "TONE" in self.CueCellTable and cell_num in self.CueCellTable.get(
+                "TONE_IDX", []
+            ):
+                superscript_markers.append("T")
+            if "LED" in self.CueCellTable and cell_num in self.CueCellTable.get(
+                "LED_IDX", []
+            ):
+                superscript_markers.append("L")
+
+        # Construct the marker string using mathtext format
+        if is_cue_cell and latex:
+            superscript_content = "".join(superscript_markers)
+            if superscript_content:
+                marker_str = r"$\mathregular{^{\ast " + superscript_content + r"}}$"
+            else:
+                marker_str = r"$\mathregular{^{\ast}}$"
+        elif is_cue_cell and not latex:
+            marker_str = self.Markers["CC"]
+        elif is_place_cell:
+            marker_str = self.Markers["PC"]
+        elif is_mossy_cell:
+            marker_str = self.Markers["MC"]
+        # else marker_str remains "" for START or NON
+
+        # Return combined string
+        return base_cell_str + marker_str
 
     def _setup_Fig_Axes_for_subplot(self) -> tuple[object, np.ndarray]:
         """
@@ -513,7 +557,7 @@ class CCF_Plotter(BC):
                     axes[i].plot(x_val, cell_cueTypes[cueType], label=cueType)
                     axes[i] = self._set_xticks(axes[i])
 
-                cell_str = self._get_cell_str_with_marker(cell)
+                cell_str = self._get_cell_str_with_marker(cell, latex=True)
                 axes[i].set_title(cell_str, fontsize=self.title_fs)
 
             # Remove unused subplots
@@ -574,7 +618,7 @@ class CCF_Plotter(BC):
                             "Amplitude (norm to baseline)", fontsize=self.axis_fs
                         )
             axes[i].set_title(
-                self._get_cell_str_with_marker(cell), fontsize=self.title_fs
+                self._get_cell_str_with_marker(cell, latex=True), fontsize=self.title_fs
             )
         # Remove unused subplots
         for j in range(i + 1, len(axes)):
@@ -820,9 +864,9 @@ class CCF_Plotter(BC):
         for cell, diff in OptoDiff.items():
             cell_num = int(cell.split("_")[-1])
             if cell_num in self.CueCellTable["PC_IDX"]:
-                cell_num = f"{cell_num}{self.pcMarker}"
+                cell_num = f"{cell_num}{self.Markers['PC']}"
             elif cell_num in self.CueCellTable["CUE_IDX"]:
-                cell_num = f"{cell_num}{self.ccMarker}"
+                cell_num = f"{cell_num}{self.Markers['CC']}"
             else:
                 cell_num = f"{cell_num}"
 
@@ -860,8 +904,8 @@ class CCF_Plotter(BC):
             sparse_labels = [
                 cell_num
                 if index % n == 0
-                else (self.ccMarker if self.ccMarker in cell_num else "")
-                or (self.pcMarker if self.pcMarker in cell_num else "")
+                else (self.Markers["CC"] if self.Markers["CC"] in cell_num else "")
+                or (self.Markers["PC"] if self.Markers["PC"] in cell_num else "")
                 for index, cell_num in enumerate(cell_nums)
             ]
             axes.set_xticks(range(len(cell_nums)))
