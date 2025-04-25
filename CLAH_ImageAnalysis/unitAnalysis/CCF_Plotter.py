@@ -695,6 +695,9 @@ class CCF_Plotter(BC):
                     cts2plot[cell_type][cueType].append(
                         np.nanmean(self.dict_to_plot[cell2use][cueType], axis=1)
                     )
+        for cell_type in cts2plot.keys():
+            for cueType in cts2plot[cell_type].keys():
+                cts2plot[cell_type][cueType] = np.array(cts2plot[cell_type][cueType])
         pass
         # TODO: start plotting average CTS by cell type on 4/28/25
 
