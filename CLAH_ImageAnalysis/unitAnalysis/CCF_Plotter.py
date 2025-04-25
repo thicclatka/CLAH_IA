@@ -488,6 +488,7 @@ class CCF_Plotter(BC):
         SEM: bool = False,
         VIO: bool = False,
         OPTO: str | None = None,
+        plot_by_cell_type: bool = False,
     ):
         """
         Plot cue-triggered signal or cue amplitude.
@@ -499,6 +500,7 @@ class CCF_Plotter(BC):
             SEM (bool, optional): If True, plot a single subplot figure with all cells using SEM. Defaults to False.
             VIO (bool, optional): If True, plot a single subplot figure with all cells using Violin Plot. Defaults to False.
             OPTO (str | None, optional): If provided, the plot will be saved with the specified opto type. Defaults to None.
+            plot_by_cell_type (bool, optional): If True, plot the cue-triggered signal for each cell type. Defaults to False.
         """
 
         # store stuff into self
@@ -532,6 +534,9 @@ class CCF_Plotter(BC):
             self._plot_SEMcueTrigSig_OR_VioPlotcueAmp()
         else:  # Plot for each cue type
             self._plot_cueTrigSig_CTSuplot_eachCell()
+
+        if plot_by_cell_type:
+            self._plot_cueTrigSig_byCellType()
 
     def _plot_cueTrigSig_CTSuplot_eachCell(self) -> None:
         """
@@ -632,6 +637,61 @@ class CCF_Plotter(BC):
             suptitle = f"{suptitle}_{self.OPTO}"
         self._cT_cA_plotSaver(fig=fig, fname=self.fname, extra_txt=suptitle)
         self._create_sep_legend()
+
+    def _plot_cueTrigSig_byCellType(self) -> None:
+        """
+        Plot cue-triggered signals for each cell type.
+        """
+        cues2consider = [
+            cue
+            for cue in self.cue_types_set
+            if "OMIT" not in cue and "SWITCH" not in cue
+        ]
+        if len(cues2consider) == 2:
+            both_cues = set(self.CueCellTable["CUE1_IDX"]) & set(
+                self.CueCellTable["CUE2_IDX"]
+            )
+            cue1 = list(set(self.CueCellTable["CUE1_IDX"]) - both_cues)
+            cue2 = list(set(self.CueCellTable["CUE2_IDX"]) - both_cues)
+            both_cues = list(both_cues)
+            both_cues.sort()
+            cue1.sort()
+            cue2.sort()
+            led, tone = None, None
+        elif len(cues2consider) == 1:
+            cue1 = list(self.CueCellTable["CUE1_IDX"])
+            both_cues, cue2, led, tone = None, None, None, None
+            cue1.sort()
+        elif len(cues2consider) == 3:
+            # TODO: implement for 3 cue version
+            raise NotImplementedError("3 cue version not implemented yet")
+
+        place = self.CueCellTable["PLACE_IDX"]
+        type_order = ["CUE1", "CUE2", "BOTH", "TONE", "LED", "PLACE"]
+
+        list_idc = []
+        for list_ind in [cue1, cue2, both_cues, led, tone, place]:
+            if list_ind is not None:
+                list_idc.append(list_ind)
+        cues2process = list(self.cue_types_set)
+        cues2process.sort()
+        cues2process = [cue for cue in type_order if cue in cues2process]
+
+        fig, axes = self.fig_tools.create_plt_subplots(
+            nrows=len(cues2process), flatten=True
+        )
+
+        cts2plot = {}
+        for cell_idc in list_idc:
+            for cell in cell_idc:
+                cell2use = f"Cell_{cell}"
+                for cueType in self.dict_to_plot[cell2use].keys():
+                    if cueType not in cts2plot.keys():
+                        cts2plot[cueType] = []
+                    cts2plot[cueType].append(
+                        np.nanmean(self.dict_to_plot[cell2use][cueType], axis=1)
+                    )
+        pass
 
     def _cT_cA_plotSaver(
         self, fig: object, fname: str, suptitle: list = [], extra_txt: list = []

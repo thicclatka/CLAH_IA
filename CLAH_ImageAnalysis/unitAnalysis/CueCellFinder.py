@@ -116,15 +116,15 @@ class CueCellFinder(CCF_Utils):
         # create CueCellInd
         self._init_CueCellInd_for_Start_n_Mid()
 
-        for cc_types in self.CueCellInd:
-            if self.CueCellInd[cc_types].size > 0:
-                self.Plotter.plotUnitByTuning(
-                    posRatesRef=self.posRatesRef,
-                    posRatesNonRef=self.posRatesNonRef,
-                    IndToPlot=self.CueCellInd[cc_types],
-                    CC_Type=cc_types,
-                    fig_name=f"{cc_types}CueCells",
-                )
+        # for cc_types in self.CueCellInd:
+        #     if self.CueCellInd[cc_types].size > 0:
+        #         self.Plotter.plotUnitByTuning(
+        #             posRatesRef=self.posRatesRef,
+        #             posRatesNonRef=self.posRatesNonRef,
+        #             IndToPlot=self.CueCellInd[cc_types],
+        #             CC_Type=cc_types,
+        #             fig_name=f"{cc_types}CueCells",
+        #         )
 
     def _find_midFR_2xMethod(self, edge: int = 5, isInfRatio: int = 25) -> None:
         """
@@ -488,7 +488,11 @@ class CueCellFinder(CCF_Utils):
                 "Mean cueTrigSig (1 Fig; subplots by cell with avgCTS by cueType)"
             )
             self.Plotter.plot_cueTrigSig_OR_cueAmp(
-                self.cueTrigSig.copy(), "cueTrigSig", ind=self.ind, SEM=True
+                self.cueTrigSig.copy(),
+                "cueTrigSig",
+                ind=self.ind,
+                SEM=True,
+                plot_by_cell_type=True,
             )
         else:
             self.print_wFrm("No cueTrigSig to plot...skipping")
