@@ -148,11 +148,16 @@ class TwoOdorDecoder(BC):
             "patience": 10,
         }
 
+        self.cellTypes = ["CUE1", "CUE2", "BOTHCUES", "PLACE"]
+        self.cellTypes_wNon = ["CUE1", "CUE2", "BOTHCUES", "PLACE", "NON"]
+
         self.plot_params = {
             "bar": {
                 "alpha": 0.7,
                 "width": 0.2,
                 "offset": 0.1,
+                "offset2": 0.05,
+                "width2": 0.1,
                 "hatch": "//",
             },
             "scatter": {
@@ -168,11 +173,11 @@ class TwoOdorDecoder(BC):
             "cmap": {
                 "imshow": "magma",
                 "odors": self.fig_tools.create_cmap4categories(num_categories=4),
-                "posrates": self.fig_tools.create_cmap4categories(
-                    num_categories=5, cmap_name="tab10"
-                ),
                 "cellTypes": self.fig_tools.create_cmap4categories(
-                    num_categories=3, cmap_name="tab20"
+                    num_categories=len(self.cellTypes), cmap_name="tab20"
+                ),
+                "cellTypes_wNon": self.fig_tools.create_cmap4categories(
+                    num_categories=len(self.cellTypes_wNon), cmap_name="tab20"
                 ),
             },
             "locator": {
@@ -180,6 +185,12 @@ class TwoOdorDecoder(BC):
                 "pad": 0.05,
             },
             "jitter": 0.02,
+            "markers": {
+                "CUE1": "$1$",
+                "CUE2": "$2$",
+                "BOTHCUES": "$B$",
+                "PLACE": "$P$",
+            },
         }
 
     def forLoop_var_init(self, sess_idx: int, sess_num: int) -> None:
@@ -228,9 +239,12 @@ class TwoOdorDecoder(BC):
         for file_type in file_types:
             self._import_file_type(file_type)
 
-        CCTD = self.findLatest(["CueCellTableDict"], path2check="Figures")
-        with open(CCTD, "rb") as f:
-            self.CueCellTableDict = json.load(f)
+        # import cell type table as self.CueCellTableDict
+        self._import_CellTypeTable()
+
+        self.cellTypeInds = {
+            ctype: self.CueCellTableDict[f"{ctype}_IDX"] for ctype in self.cellTypes
+        }
 
         ## extract lapCue from CSS
         self.lapCue = self.CSS["lapCue"]
@@ -263,6 +277,28 @@ class TwoOdorDecoder(BC):
         setattr(self, file_type, self.load_file(latest_file))
         self.print_wFrm(f"Loaded {file_type:<3}: {latest_file}")
 
+    def _import_CellTypeTable(self) -> None:
+        """
+        Imports the cell type table.
+        """
+        CCT = self.findLatest(["CueCellTableDict"], path2check="Figures")
+        with open(CCT, "rb") as f:
+            self.CueCellTableDict = json.load(f)
+
+        both_cue = list(
+            set(self.CueCellTableDict["CUE1_IDX"])
+            & set(self.CueCellTableDict["CUE2_IDX"])
+        )
+        self.CueCellTableDict["CUE1_IDX"] = list(
+            set(self.CueCellTableDict["CUE1_IDX"]) - set(both_cue)
+        )
+        self.CueCellTableDict["CUE2_IDX"] = list(
+            set(self.CueCellTableDict["CUE2_IDX"]) - set(both_cue)
+        )
+        self.CueCellTableDict["BOTHCUES_IDX"] = both_cue
+        for key in ["CUE1_IDX", "CUE2_IDX", "BOTHCUES_IDX"]:
+            self.CueCellTableDict[key].sort()
+
     def findOdorTimes(self) -> None:
         """
         Finds the odor times and labels.
@@ -293,6 +329,10 @@ class TwoOdorDecoder(BC):
         switch_lap = _find_switch_lap(lapTypeArr, lapTypeName)
 
         all_odor_times = np.array([]).reshape(0, 5)
+
+        self.plot_params["cmap"]["lapType"] = self.fig_tools.create_cmap4categories(
+            num_categories=len(lapTypeName), cmap_name="tab20"
+        )
 
         # create an array such that:
         # 0th column is cue time
@@ -478,23 +518,27 @@ class TwoOdorDecoder(BC):
         self.simMat4PRClustering["concat"] = self.dep.calc_simMatrix(TC2simMatConcat)
 
         N_cells = len(self.simMat4PRClustering["concat"])
-        cellType_labels = np.full(N_cells, np.nan)
+        true_cellTypeLabel = np.full(N_cells, np.nan)
         for c in range(N_cells):
-            if c in self.CueCellTableDict["CUE_IDX"]:
-                cellType_labels[c] = 0
-            elif c in self.CueCellTableDict["PLACE_IDX"]:
-                cellType_labels[c] = 1
+            if c in self.cellTypeInds["CUE1"]:
+                true_cellTypeLabel[c] = 0
+            elif c in self.cellTypeInds["CUE2"]:
+                true_cellTypeLabel[c] = 1
+            elif c in self.cellTypeInds["BOTHCUES"]:
+                true_cellTypeLabel[c] = 2
+            elif c in self.cellTypeInds["PLACE"]:
+                true_cellTypeLabel[c] = 3
             else:
-                cellType_labels[c] = 2
+                true_cellTypeLabel[c] = 4
+        self.true_cellTypeLabel = true_cellTypeLabel
 
-        self.cluster_labels4PR = self.dep.SpectralClustering_fit2simMatrix(
-            similarity_matrix=self.simMat4PRClustering["concat"],
-            n_clusters=len(np.unique(cellType_labels)),
-            random_state=self.random_state,
-        )
-        self.cluster_accuracy4PR = self.dep.determineSpectralClustering_accuracy(
-            true_labels=cellType_labels,
-            cluster_labels=self.cluster_labels4PR,
+        self.cluster_labels4PR, self.cluster_accuracy4PR = (
+            self.dep.SpectralClustering_fit2simMatrix(
+                similarity_matrix=self.simMat4PRClustering["concat"],
+                n_clusters=len(np.unique(true_cellTypeLabel)),
+                random_state=self.random_state,
+                true_labels=true_cellTypeLabel,
+            )
         )
 
         self.DistanceMapBTW_BCnSW = None
@@ -528,7 +572,7 @@ class TwoOdorDecoder(BC):
         maxDiffs = {key: [] for key in loc_keys}
         minDiffs = {key: [] for key in loc_keys}
         minmaxDiffs = {key: [] for key in loc_keys}
-        locations = {"L1": slice(15, 40), "L2": slice(60, 80)}
+        locations = {"L1": slice(10, 40), "L2": slice(60, 90)}
         for c in range(N_cells):
             for key, loc_slice in locations.items():
                 maxD = np.max(diff[c, loc_slice])
@@ -536,11 +580,61 @@ class TwoOdorDecoder(BC):
                 maxDiffs[key].append(maxD)
                 minDiffs[key].append(minD)
                 minmaxDiffs[key].append(
-                    (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)))
+                    (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
                 )
         maxDiffs = {key: np.array(maxDiffs[key]) for key in loc_keys}
         minDiffs = {key: np.array(minDiffs[key]) for key in loc_keys}
         minmaxDiffs = {key: np.array(minmaxDiffs[key]) for key in loc_keys}
+
+        self.cluster_labels4BC_SW = {}
+        self.cluster_accuracy4BC_SW = {}
+        for metric in self.DistanceMapBTW_BCnSW.keys():
+            if metric == "EUCLID":
+                (
+                    self.cluster_labels4BC_SW[metric],
+                    self.cluster_accuracy4BC_SW[metric],
+                ) = self.dep.KMeans_fit(
+                    array=diff,
+                    n_clusters=len(np.unique(true_cellTypeLabel)),
+                    random_state=self.random_state,
+                    true_labels=true_cellTypeLabel,
+                )
+            elif metric == "COSINE":
+                (
+                    self.cluster_labels4BC_SW[metric],
+                    self.cluster_accuracy4BC_SW[metric],
+                ) = self.dep.SpectralClustering_fit2simMatrix(
+                    similarity_matrix=self.dep.calc_simMatrix(diff),
+                    n_clusters=len(np.unique(true_cellTypeLabel)),
+                    random_state=self.random_state,
+                    true_labels=true_cellTypeLabel,
+                )
+            elif metric == "1-CORR":
+                # Cluster based on the correlation similarity *between difference vectors*
+                # Calculate pairwise Pearson correlations between the rows of 'diff'
+                correlation_matrix = np.corrcoef(diff)
+                # Handle potential NaNs if rows are constant or all-zero
+                correlation_matrix = np.nan_to_num(correlation_matrix)
+                # Shift correlation [-1, 1] to similarity [0, 1]
+                similarity_matrix_corr = (correlation_matrix + 1) / 2
+
+                (
+                    self.cluster_labels4BC_SW[metric],
+                    self.cluster_accuracy4BC_SW[metric],
+                ) = self.dep.SpectralClustering_fit2simMatrix(
+                    similarity_matrix=similarity_matrix_corr,  # Use correlation-based similarity
+                    n_clusters=len(np.unique(true_cellTypeLabel)),
+                    random_state=self.random_state,
+                    true_labels=true_cellTypeLabel,
+                    # No 'metric' argument needed here as we provide the similarity matrix
+                )
+
+            self.cluster_labels4BC_SW[metric] = (
+                self.dep.map_cluster_labels_to_true_labels(
+                    true_labels=true_cellTypeLabel,
+                    cluster_labels=self.cluster_labels4BC_SW[metric],
+                )
+            )
 
         self.BCSW_comparison = {
             "DIFF": diff,
@@ -575,17 +669,12 @@ class TwoOdorDecoder(BC):
             ("ODORSwSWITCH", int(len(np.unique(self.Labels["ODORSwSWITCH"])))),
         ]:
             # Perform spectral clustering
-            self.cluster_labels[label_cat] = self.dep.SpectralClustering_fit2simMatrix(
-                similarity_matrix=self.similarity_matrix,
-                n_clusters=n_clusters,
-                random_state=self.random_state,
-            )
-
-            # Calculate accuracy & get row & col indices from linear_sum_assignment of confusion matrix
-            self.clustering_accuracy[label_cat] = (
-                self.dep.determineSpectralClustering_accuracy(
+            self.cluster_labels[label_cat], self.clustering_accuracy[label_cat] = (
+                self.dep.SpectralClustering_fit2simMatrix(
+                    similarity_matrix=self.similarity_matrix,
+                    n_clusters=n_clusters,
+                    random_state=self.random_state,
                     true_labels=self.Labels[label_cat],
-                    cluster_labels=self.cluster_labels[label_cat],
                 )
             )
 
@@ -777,6 +866,12 @@ class TwoOdorDecoder(BC):
 
         # histogram of distance maps
         self._plot_histograms4DistanceMaps()
+
+        # plot minmax diff
+        self._plot_minmax_diff()
+
+        # plot tuning similarity by cell type
+        self.analyzing_BCSwitchTuning()
 
         self.print_done_small_proc()
 
@@ -1129,77 +1224,36 @@ class TwoOdorDecoder(BC):
         ax4mult = ax[0]
         ax4single = ax[1]
 
-        cmap4labels = self.plot_params["cmap"]["posrates"]
+        cmap4lapType = self.plot_params["cmap"]["lapType"]
 
         cmap4cellTypes = self.plot_params["cmap"]["cellTypes"]
 
-        colors = [cmap4labels(int(idx)) for idx in range(len(self.lapTypeName))]
+        colors = [cmap4lapType(int(idx)) for idx in range(len(self.lapTypeName))]
 
-        colors4cellTypes = [cmap4cellTypes(int(idx)) for idx in range(3)]
+        colors4cellTypes = [
+            cmap4cellTypes(int(idx)) for idx in range(len(self.cellTypes))
+        ]
 
-        cueEmbeds2use = []
         for idx, embedding in enumerate(embeddings):
-            cue_idx = self.CueCellTableDict["CUE_IDX"]
-            place_idx = self.CueCellTableDict["PLACE_IDX"]
-            non_idx = self.CueCellTableDict["NON_IDX"]
+            for ctype in self.cellTypes:
+                ax4mult.scatter(
+                    embedding[self.cellTypeInds[ctype], 0],
+                    embedding[self.cellTypeInds[ctype], 1],
+                    color=colors[idx],
+                    s=self.plot_params["scatter"]["s_small"],
+                    alpha=self.plot_params["scatter"]["alpha"],
+                    marker=self.plot_params["markers"][ctype],
+                )
 
-            cue_embedding = embedding[cue_idx, :]
-            place_embedding = embedding[place_idx, :]
-            rest_embedding = embedding[non_idx, :]
-            ax4mult.scatter(
-                cue_embedding[:, 0],
-                cue_embedding[:, 1],
-                color=colors[idx],
-                s=self.plot_params["scatter"]["s_small"] + 5,
-                alpha=self.plot_params["scatter"]["alpha"],
-                marker="*",
-            )
-            ax4mult.scatter(
-                place_embedding[:, 0],
-                place_embedding[:, 1],
-                color=colors[idx],
+        for cidx, ctype in enumerate(self.cellTypes):
+            ax4single.scatter(
+                embedding_concat[self.cellTypeInds[ctype], 0],
+                embedding_concat[self.cellTypeInds[ctype], 1],
+                color=colors4cellTypes[cidx],
                 s=self.plot_params["scatter"]["s_small"],
                 alpha=self.plot_params["scatter"]["alpha"],
-                marker="+",
+                marker=self.plot_params["markers"][ctype],
             )
-            ax4mult.scatter(
-                rest_embedding[:, 0],
-                rest_embedding[:, 1],
-                color=colors[idx],
-                s=self.plot_params["scatter"]["s_small"],
-                alpha=self.plot_params["scatter"]["alpha"],
-                marker="o",
-            )
-            cueEmbeds2use.append(cue_embedding)
-
-        cue_embed_concat = embedding_concat[cue_idx, :]
-        place_embed_concat = embedding_concat[place_idx, :]
-        rest_embed_concat = embedding_concat[non_idx, :]
-
-        ax4single.scatter(
-            cue_embed_concat[:, 0],
-            cue_embed_concat[:, 1],
-            color=colors4cellTypes[0],
-            s=self.plot_params["scatter"]["s_small"] + 5,
-            alpha=self.plot_params["scatter"]["alpha"],
-            marker="*",
-        )
-        ax4single.scatter(
-            place_embed_concat[:, 0],
-            place_embed_concat[:, 1],
-            color=colors4cellTypes[1],
-            s=self.plot_params["scatter"]["s_small"],
-            alpha=self.plot_params["scatter"]["alpha"],
-            marker="x",
-        )
-        ax4single.scatter(
-            rest_embed_concat[:, 0],
-            rest_embed_concat[:, 1],
-            color=colors4cellTypes[2],
-            s=self.plot_params["scatter"]["s_small"],
-            alpha=self.plot_params["scatter"]["alpha"],
-            marker="o",
-        )
 
         # Create legend
         legend_elements = []
@@ -1214,11 +1268,12 @@ class TwoOdorDecoder(BC):
 
         legend_elements4single = []
         facecolor4single = colors4cellTypes
+        marker4single = [self.plot_params["markers"][ctype] for ctype in self.cellTypes]
         legend_elements4single = self.fig_tools.create_legend_patch_fLoop(
             facecolor=facecolor4single,
-            label=["cue", "place", "NA"],
+            label=self.cellTypes,
             edgecolor=facecolor4single,
-            marker=["*", "x", "o"],
+            marker=marker4single,
         )
         ax4single.legend(handles=legend_elements4single)
 
@@ -1359,78 +1414,73 @@ class TwoOdorDecoder(BC):
         self.print_wFrm("Plotting histograms of distance maps")
 
         fig, axes = self.fig_tools.create_plt_subplots(
-            nrows=len(self.DistanceMapBTW_BCnSW.keys()),
-            ncols=3,
+            ncols=len(self.DistanceMapBTW_BCnSW.keys()),
+            nrows=3,
             figsize=(20, 16),
         )
 
-        CC_idx = self.CueCellTableDict["CUE_IDX"]
-        PL_idx = self.CueCellTableDict["PLACE_IDX"]
         # NA_idx = self.CueCellTableDict["NON_IDX"]
 
-        # diff_embed = {
-        #     "euclidean": None,
-        #     "cosine": None,
-        #     "correlation": None,
-        # }
-        # for metric in diff_embed.keys():
-        #     diff_embed[metric] = self.dep.UMAP_fit2distMatrix(
-        #         self.BCSW_comparison["DIFF"], metric=metric
-        #     )
+        diff_embed = {
+            "euclidean": None,
+            "cosine": None,
+            "correlation": None,
+        }
+        for metric in diff_embed.keys():
+            diff_embed[metric] = self.dep.UMAP_fit2distMatrix(
+                self.BCSW_comparison["DIFF"], metric=metric
+            )
 
-        idx2use = [CC_idx, PL_idx]
-
-        labels_to_use = ["Cue", "Place"]
+        labels_to_use = self.cellTypes
         colors = [
             self.plot_params["cmap"]["cellTypes"](int(idx))
             for idx in range(len(labels_to_use))
         ]
 
-        histo_axes = axes[:, 0]
-        bar1_axes = axes[:, 1]
-        bar2_axes = axes[:, 2]
+        histo_axes = axes[0, :]
+        bar1_axes = axes[1, :]
+        umap_axes = axes[2, :]
 
         for idx, (key, distMap) in enumerate(self.DistanceMapBTW_BCnSW.items()):
             ax_histo = histo_axes[idx]
             ax_bar = bar1_axes[idx]
-            data_to_plot = [distMap[idx] for idx in idx2use]
-            means = [np.mean(data_to_plot[idx]) for idx in range(len(data_to_plot))]
-            sterr = [
-                np.std(data_to_plot[idx]) / np.sqrt(len(data_to_plot[idx]))
-                for idx in range(len(data_to_plot))
-            ]
-            # stat_cp, p_cp = mannwhitneyu(data_to_plot[0], data_to_plot[1])
-            # labels_to_use = ["Cue", "Place", "NA"]
-            # ax_histo.text(
-            #     0.5,
-            #     0.95,
-            #     f"MWU: {stat_cp:.3f}, p: {p_cp:.3f}",
-            #     transform=ax_histo.transAxes,
-            #     ha="center",
-            #     va="top",
-            #
-            self.fig_tools.create_sig_2samp_annotate(
-                ax=ax_bar,
-                arr0=data_to_plot[0],
-                arr1=data_to_plot[1],
-                coords=(0.5, None),
-                parametric=False,
-            )
+            data_to_plot = {
+                ctype: np.array([distMap[idx] for idx in self.cellTypeInds[ctype]])
+                for ctype in self.cellTypes
+            }
+            means = {
+                ctype: np.mean(data_to_plot[ctype])
+                for ctype in self.cellTypes
+                if len(data_to_plot[ctype]) > 0
+            }
+            sterr = {
+                ctype: np.std(data_to_plot[ctype]) / np.sqrt(len(data_to_plot[ctype]))
+                for ctype in self.cellTypes
+                if len(data_to_plot[ctype]) > 0
+            }
 
-            for idx in range(len(data_to_plot)):
+            # self.fig_tools.create_sig_2samp_annotate(
+            #     ax=ax_bar,
+            #     arr0=data_to_plot[0],
+            #     arr1=data_to_plot[1],
+            #     coords=(0.5, None),
+            #     parametric=False,
+            # )
+
+            for cidx, ctype in enumerate(self.cellTypes):
                 self.fig_tools.bar_plot(
                     ax=ax_bar,
-                    X=labels_to_use[idx],
-                    Y=means[idx],
-                    yerr=sterr[idx],
-                    color=colors[idx],
-                    alpha=self.plot_params["scatter"]["alpha"],
+                    X=labels_to_use[cidx],
+                    Y=means[ctype],
+                    yerr=sterr[ctype],
+                    color=colors[cidx],
+                    alpha=self.plot_params["bar"]["alpha"],
                 )
                 self.fig_tools.scatter_plot(
                     ax=ax_bar,
-                    X=idx,
-                    Y=data_to_plot[idx],
-                    color=colors[idx],
+                    X=cidx,
+                    Y=data_to_plot[ctype],
+                    color=colors[cidx],
                     s=self.plot_params["scatter"]["s_small"],
                     # alpha=self.plot_params["scatter"]["alpha"],
                 )
@@ -1440,8 +1490,13 @@ class TwoOdorDecoder(BC):
             ax_bar.set_xticks(np.arange(len(labels_to_use)))
             ax_bar.set_xticklabels(labels_to_use)
 
+            data4histo = [
+                data_to_plot[ctype]
+                for ctype in self.cellTypes
+                if len(data_to_plot[ctype]) > 0
+            ]
             ax_histo.hist(
-                data_to_plot,
+                data4histo,
                 bins=20,
                 color=colors,
                 label=labels_to_use,
@@ -1454,93 +1509,175 @@ class TwoOdorDecoder(BC):
             ax_histo.set_ylabel("Count")
             ax_histo.legend()
 
-        for idx, (diff_type, diff_name) in enumerate(
-            [
-                # ("MINDIFFLOC", "Min Difference Bin Location"),
-                # ("MAXDIFFLOC", "Max Difference Bin Location"),
-                ("MINMAXDIFF", "Min-Max Difference"),
-            ]
-        ):
-            bar2_ax = bar2_axes[idx]
+        for uidx, (key, embed) in enumerate(diff_embed.items()):
+            for iidx, cidx in enumerate(self.cellTypes):
+                umap_axes[uidx].scatter(
+                    embed[self.cellTypeInds[cidx], 0],
+                    embed[self.cellTypeInds[cidx], 1],
+                    color=colors[iidx],
+                    s=self.plot_params["scatter"]["s_large"],
+                )
+            if key == "euclidean":
+                accuKey2use = "EUCLID"
+            elif key == "cosine":
+                accuKey2use = "COSINE"
+            elif key == "correlation":
+                accuKey2use = "1-CORR"
+
+            umap_axes[uidx].set_title(
+                f"Clustering Accuracy: {self.cluster_accuracy4BC_SW[accuKey2use]:.3f}"
+            )
+            umap_axes[uidx].set_xlabel(
+                "UMAP 1",
+                fontsize=self.plot_params["fsize"]["axis"],
+                fontweight="bold",
+            )
+            umap_axes[uidx].set_ylabel(
+                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
+            )
+            umap_axes[uidx].spines["top"].set_visible(False)
+            umap_axes[uidx].spines["right"].set_visible(False)
+            # Remove tick labels (numbers) and tick marks from axes
+            umap_axes[uidx].tick_params(axis="x", labelbottom=False, bottom=False)
+            umap_axes[uidx].tick_params(axis="y", labelleft=False, left=False)
+
+        self.fig_tools.save_figure(
+            fig, "Distance_Maps_BothcuesVSswitch", figure_save_path=self.FigPath
+        )
+
+    def _plot_minmax_diff(self) -> None:
+        """
+        Plots the min-max difference between L1 and L2 for each cell type.
+        """
+        self.print_wFrm("Plotting min-max difference")
+        labels_to_use = self.cellTypes
+        colors = [
+            self.plot_params["cmap"]["cellTypes"](int(idx))
+            for idx in range(len(labels_to_use))
+        ]
+
+        barTypes = [("MINMAXDIFF", "Min-Max Difference")]
+        fig, ax = self.fig_tools.create_plt_subplots(nrows=len(barTypes))
+        bar2_ax = ax
+
+        for idx, (diff_type, diff_name) in enumerate(barTypes):
             bar2_ax.set_title(diff_name)
             bar2_ax.set_xlabel("Cell Type")
             bar2_ax.set_ylabel(diff_name)
             bar2_ax.set_xticks(np.arange(len(labels_to_use)))
             bar2_ax.set_xticklabels(labels_to_use)
 
-            for iidx, cidx in enumerate(idx2use):
-                data2use_L1 = self.BCSW_comparison[diff_type]["L1"][cidx]
-                data2use_L2 = self.BCSW_comparison[diff_type]["L2"][cidx]
-                means = [np.mean(data2use_L1), np.mean(data2use_L2)]
-                sterr = [
-                    np.std(data2use_L1) / np.sqrt(len(data2use_L1)),
-                    np.std(data2use_L2) / np.sqrt(len(data2use_L2)),
+            for cidx, ctype in enumerate(self.cellTypes):
+                data2use = [
+                    self.BCSW_comparison[diff_type]["L1"][self.cellTypeInds[ctype]],
+                    self.BCSW_comparison[diff_type]["L2"][self.cellTypeInds[ctype]],
                 ]
-                self.fig_tools.bar_plot(
-                    ax=bar2_ax,
-                    X=iidx - self.plot_params["bar"]["offset"],
-                    Y=means[0],
-                    yerr=sterr[0],
-                    color=colors[iidx],
-                    alpha=self.plot_params["bar"]["alpha"],
-                )
-                self.fig_tools.scatter_plot(
-                    ax=bar2_ax,
-                    X=iidx - self.plot_params["bar"]["offset"],
-                    Y=data2use_L1,
-                    color=colors[iidx],
-                    s=self.plot_params["scatter"]["s_small"],
-                    jitter=0,
-                )
-                self.fig_tools.bar_plot(
-                    ax=bar2_ax,
-                    X=iidx + self.plot_params["bar"]["offset"],
-                    Y=means[1],
-                    yerr=sterr[1],
-                    color=colors[iidx],
-                    alpha=self.plot_params["bar"]["alpha"],
-                    hatch=self.plot_params["bar"]["hatch"],
-                )
-                self.fig_tools.scatter_plot(
-                    ax=bar2_ax,
-                    X=iidx + self.plot_params["bar"]["offset"],
-                    Y=data2use_L2,
-                    color=colors[iidx],
-                    s=self.plot_params["scatter"]["s_small"],
-                    jitter=0,
-                )
+                means = [np.nanmean(data2use[0]), np.nanmean(data2use[1])]
+                sterr = [
+                    np.nanstd(data2use[0]) / np.sqrt(len(data2use[0])),
+                    np.nanstd(data2use[1]) / np.sqrt(len(data2use[1])),
+                ]
+                for iidx, (d2plot, mean, sterr) in enumerate(
+                    zip(data2use, means, sterr)
+                ):
+                    if iidx == 0:
+                        off = -1
+                    elif iidx == 1:
+                        off = 1
+                    self.fig_tools.bar_plot(
+                        ax=bar2_ax,
+                        X=cidx + off * self.plot_params["bar"]["offset"],
+                        Y=mean,
+                        yerr=sterr,
+                        width=self.plot_params["bar"]["width"],
+                        color=colors[cidx],
+                        alpha=self.plot_params["bar"]["alpha"],
+                    )
+                    self.fig_tools.scatter_plot(
+                        ax=bar2_ax,
+                        X=cidx + off * self.plot_params["bar"]["offset"],
+                        Y=d2plot,
+                        color=colors[cidx],
+                        s=self.plot_params["scatter"]["s_small"],
+                        jitter=0,
+                    )
                 bar2_ax.plot(
                     [
-                        iidx - self.plot_params["bar"]["offset"],
-                        iidx + self.plot_params["bar"]["offset"],
+                        cidx - self.plot_params["bar"]["offset"],
+                        cidx + self.plot_params["bar"]["offset"],
                     ],
-                    [data2use_L1, data2use_L2],
-                    color=colors[iidx],
+                    [data2use[0], data2use[1]],
+                    color=colors[cidx],
                 )
-        # for uidx, (key, embed) in enumerate(diff_embed.items()):
-        #     for iidx, cidx in enumerate(idx2use):
-        #         umap_axes[uidx].scatter(
-        #             embed[cidx, 0],
-        #             embed[cidx, 1],
-        #             color=colors[iidx],
-        #             s=self.plot_params["scatter"]["s_large"],
-        #         )
-        #     umap_axes[uidx].set_title(f"UMAP of Diff - {key}")
-        #     umap_axes[uidx].set_xlabel(
-        #         "UMAP 1",
-        #         fontsize=self.plot_params["fsize"]["axis"],
-        #         fontweight="bold",
-        #     )
-        #     umap_axes[uidx].set_ylabel(
-        #         "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
-        #     )
-        #     umap_axes[uidx].spines["top"].set_visible(False)
-        #     umap_axes[uidx].spines["right"].set_visible(False)
-        #     # Remove tick labels (numbers) and tick marks from axes
-        #     umap_axes[uidx].tick_params(axis="x", labelbottom=False, bottom=False)
-        #     umap_axes[uidx].tick_params(axis="y", labelleft=False, left=False)
+                bar2_ax.set_ylim(-1.1, 1.1)  # Adjust limits to make space
 
-        self.fig_tools.save_figure(fig, "Distance_Maps", figure_save_path=self.FigPath)
+                # Annotation for L1 dominance (top)
+                bar2_ax.annotate(
+                    "More L1 active",
+                    xy=(1.02, 0.9),
+                    xycoords="axes fraction",
+                    xytext=(10, 0),
+                    textcoords="offset points",
+                    ha="left",
+                    va="center",
+                    arrowprops=dict(arrowstyle="->", color="black"),
+                )
+
+                # Annotation for L2 dominance (bottom)
+                bar2_ax.annotate(
+                    "More L2 active",
+                    xy=(1.02, 0.1),
+                    xycoords="axes fraction",
+                    xytext=(10, 0),
+                    textcoords="offset points",
+                    ha="left",
+                    va="center",
+                    arrowprops=dict(arrowstyle="->", color="black"),
+                )
+
+        self.fig_tools.save_figure(fig, "MinMaxDiff", figure_save_path=self.FigPath)
+
+    def analyzing_BCSwitchTuning(self) -> None:
+        """
+        Analyzes the tuning similarity between different cell types.
+        """
+        self.print_wFrm("Plotting tuning similarity by cell type/cluster")
+        labels_to_use = self.cellTypes_wNon
+        colors = [
+            self.plot_params["cmap"]["cellTypes_wNon"](int(idx))
+            for idx in range(len(labels_to_use))
+        ]
+        fig, ax = self.fig_tools.create_plt_subplots()
+
+        PerBinTuning = np.zeros(
+            (len(labels_to_use), self.BCSW_comparison["DIFF"].shape[1])
+        )
+        for cidx, ctype in enumerate(np.unique(self.true_cellTypeLabel)):
+            cell_indices = np.where(self.true_cellTypeLabel == ctype)[0]
+            cell_tuning_per_bin = np.nanmean(
+                self.BCSW_comparison["DIFF"][cell_indices], axis=0
+            )
+            PerBinTuning[cidx, :] = cell_tuning_per_bin
+
+        im = self.fig_tools.plot_imshow(
+            fig=fig,
+            axis=ax,
+            data2plot=PerBinTuning,
+            cmap="RdYlGn",
+            aspect="auto",
+            title="BC-SW Tuning by cell type",
+            xlabel="Position",
+            ylabel="Cell Type",
+            yticks=np.arange(len(labels_to_use)),
+            return_im=True,
+        )
+
+        fig.colorbar(im, ax=ax, label="BC-SW Tuning")
+        ax.set_yticklabels(labels_to_use)
+
+        self.fig_tools.save_figure(
+            fig, "BCSwitch_Tuning", figure_save_path=self.FigPath
+        )
 
     def analyze_tuning_similarity_by_cell_type(self):
         """

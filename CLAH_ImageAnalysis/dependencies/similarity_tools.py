@@ -1,5 +1,5 @@
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import SpectralClustering
+from sklearn.cluster import SpectralClustering, KMeans
 from sklearn.linear_model import LinearRegression
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
@@ -32,6 +32,7 @@ def SpectralClustering_fit2simMatrix(
     similarity_matrix: np.ndarray,
     n_clusters: int,
     random_state: int = 42,
+    true_labels: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Fit a spectral clustering model to a similarity matrix.
@@ -43,13 +44,54 @@ def SpectralClustering_fit2simMatrix(
     Returns:
         np.ndarray: Cluster labels of shape (n_samples,)
     """
+    # check if matrix is actually a similarity matrix
+    if similarity_matrix.shape[0] != similarity_matrix.shape[1]:
+        raise ValueError("Similarity matrix must be square")
+    if np.any(similarity_matrix < 0):
+        raise ValueError("Similarity matrix must be non-negative")
+    if np.any(similarity_matrix > 1):
+        raise ValueError("Similarity matrix must be normalized to [0, 1]")
+
     spectral = SpectralClustering(
         n_clusters=n_clusters,
         affinity="precomputed",
         random_state=random_state,
     )
     cluster_labels = spectral.fit_predict(similarity_matrix)
-    return cluster_labels
+
+    accuracy = None
+    if true_labels is not None:
+        accuracy = determine_fit_accuracy(
+            true_labels=true_labels, cluster_labels=cluster_labels
+        )
+    return cluster_labels, accuracy
+
+
+def KMeans_fit(
+    array: np.ndarray,
+    n_clusters: int,
+    random_state: int = 42,
+    true_labels: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Fit a KMeans model to a given array.
+
+    Parameters:
+        array (np.ndarray): Input array of shape (n_samples, n_features)
+        n_clusters (int): Number of clusters to fit. Should match the number of unique categories.
+        random_state (int): Random state for KMeans
+
+    Returns:
+        np.ndarray: Cluster labels of shape (n_samples,)
+    """
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
+    cluster_labels = kmeans.fit_predict(array)
+    accuracy = None
+    if true_labels is not None:
+        accuracy = determine_fit_accuracy(
+            true_labels=true_labels, cluster_labels=cluster_labels
+        )
+    return cluster_labels, accuracy
 
 
 def determine_projection_weights(
@@ -154,12 +196,12 @@ def find_optimal_assignment(
     return cm, row_ind, col_ind
 
 
-def determineSpectralClustering_accuracy(
+def determine_fit_accuracy(
     true_labels: np.ndarray,
     cluster_labels: np.ndarray,
 ) -> tuple[float, np.ndarray, np.ndarray]:
     """
-    Determine the accuracy of a spectral clustering model.
+    Determine the accuracy of a fit model.
 
     Parameters:
         true_labels (np.ndarray): Input true labels of shape (n_samples,)
