@@ -536,6 +536,7 @@ class CCF_Plotter(BC):
             self._plot_cueTrigSig_CTSuplot_eachCell()
 
         if plot_by_cell_type:
+            # plot average CTS by significant cell type
             self._plot_cueTrigSig_byCellType()
 
     def _plot_cueTrigSig_CTSuplot_eachCell(self) -> None:
@@ -642,6 +643,8 @@ class CCF_Plotter(BC):
         """
         Plot cue-triggered signals for each cell type.
         """
+        color_map = self.colors
+
         cues2consider = [
             cue
             for cue in self.cue_types_set
@@ -679,9 +682,6 @@ class CCF_Plotter(BC):
             for c_idx, cue in enumerate(type_order)
             if list_ind2check[c_idx] is not None
         ]
-        fig, axes = self.fig_tools.create_plt_subplots(
-            nrows=len(types2process), flatten=True
-        )
 
         cts2plot = {}
         for cell_type, cell_idc in zip(types2process, list_idc):
@@ -695,11 +695,39 @@ class CCF_Plotter(BC):
                     cts2plot[cell_type][cueType].append(
                         np.nanmean(self.dict_to_plot[cell2use][cueType], axis=1)
                     )
-        for cell_type in cts2plot.keys():
+        fig, axes = self.fig_tools.create_plt_subplots(
+            nrows=len(types2process) // 2, ncols=2, flatten=True
+        )
+
+        for cell_idx, cell_type in enumerate(cts2plot.keys()):
             for cueType in cts2plot[cell_type].keys():
-                cts2plot[cell_type][cueType] = np.array(cts2plot[cell_type][cueType])
-        pass
-        # TODO: start plotting average CTS by cell type on 4/28/25
+                data2plot = np.array(cts2plot[cell_type][cueType]).copy()
+                for idx, cd in enumerate(data2plot):
+                    if cd.max() > 100:
+                        # set to nan if max is greater than 100
+                        data2plot[idx] = np.full_like(cd, np.nan)
+                # data2plot = data2plot / data2plot.max()
+                n_cells = data2plot.shape[0]
+                self.fig_tools.plot_SEM(
+                    arr=data2plot.T,  # need to transpose to get average over cells per timepoint
+                    color=color_map[cueType],
+                    ax=axes[cell_idx],
+                    x_ind=self.ind,
+                    vline=True,
+                )
+                axes[cell_idx].set_title(
+                    f"{cell_type} Cells (N = {n_cells})", fontsize=self.title_fs
+                )
+                axes[cell_idx] = self._set_xticks(axes[cell_idx])
+                axes[cell_idx].set_ylabel(
+                    "Cue triggered Response", fontsize=self.axis_fs
+                )
+
+        self._cT_cA_plotSaver(
+            fig=fig,
+            fname=self.fname,
+            extra_txt=f"{self.CCFPtxt['SEM']}_byCellType",
+        )
 
     def _cT_cA_plotSaver(
         self, fig: object, fname: str, suptitle: list = [], extra_txt: list = []

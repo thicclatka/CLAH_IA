@@ -1439,3 +1439,36 @@ def delete_axes(fig: plt.Figure) -> None:
     for ax in fig.get_axes():
         if not ax.get_children():
             ax.remove()
+
+
+def format_axes4UMAP(
+    ax: plt.Axes, fontsize: int = 14, fontweight: str = "bold"
+) -> None:
+    """
+    Format axis labels and remove spines for UMAP plots.
+
+    Parameters:
+        ax (plt.Axes): The axis to format.
+        fontsize (int, optional): The font size of the axis labels. Default is 14.
+        fontweight (str, optional): The font weight of the axis labels. Default is "bold".
+    """
+
+    # name labels
+    ax.set_xlabel(
+        "UMAP 1",
+        fontsize=fontsize,
+        fontweight=fontweight,
+    )
+    ax.set_ylabel(
+        "UMAP 2",
+        fontsize=fontsize,
+        fontweight=fontweight,
+    )
+
+    # remove spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    # Remove tick labels (numbers) and tick marks from axes
+    ax.tick_params(axis="x", labelbottom=False, bottom=False)
+    ax.tick_params(axis="y", labelleft=False, left=False)

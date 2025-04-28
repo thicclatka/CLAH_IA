@@ -382,6 +382,8 @@ class CueCellFinder(CCF_Utils):
         dtmArr = []
         for cue in self.cues:
             omit2use = f"OMIT{cue}"
+            if self.twoOdor_oneLoc:
+                omit2use = "OMITBOTH"
             sig = np.array(self.RankSumDict[cue][omit2use][:, self.CCF_Stats.sig_idx])
             direction = np.array(
                 self.RankSumDict[cue][omit2use][:, self.CCF_Stats.dir_idx]
@@ -485,7 +487,7 @@ class CueCellFinder(CCF_Utils):
                 self.cueTrigSig.copy(), "cueTrigSig", ind=self.ind
             )
             self.print_wFrm(
-                "Mean cueTrigSig (1 Fig; subplots by cell with avgCTS by cueType)"
+                "Mean cueTrigSig (2 Figs; 1) subplots by cell with avgCTS by cueType; 2) avgCTS by cell type)"
             )
             self.Plotter.plot_cueTrigSig_OR_cueAmp(
                 self.cueTrigSig.copy(),
