@@ -70,7 +70,7 @@ class GeneralDecoder:
                     gamma=gamma,
                     weight=weight,
                 )
-                accu2check = np.max(np.mean(fold_accuracies, 1))
+                accu2check = np.max(fold_accuracies)
                 if accu2check >= best_accuracy:
                     best_accuracy = accu2check
                     best_C = C
@@ -136,10 +136,6 @@ class GeneralDecoder:
             n_splits=num_folds, shuffle=True, random_state=random_state
         )
 
-        accuracy = []
-        conf_matrices = []
-        medae_scores = []  # List to store MedAE scores across "timepoints"
-
         fold_accuracy = []
         fold_conf_matrices = []
         fold_medae = []  # List to store MedAE for each fold
@@ -196,13 +192,12 @@ class GeneralDecoder:
             medae = np.median(np.abs(YTest - predictions))
             fold_medae.append(medae)
 
-        # store the results for the current "timepoint"
-        accuracy.append(fold_accuracy)
-        conf_matrices.append(fold_conf_matrices)
-        medae_scores.append(fold_medae)
-
         # Return numpy arrays for all metrics
-        return np.array(accuracy), np.array(conf_matrices), np.array(medae_scores)
+        return (
+            np.array(fold_accuracy),
+            np.array(fold_conf_matrices),
+            np.array(fold_medae),
+        )
 
     # @staticmethod
     # def decode_via_LSTM(

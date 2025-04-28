@@ -23,6 +23,10 @@ def calc_simMatrix(array: np.ndarray) -> np.ndarray:
     if np.min(similarity_matrix) < 0:
         similarity_matrix = (similarity_matrix + 1) / 2
 
+    # catch for when similarity matrix is not normalized to [0, 1] after + 1 / 2 normalization
+    if np.max(similarity_matrix) > 1:
+        similarity_matrix = similarity_matrix / np.max(similarity_matrix)
+
     # Set diagonal to 1.0
     np.fill_diagonal(similarity_matrix, 1.0)
     return similarity_matrix
@@ -49,8 +53,6 @@ def SpectralClustering_fit2simMatrix(
         raise ValueError("Similarity matrix must be square")
     if np.any(similarity_matrix < 0):
         raise ValueError("Similarity matrix must be non-negative")
-    if np.any(similarity_matrix > 1):
-        raise ValueError("Similarity matrix must be normalized to [0, 1]")
 
     spectral = SpectralClustering(
         n_clusters=n_clusters,

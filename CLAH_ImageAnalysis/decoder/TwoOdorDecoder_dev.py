@@ -63,6 +63,7 @@ class TwoOdorDecoder(BC):
         self.findPosRateClustering()
         self.findOdorClustering()
         self.DecodeOdorEpochs()
+        self.DecodeBCSW()
         self.plotResults()
         self.analyze_tuning_similarity_by_cell_type()
 
@@ -498,7 +499,7 @@ class TwoOdorDecoder(BC):
             # curr_posRateByLap = self.PCLappedSess[f"lapType{lidx}"]["ByLap"]["posRates"]
             TC = self.PCLappedSess[f"lapType{lidx}"]["posRates"]
             (N_cells, P_bins) = TC.shape
-            # --- Feature Scaling (Min-Max per cell/feature) on Downsampled FV ---
+            # Feature Scaling (Min-Max per cell/feature) on Downsampled FV ---
             TC_scaled = np.zeros_like(TC)
             for cell_idx in range(N_cells):
                 cell_data = TC[cell_idx, :]
@@ -516,7 +517,9 @@ class TwoOdorDecoder(BC):
         self.TuningCurvesScaled = TuningCurvesScaled
         TC2simMatConcat = np.concatenate(TuningCurvesScaled, axis=1)
         self.simMat4PRClustering["concat"] = self.dep.calc_simMatrix(TC2simMatConcat)
+        self.print_done_small_proc()
 
+        self.rprint("Creating true cell type labels")
         N_cells = len(self.simMat4PRClustering["concat"])
         true_cellTypeLabel = np.full(N_cells, np.nan)
         for c in range(N_cells):
@@ -531,7 +534,22 @@ class TwoOdorDecoder(BC):
             else:
                 true_cellTypeLabel[c] = 4
         self.true_cellTypeLabel = true_cellTypeLabel
+        cue1_amount = np.sum(true_cellTypeLabel == 0)
+        cue2_amount = np.sum(true_cellTypeLabel == 1)
+        both_amount = np.sum(true_cellTypeLabel == 2)
+        place_amount = np.sum(true_cellTypeLabel == 3)
+        other_amount = np.sum(true_cellTypeLabel == 4)
+        for ct, amt in [
+            ("CUE1", cue1_amount),
+            ("CUE2", cue2_amount),
+            ("BOTHCUES", both_amount),
+            ("PLACE", place_amount),
+            ("OTHER", other_amount),
+        ]:
+            self.print_wFrm(f"{ct}: {amt:>10d}", frame_num=1)
+        self.print_done_small_proc()
 
+        self.rprint("Performing spectral clustering on concatenated tuning curves")
         self.cluster_labels4PR, self.cluster_accuracy4PR = (
             self.dep.SpectralClustering_fit2simMatrix(
                 similarity_matrix=self.simMat4PRClustering["concat"],
@@ -540,24 +558,34 @@ class TwoOdorDecoder(BC):
                 true_labels=true_cellTypeLabel,
             )
         )
+        self.print_done_small_proc()
 
+        self.rprint("Calculating distance map between BOTHCUES and SWITCH")
         self.DistanceMapBTW_BCnSW = None
         BC_idx = np.where(self.lapTypeName == "BOTHCUES")[0][0]
         SW_idx = np.where(self.lapTypeName == "SWITCH")[0][0]
+        OM_idx = np.where(self.lapTypeName == "OMITBOTH")[0][0]
 
         rowwise_corr_coeffs = np.full(len(self.simMat4PRClustering["concat"]), np.nan)
         for c in range(N_cells):
             BC_row = TuningCurvesScaled[BC_idx][c]
             SW_row = TuningCurvesScaled[SW_idx][c]
-            if np.std(BC_row) > 0 and np.std(SW_row) > 0:
-                rowwise_corr_coeffs[c] = np.corrcoef(BC_row, SW_row)[0, 1]
-            elif np.all(BC_row == SW_row):
+            OM_row = TuningCurvesScaled[OM_idx][c]
+            BCminOM = BC_row - OM_row
+            SWminOM = SW_row - OM_row
+            if np.std(BCminOM) > 0 and np.std(SWminOM) > 0:
+                rowwise_corr_coeffs[c] = np.corrcoef(BCminOM, SWminOM)[0, 1]
+            elif np.all(BCminOM == SWminOM):
                 rowwise_corr_coeffs[c] = 1
             else:
                 rowwise_corr_coeffs[c] = 0
 
-        diff = TuningCurvesScaled[BC_idx] - TuningCurvesScaled[SW_idx]
-        prod = TuningCurvesScaled[BC_idx] * TuningCurvesScaled[SW_idx]
+        BCminOmit = TuningCurvesScaled[BC_idx] - TuningCurvesScaled[OM_idx]
+        SWminOmit = TuningCurvesScaled[SW_idx] - TuningCurvesScaled[OM_idx]
+        diff = BCminOmit - SWminOmit
+        prod = BCminOmit * SWminOmit
+
+        self.print_wFrm("Finding euclidean, cosine, and 1-correlation distance maps")
         self.DistanceMapBTW_BCnSW = {
             "EUCLID": np.linalg.norm(diff, axis=1),
             "COSINE": np.sum(prod, axis=1)
@@ -568,24 +596,46 @@ class TwoOdorDecoder(BC):
             "1-CORR": 1 - rowwise_corr_coeffs,
         }
 
+        self.print_wFrm("Focusing on difference in activity for bins of interest")
+
+        locations = {"L1": slice(10, 40), "L2": slice(60, 90)}
+        self.print_wFrm(f"Locations: {locations}", frame_num=1)
+        self.print_wFrm(
+            "Calculating max, min, and min-max difference for each location",
+            frame_num=1,
+        )
+
         loc_keys = ["L1", "L2"]
         maxDiffs = {key: [] for key in loc_keys}
         minDiffs = {key: [] for key in loc_keys}
         minmaxDiffs = {key: [] for key in loc_keys}
-        locations = {"L1": slice(10, 40), "L2": slice(60, 90)}
+        maxDiffs_loc = {key: [] for key in loc_keys}
+        minDiffs_loc = {key: [] for key in loc_keys}
+        diffAUCs = {key: [] for key in loc_keys}
         for c in range(N_cells):
             for key, loc_slice in locations.items():
+                diffAUC = np.sum(diff[c, loc_slice])
                 maxD = np.max(diff[c, loc_slice])
                 minD = np.min(diff[c, loc_slice])
+                maxDloc = np.argmax(diff[c, loc_slice])
+                minDloc = np.argmin(diff[c, loc_slice])
                 maxDiffs[key].append(maxD)
                 minDiffs[key].append(minD)
-                minmaxDiffs[key].append(
-                    (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
-                )
+                maxDiffs_loc[key].append(maxDloc)
+                minDiffs_loc[key].append(minDloc)
+                # minmaxDiffs[key].append(
+                #     (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
+                # )
+                minmaxDiffs[key].append(np.mean(diff[c, loc_slice]))
+                diffAUCs[key].append(diffAUC)
         maxDiffs = {key: np.array(maxDiffs[key]) for key in loc_keys}
         minDiffs = {key: np.array(minDiffs[key]) for key in loc_keys}
         minmaxDiffs = {key: np.array(minmaxDiffs[key]) for key in loc_keys}
+        maxDiffs_loc = {key: np.array(maxDiffs_loc[key]) for key in loc_keys}
+        minDiffs_loc = {key: np.array(minDiffs_loc[key]) for key in loc_keys}
+        self.print_done_small_proc()
 
+        self.rprint("Performing clustering on distance maps")
         self.cluster_labels4BC_SW = {}
         self.cluster_accuracy4BC_SW = {}
         for metric in self.DistanceMapBTW_BCnSW.keys():
@@ -635,17 +685,23 @@ class TwoOdorDecoder(BC):
                     cluster_labels=self.cluster_labels4BC_SW[metric],
                 )
             )
+        self.print_done_small_proc()
 
+        self.folds4BCSW = np.min(
+            [cue1_amount, cue2_amount, both_amount, place_amount, other_amount]
+        )
         self.BCSW_comparison = {
             "DIFF": diff,
             "PROD": prod,
             "CORREL": rowwise_corr_coeffs,
             "MAXDIFF": maxDiffs,
             "MINDIFF": minDiffs,
+            "MAXDIFF_LOC": maxDiffs_loc,
+            "MINDIFF_LOC": minDiffs_loc,
             "MINMAXDIFF": minmaxDiffs,
+            "DIFFAUC": diffAUCs,
         }
-
-        self.print_done_small_proc()
+        self.loc_keys = loc_keys
 
     def findOdorClustering(self) -> None:
         """
@@ -709,7 +765,7 @@ class TwoOdorDecoder(BC):
             None
         """
 
-        def _decodeNfindAccu(label, folds):
+        def _decodeNfindAccu(label: np.ndarray, folds: int, ind4ct: list | None = None):
             """
             Calculates the accuracy of the decoder based on the given label and number of folds.
 
@@ -718,16 +774,31 @@ class TwoOdorDecoder(BC):
                 The label array used for decoding.
             - folds: int
                 The number of folds used for cross-validationOdorPeaksNTimes.
+            - ind4ct: list
+                The indices of the cells to use for decoding.
 
             Returns:
             - accuracy: float
                 The accuracy of the decoder.
 
             """
-            # see params4decoder in self.static_class_var_init for SVC and GBM parameters
+            OPT2use = self.normOdorPeaksNTimes.copy()
+            label2use = label.copy()
+            if ind4ct is not None:
+                ind1_4ct = [
+                    ind * 2 for ind in ind4ct
+                ]  # multiply by 2 give peak time & height columns
+                ind2_4ct = [
+                    ind + 1 for ind in ind1_4ct
+                ]  # add 1 to get 2nd column for each cell
+                ind3_4ct = np.concatenate(
+                    [ind1_4ct, ind2_4ct]
+                )  # concatenate to get all columns
+                ind3_4ct = np.sort(ind3_4ct)  # sort to get correct order
+                OPT2use = OPT2use[:, ind3_4ct]
             accuracy, conf_matrices, _ = GeneralDecoder.run_Decoder(
-                data_arr=self.normOdorPeaksNTimes,
-                label_arr=np.array(label),
+                data_arr=OPT2use,
+                label_arr=np.array(label2use),
                 num_folds=folds,
                 decoder_type=self.decoder_type,
                 random_state=self.random_state,
@@ -746,32 +817,6 @@ class TwoOdorDecoder(BC):
             - int: The fold count based on the given key. Returns `self.num_folds` if key is "ODORS", otherwise returns `self.num_folds4switch`.
             """
             return self.num_folds if key == "ODORS" else self.num_folds4switch
-
-        def _print_acc_results(accu: np.ndarray, key: str, max_length: int) -> str:
-            """
-            Prints the accuracy results.
-
-            Args:
-                accu (numpy.ndarray): Array of accuracy values.
-
-            Returns:
-                str: A string representation of the accuracy results.
-
-            """
-            stats = ["Mean", "Std", "Max", "Min"]
-            values = [
-                np.mean(accu),
-                np.std(accu),
-                np.max(accu),
-                np.min(accu),
-            ]
-            accu_str = "Accuracy: " + " / ".join(
-                f"{stat}: {value:.4f}" for stat, value in zip(stats, values)
-            )
-            self.print_wFrm(
-                f"{key:{max_length}} = {accu_str}",
-                frame_num=1,
-            )
 
         if self.cost_param is None and self.decoder_type == "SVC":
             self.rprint(
@@ -802,13 +847,25 @@ class TwoOdorDecoder(BC):
         self.accuracy = {key: None for key in self.Labels.keys()}
         self.confusion_matrix = {key: None for key in self.Labels.keys()}
 
+        self.accuracy_byCT = {
+            ct: {key: None for key in self.Labels.keys()} for ct in self.cellTypes
+        }
         max_length = max(len(key) for key in self.Labels.keys())
 
         for key, label in self.Labels.items():
             self.accuracy[key], self.confusion_matrix[key] = _decodeNfindAccu(
                 label, _determine_fold_count(key)
             )
-            _print_acc_results(self.accuracy[key], key, max_length)
+            self._print_acc_results(self.accuracy[key], key, max_length)
+
+        # self.print_wFrm("Decoding by cell type:")
+        # for ct in self.cellTypes:
+        #     self.print_wFrm(f"Cell type: {ct}", frame_num=1)
+        #     for key, label in self.Labels.items():
+        #         self.accuracy_byCT[ct][key], _ = _decodeNfindAccu(
+        #             label, _determine_fold_count(key), ind4ct=self.cellTypeInds[ct]
+        #         )
+        #         self._print_acc_results(self.accuracy_byCT[ct][key], key, max_length)
 
         self.print_wFrm(f"Randomizing labels {self.null_repeats} times:")
         # null_accuracy has shape of trial time x num repeats x num folds
@@ -835,7 +892,63 @@ class TwoOdorDecoder(BC):
         print("complete")
 
         for key, null_accu in self.null_accuracy.items():
-            _print_acc_results(np.mean(null_accu, 1), key, max_length)
+            self._print_acc_results(np.mean(null_accu, 1), key, max_length)
+        self.print_done_small_proc()
+
+    def DecodeBCSW(self) -> None:
+        self.rprint("Decoding BC-SWITCH Tuning")
+        self.print_wFrm("Creating feature vector")
+        self.fv4BCSW = None
+        for key in self.loc_keys:
+            max4fv = self.BCSW_comparison["MAXDIFF_LOC"][key]
+            min4fv = self.BCSW_comparison["MINDIFF_LOC"][key]
+            minmax4fv = self.BCSW_comparison["MINMAXDIFF"][key]
+            diffAUC4fv = self.BCSW_comparison["DIFFAUC"][key]
+            fv = np.column_stack([max4fv, min4fv, minmax4fv, diffAUC4fv])
+            if self.fv4BCSW is None:
+                self.fv4BCSW = fv
+            else:
+                self.fv4BCSW = np.column_stack([self.fv4BCSW, fv])
+
+        self.print_wFrm("Normalizing feature vector")
+        self.fv4BCSW = self.dep.feature_normalization(self.fv4BCSW)
+
+        self.print_wFrm("Decoding")
+        self.accuracy4BCSW, self.cm4BCSW, _ = GeneralDecoder.run_Decoder(
+            data_arr=self.fv4BCSW,
+            label_arr=self.true_cellTypeLabel,
+            num_folds=self.folds4BCSW,
+            decoder_type="SVC",
+            C=self.params4decoder["C"],
+            weight=self.params4decoder["weight"],
+            random_state=self.random_state,
+        )
+        self._print_acc_results(self.accuracy4BCSW, "BCSW", 10)
+
+        self.null_accuracy4BCSW = np.full((self.null_repeats, self.folds4BCSW), np.nan)
+        self.print_wFrm("Randomizing labels")
+        for r in range(self.null_repeats):
+            null_labels = np.random.permutation(self.true_cellTypeLabel)
+            self.null_accuracy4BCSW[r], _, _ = GeneralDecoder.run_Decoder(
+                data_arr=self.fv4BCSW,
+                label_arr=null_labels,
+                num_folds=self.folds4BCSW,
+                decoder_type="SVC",
+                C=self.params4decoder["C"],
+                weight=self.params4decoder["weight"],
+                random_state=self.random_state,
+            )
+        self._print_acc_results(np.mean(self.null_accuracy4BCSW, 1), "BCSW", 10)
+
+        self.cluster_labels4BCSWTUNING, self.cluster_accuracy4BCSWTUNING = (
+            self.dep.KMeans_fit(
+                array=self.fv4BCSW,
+                n_clusters=len(np.unique(self.true_cellTypeLabel)),
+                random_state=self.random_state,
+                true_labels=self.true_cellTypeLabel,
+            )
+        )
+
         self.print_done_small_proc()
 
     def plotResults(self) -> None:
@@ -850,10 +963,12 @@ class TwoOdorDecoder(BC):
         """
         self.rprint("Plotting results:")
 
-        self._plotBar_Accuracy()
+        self._plotBar_Accuracy4OdorDetails()
+
+        self._plotBar_Accuracy4BCSW()
 
         # confusion matrix
-        self._plotConfusionMatrix()
+        self._plotConfusionMatrix_OdorDetails()
 
         # similarity matrix with clustering
         self._plot_similarity_matrix4OdorDetails()
@@ -863,6 +978,9 @@ class TwoOdorDecoder(BC):
 
         # UMAP projection plot based on posRates
         self._plot_umap_projection4PosRates()
+
+        # plot BC-SWITCH Tuning UMAP projection
+        self._plot_UMAP_BCSWTUNING()
 
         # histogram of distance maps
         self._plot_histograms4DistanceMaps()
@@ -875,7 +993,7 @@ class TwoOdorDecoder(BC):
 
         self.print_done_small_proc()
 
-    def _plotBar_Accuracy(self) -> None:
+    def _plotBar_Accuracy4OdorDetails(self) -> None:
         fig, axis = self.fig_tools.create_plt_subplots()
 
         odor_color = self.color_dict["blue"]
@@ -977,6 +1095,90 @@ class TwoOdorDecoder(BC):
         # self.print_wFrm("Saving figure")
         self.fig_tools.save_figure(
             fig, f"Decoder_Results_{self.decoder_type}", figure_save_path=self.FigPath
+        )
+
+    def _plotBar_Accuracy4BCSW(self) -> None:
+        self.print_wFrm("Plotting accuracy for BC-SWITCH Tuning")
+        fig, axis = self.fig_tools.create_plt_subplots()
+        color = self.color_dict["green"]
+        unique_labels = np.unique(self.true_cellTypeLabel)
+        y_chance = 1 / len(unique_labels)
+        x4accu = 0 - self.plot_params["bar"]["offset"]
+        x4null = 0 + self.plot_params["bar"]["offset"]
+
+        axis.axhline(
+            y=y_chance,
+            # xmin=-0.2,
+            # xmax=0.2,
+            color="black",
+            linestyle=":",
+            linewidth=2,
+        )
+
+        accu2use = self.accuracy4BCSW.T.squeeze()
+        null_accu2use = np.mean(self.null_accuracy4BCSW, axis=0)
+
+        self.fig_tools.create_sig_2samp_annotate(
+            ax=axis,
+            arr0=accu2use,
+            arr1=null_accu2use,
+            coords=(0, None),
+            paired=True,
+        )
+
+        self.fig_tools.scatter_plot(
+            ax=axis,
+            X=x4accu,
+            Y=accu2use,
+            color=color,
+            s=self.plot_params["scatter"]["s_large"],
+            jitter=0.01,
+        )
+
+        self.fig_tools.scatter_plot(
+            ax=axis,
+            X=x4null,
+            Y=null_accu2use,
+            color=color,
+            s=self.plot_params["scatter"]["s_large"],
+            jitter=0.01,
+        )
+
+        self.fig_tools.bar_plot(
+            ax=axis,
+            X=x4accu,
+            Y=np.mean(accu2use),
+            yerr=np.std(accu2use) / np.sqrt(len(accu2use)),
+            width=self.plot_params["bar"]["width"],
+            alpha=self.plot_params["bar"]["alpha"],
+            color=color,
+        )
+
+        self.fig_tools.bar_plot(
+            ax=axis,
+            X=x4null,
+            Y=np.mean(null_accu2use),
+            yerr=np.std(null_accu2use) / np.sqrt(len(null_accu2use)),
+            color=color,
+            hatch=self.plot_params["bar"]["hatch"],
+            width=self.plot_params["bar"]["width"],
+            alpha=self.plot_params["bar"]["alpha"],
+        )
+
+        axis.set_ylabel("Accuracy")
+        title = f"{self.folder_name}\nDecoding BC-SWITCH Tuning"
+        title_2ndLYR = [f"Decoder: {self.decoder_type}"]
+        if self.params4decoder is not None:
+            title_2ndLYR += [
+                f"{key}: {value}" for key, value in self.params4decoder.items()
+            ]
+        title_2ndLYR = " | ".join(title_2ndLYR)
+        title_all = f"{title}\n{title_2ndLYR}"
+        axis.set_title(title_all, fontsize=self.plot_params["fsize"]["title"])
+        axis.set_ylim(0, 1)
+
+        self.fig_tools.save_figure(
+            fig, "Decoder_Results_BCSW", figure_save_path=self.FigPath
         )
 
     def _plot_similarity_matrix4OdorDetails(self) -> None:
@@ -1107,7 +1309,49 @@ class TwoOdorDecoder(BC):
         self.fig_tools.tighten_layoutWspecific_axes(coords2tighten=[0, 0.03, 1, 0.95])
 
         self.fig_tools.save_figure(
-            fig, "Similarity_Matrix", figure_save_path=self.FigPath
+            fig, "Similarity_Matrix_OdorDetails", figure_save_path=self.FigPath
+        )
+
+    def _plot_UMAP_BCSWTUNING(self) -> None:
+        self.print_wFrm("Plotting BC-SWITCH Tuning UMAP projection")
+        fig, axis = self.fig_tools.create_plt_subplots()
+        embedding = self.dep.UMAP_fit2distMatrix(
+            self.fv4BCSW,
+            metric="euclidean",
+        )
+        cmap4labels = self.plot_params["cmap"]["cellTypes_wNon"]
+        unique_labels = [int(lab) for lab in np.unique(self.true_cellTypeLabel)]
+        colors = [cmap4labels(int(lab)) for lab in unique_labels]
+
+        for label in unique_labels:
+            if label == 4:
+                continue
+            inds = np.where(self.true_cellTypeLabel == label)[0]
+            axis.scatter(
+                embedding[inds, 0],
+                embedding[inds, 1],
+                color=colors[label],
+                s=self.plot_params["scatter"]["s_small"],
+                alpha=self.plot_params["scatter"]["alpha"],
+            )
+
+        self.fig_tools.format_axes4UMAP(
+            axis, fontsize=self.plot_params["fsize"]["axis"]
+        )
+        fig.suptitle(
+            f"UMAP Projection of BC-SWITCH Tuning\nAccuracy: {self.cluster_accuracy4BCSWTUNING:.3f}"
+        )
+        facecolors = colors[:-1]
+        legend_elements = self.fig_tools.create_legend_patch_fLoop(
+            facecolor=facecolors,
+            label=self.cellTypes_wNon[:-1],
+            edgecolor=facecolors,
+            marker=["o"] * len(facecolors),
+        )
+        axis.legend(handles=legend_elements)
+
+        self.fig_tools.save_figure(
+            fig, "UMAP_BCSW_TUNING", figure_save_path=self.FigPath
         )
 
     def _plot_umap_projection4OdorDetails(self) -> None:
@@ -1129,6 +1373,19 @@ class TwoOdorDecoder(BC):
         self.print_wFrm("Finding UMAP embedding", frame_num=1)
         # extract UMAP embedding
         embedding = self.dep.UMAP_fit2distMatrix(distance_matrix)
+
+        embedding_by_ct = {}
+        for ctype in self.cellTypes:
+            OPT2use = self.normOdorPeaksNTimes.copy()
+            ind4ct = self.cellTypeInds[ctype]
+            ind1_4ct = [ind * 2 for ind in ind4ct]
+            ind2_4ct = [ind + 1 for ind in ind1_4ct]
+            ind3_4ct = np.sort(np.concatenate([ind1_4ct, ind2_4ct]))
+            OPT2use = OPT2use[:, ind3_4ct]
+            simMat4ct = self.dep.calc_simMatrix(OPT2use)
+            embedding_by_ct[ctype] = self.dep.UMAP_fit2distMatrix(
+                self.dep.create_distance_matrix_from_similarity_matrix(simMat4ct)
+            )
 
         for idx, (ax, label_cat) in enumerate(zip(axes, self.Labels.keys())):
             cmap4labels = self.plot_params["cmap"]["odors"]
@@ -1164,20 +1421,9 @@ class TwoOdorDecoder(BC):
                 f"{self.plot_params['cat_names4plot'][idx]}\nAccuracy: {self.clustering_accuracy[label_cat]:.3f}",
                 fontsize=self.plot_params["fsize"]["title"],
             )
-            ax.set_xlabel(
-                "UMAP 1",
-                fontsize=self.plot_params["fsize"]["axis"],
-                fontweight="bold",
+            self.fig_tools.format_axes4UMAP(
+                ax, fontsize=self.plot_params["fsize"]["axis"]
             )
-            ax.set_ylabel(
-                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
-            )
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-
-            # Remove tick labels (numbers) and tick marks from axes
-            ax.tick_params(axis="x", labelbottom=False, bottom=False)
-            ax.tick_params(axis="y", labelleft=False, left=False)
 
         fig.suptitle(
             f"UMAP Projection (Odor Details) - {self.folder_name}",
@@ -1286,20 +1532,9 @@ class TwoOdorDecoder(BC):
         )
 
         for a in [ax4mult, ax4single]:
-            a.set_xlabel(
-                "UMAP 1",
-                fontsize=self.plot_params["fsize"]["axis"],
-                fontweight="bold",
+            self.fig_tools.format_axes4UMAP(
+                a, fontsize=self.plot_params["fsize"]["axis"]
             )
-            a.set_ylabel(
-                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
-            )
-            a.spines["top"].set_visible(False)
-            a.spines["right"].set_visible(False)
-
-            # Remove tick labels (numbers) and tick marks from axes
-            a.tick_params(axis="x", labelbottom=False, bottom=False)
-            a.tick_params(axis="y", labelleft=False, left=False)
 
         fig.suptitle(
             f"UMAP Projection (Position Rates) - {self.folder_name}",
@@ -1310,7 +1545,7 @@ class TwoOdorDecoder(BC):
             fig, "UMAP_Projection_PosRates", figure_save_path=self.FigPath
         )
 
-    def _plotConfusionMatrix(self) -> None:
+    def _plotConfusionMatrix_OdorDetails(self) -> None:
         """
         Plot the confusion matrices.
 
@@ -1320,7 +1555,7 @@ class TwoOdorDecoder(BC):
         Returns:
             None
         """
-        self.print_wFrm("Confusion Matrices")
+        self.print_wFrm("Confusion Matrices for Odor Details")
 
         n2use = len(self.confusion_matrix.keys())
 
@@ -1402,7 +1637,9 @@ class TwoOdorDecoder(BC):
             )
 
         self.fig_tools.save_figure(
-            fig, f"Confusion_Matrix_{self.decoder_type}", figure_save_path=self.FigPath
+            fig,
+            f"Confusion_Matrix_{self.decoder_type}_OdorDetails",
+            figure_save_path=self.FigPath,
         )
 
     def _plot_histograms4DistanceMaps(self) -> None:
@@ -1527,22 +1764,12 @@ class TwoOdorDecoder(BC):
             umap_axes[uidx].set_title(
                 f"Clustering Accuracy: {self.cluster_accuracy4BC_SW[accuKey2use]:.3f}"
             )
-            umap_axes[uidx].set_xlabel(
-                "UMAP 1",
-                fontsize=self.plot_params["fsize"]["axis"],
-                fontweight="bold",
+            self.fig_tools.format_axes4UMAP(
+                umap_axes[uidx], fontsize=self.plot_params["fsize"]["axis"]
             )
-            umap_axes[uidx].set_ylabel(
-                "UMAP 2", fontsize=self.plot_params["fsize"]["axis"], fontweight="bold"
-            )
-            umap_axes[uidx].spines["top"].set_visible(False)
-            umap_axes[uidx].spines["right"].set_visible(False)
-            # Remove tick labels (numbers) and tick marks from axes
-            umap_axes[uidx].tick_params(axis="x", labelbottom=False, bottom=False)
-            umap_axes[uidx].tick_params(axis="y", labelleft=False, left=False)
 
         self.fig_tools.save_figure(
-            fig, "Distance_Maps_BothcuesVSswitch", figure_save_path=self.FigPath
+            fig, "Distance_Maps_BCSW", figure_save_path=self.FigPath
         )
 
     def _plot_minmax_diff(self) -> None:
@@ -1601,19 +1828,19 @@ class TwoOdorDecoder(BC):
                         s=self.plot_params["scatter"]["s_small"],
                         jitter=0,
                     )
-                bar2_ax.plot(
-                    [
-                        cidx - self.plot_params["bar"]["offset"],
-                        cidx + self.plot_params["bar"]["offset"],
-                    ],
-                    [data2use[0], data2use[1]],
-                    color=colors[cidx],
-                )
-                bar2_ax.set_ylim(-1.1, 1.1)  # Adjust limits to make space
+                # bar2_ax.plot(
+                #     [
+                #         cidx - self.plot_params["bar"]["offset"],
+                #         cidx + self.plot_params["bar"]["offset"],
+                #     ],
+                #     [data2use[0], data2use[1]],
+                #     color=colors[cidx],
+                # )
+                # bar2_ax.set_ylim(-1.1, 1.1)  # Adjust limits to make space
 
                 # Annotation for L1 dominance (top)
                 bar2_ax.annotate(
-                    "More L1 active",
+                    "More BC active",
                     xy=(1.02, 0.9),
                     xycoords="axes fraction",
                     xytext=(10, 0),
@@ -1625,7 +1852,7 @@ class TwoOdorDecoder(BC):
 
                 # Annotation for L2 dominance (bottom)
                 bar2_ax.annotate(
-                    "More L2 active",
+                    "More SWITCH active",
                     xy=(1.02, 0.1),
                     xycoords="axes fraction",
                     xytext=(10, 0),
@@ -1635,7 +1862,9 @@ class TwoOdorDecoder(BC):
                     arrowprops=dict(arrowstyle="->", color="black"),
                 )
 
-        self.fig_tools.save_figure(fig, "MinMaxDiff", figure_save_path=self.FigPath)
+        self.fig_tools.save_figure(
+            fig, "MinMaxDiff_BCSW_ByLocation", figure_save_path=self.FigPath
+        )
 
     def analyzing_BCSwitchTuning(self) -> None:
         """
@@ -1643,14 +1872,24 @@ class TwoOdorDecoder(BC):
         """
         self.print_wFrm("Plotting tuning similarity by cell type/cluster")
         labels_to_use = self.cellTypes_wNon
-        colors = [
-            self.plot_params["cmap"]["cellTypes_wNon"](int(idx))
-            for idx in range(len(labels_to_use))
-        ]
+        # colors = [
+        #     self.plot_params["cmap"]["cellTypes_wNon"](int(idx))
+        #     for idx in range(len(labels_to_use))
+        # ]
         fig, ax = self.fig_tools.create_plt_subplots()
 
+        labels2print = [
+            f"{label_name}\n(N={len(np.where(self.true_cellTypeLabel == lidx)[0])})"
+            for lidx, label_name in zip(
+                np.unique(self.true_cellTypeLabel), labels_to_use
+            )
+        ]
+
         PerBinTuning = np.zeros(
-            (len(labels_to_use), self.BCSW_comparison["DIFF"].shape[1])
+            (
+                len(np.unique(self.true_cellTypeLabel)),
+                self.BCSW_comparison["DIFF"].shape[1],
+            )
         )
         for cidx, ctype in enumerate(np.unique(self.true_cellTypeLabel)):
             cell_indices = np.where(self.true_cellTypeLabel == ctype)[0]
@@ -1673,11 +1912,9 @@ class TwoOdorDecoder(BC):
         )
 
         fig.colorbar(im, ax=ax, label="BC-SW Tuning")
-        ax.set_yticklabels(labels_to_use)
+        ax.set_yticklabels(labels2print)
 
-        self.fig_tools.save_figure(
-            fig, "BCSwitch_Tuning", figure_save_path=self.FigPath
-        )
+        self.fig_tools.save_figure(fig, "BCSW_Heatmap", figure_save_path=self.FigPath)
 
     def analyze_tuning_similarity_by_cell_type(self):
         """
@@ -1788,6 +2025,32 @@ class TwoOdorDecoder(BC):
         print_comparison("Within-Cue vs Within-Place", sim_within_cue, sim_within_place)
 
         self.print_done_small_proc()
+
+    def _print_acc_results(self, accu: np.ndarray, key: str, max_length: int) -> str:
+        """
+        Prints the accuracy results.
+
+        Args:
+            accu (numpy.ndarray): Array of accuracy values.
+
+        Returns:
+            str: A string representation of the accuracy results.
+
+        """
+        stats = ["Mean", "Std", "Max", "Min"]
+        values = [
+            np.mean(accu),
+            np.std(accu),
+            np.max(accu),
+            np.min(accu),
+        ]
+        accu_str = "Accuracy: " + " / ".join(
+            f"{stat}: {value:.4f}" for stat, value in zip(stats, values)
+        )
+        self.print_wFrm(
+            f"{key:{max_length}} = {accu_str}",
+            frame_num=1,
+        )
 
 
 if __name__ == "__main__":
