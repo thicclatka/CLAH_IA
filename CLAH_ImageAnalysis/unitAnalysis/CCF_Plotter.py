@@ -77,6 +77,52 @@ class CCF_Plotter(BC):
 
         self.forPres = forPres
 
+        self.types2process = None
+
+    def find_types2process_from_CCT(self) -> None:
+        """
+        Find the types to process from the Cue Cell Table.
+        """
+
+        cues2consider = [
+            cue
+            for cue in self.cue_types_set
+            if "OMIT" not in cue and "SWITCH" not in cue
+        ]
+        if len(cues2consider) == 2:
+            both_cues = set(self.CueCellTable["CUE1_IDX"]) & set(
+                self.CueCellTable["CUE2_IDX"]
+            )
+            cue1 = list(set(self.CueCellTable["CUE1_IDX"]) - both_cues)
+            cue2 = list(set(self.CueCellTable["CUE2_IDX"]) - both_cues)
+            both_cues = list(both_cues)
+            both_cues.sort()
+            cue1.sort()
+            cue2.sort()
+            led, tone = None, None
+        elif len(cues2consider) == 1:
+            cue1 = list(self.CueCellTable["CUE1_IDX"])
+            both_cues, cue2, led, tone = None, None, None, None
+            cue1.sort()
+        elif len(cues2consider) == 3:
+            # TODO: implement for 3 cue version
+            raise NotImplementedError("3 cue version not implemented yet")
+
+        place = self.CueCellTable["PLACE_IDX"]
+        type_order = ["CUE1", "CUE2", "BOTH", "TONE", "LED", "PLACE"]
+
+        self.list_idc = []
+        list_ind2check = [cue1, cue2, both_cues, led, tone, place]
+        for list_ind in list_ind2check:
+            if list_ind is not None:
+                self.list_idc.append(list_ind)
+
+        self.types2process = [
+            cue
+            for c_idx, cue in enumerate(type_order)
+            if list_ind2check[c_idx] is not None
+        ]
+
     def plot_CueCellTable(self, CueCellTable: dict) -> None:
         """
         Plot the Cue Cell Table.
@@ -535,9 +581,13 @@ class CCF_Plotter(BC):
         else:  # Plot for each cue type
             self._plot_cueTrigSig_CTSuplot_eachCell()
 
-        if plot_by_cell_type:
+        if plot_by_cell_type and SEM:
             # plot average CTS by significant cell type
             self._plot_cueTrigSig_byCellType()
+
+        if plot_by_cell_type and VIO:
+            # plot average cueAmp by significant cell type
+            self._plot_cueAmp_byCellType()
 
     def _plot_cueTrigSig_CTSuplot_eachCell(self) -> None:
         """
@@ -620,9 +670,7 @@ class CCF_Plotter(BC):
                     axes[i].set_xticks(range(0, len(abbrev_labels)))
                     axes[i].set_xticklabels(abbrev_labels, fontsize="small")
                     if i % self.num_cols == 0:
-                        axes[i].set_ylabel(
-                            "Amplitude (norm to baseline)", fontsize=self.axis_fs
-                        )
+                        axes[i].set_ylabel("Post-cue Amp", fontsize=self.axis_fs)
             axes[i].set_title(
                 self._get_cell_str_with_marker(cell, latex=True), fontsize=self.title_fs
             )
@@ -645,46 +693,11 @@ class CCF_Plotter(BC):
         """
         color_map = self.colors
 
-        cues2consider = [
-            cue
-            for cue in self.cue_types_set
-            if "OMIT" not in cue and "SWITCH" not in cue
-        ]
-        if len(cues2consider) == 2:
-            both_cues = set(self.CueCellTable["CUE1_IDX"]) & set(
-                self.CueCellTable["CUE2_IDX"]
-            )
-            cue1 = list(set(self.CueCellTable["CUE1_IDX"]) - both_cues)
-            cue2 = list(set(self.CueCellTable["CUE2_IDX"]) - both_cues)
-            both_cues = list(both_cues)
-            both_cues.sort()
-            cue1.sort()
-            cue2.sort()
-            led, tone = None, None
-        elif len(cues2consider) == 1:
-            cue1 = list(self.CueCellTable["CUE1_IDX"])
-            both_cues, cue2, led, tone = None, None, None, None
-            cue1.sort()
-        elif len(cues2consider) == 3:
-            # TODO: implement for 3 cue version
-            raise NotImplementedError("3 cue version not implemented yet")
-
-        place = self.CueCellTable["PLACE_IDX"]
-        type_order = ["CUE1", "CUE2", "BOTH", "TONE", "LED", "PLACE"]
-
-        list_idc = []
-        list_ind2check = [cue1, cue2, both_cues, led, tone, place]
-        for list_ind in list_ind2check:
-            if list_ind is not None:
-                list_idc.append(list_ind)
-        types2process = [
-            cue
-            for c_idx, cue in enumerate(type_order)
-            if list_ind2check[c_idx] is not None
-        ]
+        if self.types2process is None:
+            self.find_types2process_from_CCT()
 
         cts2plot = {}
-        for cell_type, cell_idc in zip(types2process, list_idc):
+        for cell_type, cell_idc in zip(self.types2process, self.list_idc):
             if cell_type not in cts2plot.keys():
                 cts2plot[cell_type] = {}
             for cell in cell_idc:
@@ -696,7 +709,7 @@ class CCF_Plotter(BC):
                         np.nanmean(self.dict_to_plot[cell2use][cueType], axis=1)
                     )
         fig, axes = self.fig_tools.create_plt_subplots(
-            nrows=len(types2process) // 2, ncols=2, flatten=True
+            nrows=len(self.types2process) // 2, ncols=2, flatten=True
         )
 
         for cell_idx, cell_type in enumerate(cts2plot.keys()):
@@ -708,6 +721,7 @@ class CCF_Plotter(BC):
                         data2plot[idx] = np.full_like(cd, np.nan)
                 # data2plot = data2plot / data2plot.max()
                 n_cells = data2plot.shape[0]
+
                 self.fig_tools.plot_SEM(
                     arr=data2plot.T,  # need to transpose to get average over cells per timepoint
                     color=color_map[cueType],
@@ -727,6 +741,62 @@ class CCF_Plotter(BC):
             fig=fig,
             fname=self.fname,
             extra_txt=f"{self.CCFPtxt['SEM']}_byCellType",
+        )
+
+    def _plot_cueAmp_byCellType(self) -> None:
+        """
+        Plot cue amplitude for each cell type.
+        """
+        color_map = self.colors
+
+        if self.types2process is None:
+            self.find_types2process_from_CCT()
+
+        ca2plot = {}
+        for cell_type, cell_idc in zip(self.types2process, self.list_idc):
+            if cell_type not in ca2plot.keys():
+                ca2plot[cell_type] = {}
+            for cell in cell_idc:
+                cell2use = f"Cell_{cell}"
+                for cueType in self.dict_to_plot[cell2use].keys():
+                    if cueType not in ca2plot[cell_type].keys():
+                        ca2plot[cell_type][cueType] = []
+                    ca2plot[cell_type][cueType].append(
+                        np.mean(self.dict_to_plot[cell2use][cueType])
+                    )
+
+        fig, axes = self.fig_tools.create_plt_subplots(
+            nrows=len(self.types2process) // 2, ncols=2, flatten=True
+        )
+
+        abbrev_labels = [
+            self.cueType_abbrev[cueType]
+            for cueType in ca2plot[next(iter(ca2plot))].keys()
+            if cueType in self.cueType_abbrev
+        ]
+
+        for cell_idx, cell_type in enumerate(ca2plot.keys()):
+            for cT_idx, cueType in enumerate(ca2plot[cell_type].keys()):
+                data2plot = np.array(ca2plot[cell_type][cueType]).copy()
+
+                n_cells = data2plot.shape[0]
+                self.fig_tools.violin_plot(
+                    ax=axes[cell_idx],
+                    x=[cT_idx] * len(data2plot),
+                    y=data2plot,
+                    color=color_map[cueType],
+                )
+                axes[cell_idx].set_title(
+                    f"{cell_type} Cells (N = {n_cells})", fontsize=self.title_fs
+                )
+                axes[cell_idx].set_xticks(range(0, len(abbrev_labels)))
+                axes[cell_idx].set_xticklabels(abbrev_labels, fontsize="small")
+                axes[cell_idx].set_ylabel("Post-cue Amp", fontsize=self.axis_fs)
+
+        self._cT_cA_plotSaver(
+            fig=fig,
+            fname=self.fname,
+            extra_txt=f"{self.CCFPtxt['VIO']}_byCellType",
         )
 
     def _cT_cA_plotSaver(

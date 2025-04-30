@@ -268,10 +268,10 @@ class CueCellFinder(CCF_Utils):
         if self.cueAmp:
             # plot cueAmp boxplots
             self.print_wFrm(
-                "cueAmp (1 Fig; suplots by cell with cueAmp Violin Plots by cueType)"
+                "cueAmp (2 Figs; 1) plots by cell with post cue Amplitude by cueType; 2) plots by cell type (both Violin plots))"
             )
             self.Plotter.plot_cueTrigSig_OR_cueAmp(
-                self.cueAmp, "cueAmp", ind=self.ind, VIO=True
+                self.cueAmp, "cueAmp", ind=self.ind, VIO=True, plot_by_cell_type=True
             )
             # export stats results to csv
             self.print_wFrm(
