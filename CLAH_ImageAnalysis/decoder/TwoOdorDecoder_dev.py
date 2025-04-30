@@ -65,7 +65,7 @@ class TwoOdorDecoder(BC):
         self.DecodeOdorEpochs()
         self.DecodeBCSW()
         self.plotResults()
-        self.analyze_tuning_similarity_by_cell_type()
+        # self.analyze_tuning_similarity_by_cell_type()
 
     def static_class_var_init(
         self,
@@ -173,7 +173,9 @@ class TwoOdorDecoder(BC):
             },
             "cmap": {
                 "imshow": "magma",
-                "odors": self.fig_tools.create_cmap4categories(num_categories=4),
+                "odors": self.fig_tools.create_cmap4categories(
+                    num_categories=4, cmap_name="Accent"
+                ),
                 "cellTypes": self.fig_tools.create_cmap4categories(
                     num_categories=len(self.cellTypes), cmap_name="tab20"
                 ),
@@ -300,6 +302,27 @@ class TwoOdorDecoder(BC):
         for key in ["CUE1_IDX", "CUE2_IDX", "BOTHCUES_IDX"]:
             self.CueCellTableDict[key].sort()
 
+    def get_pkvals_from_OPT(
+        self, OPT: np.ndarray, ind4ct: list | None = None
+    ) -> np.ndarray:
+        """
+        Extracts the peak values from the OPT array.
+        """
+        OPT2use = OPT.copy()
+        if ind4ct is not None:
+            ind1_4ct = [
+                ind * 2 for ind in ind4ct
+            ]  # multiply by 2 give peak time & height columns
+            ind2_4ct = [
+                ind + 1 for ind in ind1_4ct
+            ]  # add 1 to get 2nd column for each cell
+            ind3_4ct = np.concatenate(
+                [ind1_4ct, ind2_4ct]
+            )  # concatenate to get all columns
+            ind3_4ct = np.sort(ind3_4ct)  # sort to get correct order
+            OPT2use = OPT2use[:, ind3_4ct]
+        return OPT2use
+
     def findOdorTimes(self) -> None:
         """
         Finds the odor times and labels.
@@ -421,8 +444,8 @@ class TwoOdorDecoder(BC):
         }
 
         # use z-scored C_Temp
-        # CTEMP2USE = self.zC_Temp.copy()
-        CTEMP2USE = self.C_Temp.copy()
+        CTEMP2USE = self.zC_Temp.copy()
+        # CTEMP2USE = self.C_Temp.copy()
 
         for idx, ot in enumerate(self.OdorTimes):
             cue_start_time = ot[0]
@@ -437,11 +460,15 @@ class TwoOdorDecoder(BC):
             trial_indices = np.where(
                 (self.adjFrTimes >= trial_start) & (self.adjFrTimes <= trial_end)
             )[0]
+            precue_indices = np.where(
+                (self.adjFrTimes >= trial_start) & (self.adjFrTimes <= cue_start_time)
+            )[0]
             post_cue_indices = np.where(
                 (self.adjFrTimes > cue_start_time) & (self.adjFrTimes <= trial_end)
             )[0]
 
             if trial_indices.shape[0] == self.trial_dur:
+                baseline_data = CTEMP2USE[:, precue_indices]
                 # Get trial data
                 trial_data = CTEMP2USE[:, trial_indices]
                 self.OdorEpochs[:, :, idx] = trial_data
@@ -451,7 +478,9 @@ class TwoOdorDecoder(BC):
                 post_time_data = self.adjFrTimes[post_cue_indices]
 
                 # Find peaks and times
-                max_peak_val = np.max(post_cue_data, axis=1)
+                max_peak_val = np.max(post_cue_data, axis=1) - np.mean(
+                    baseline_data, axis=1
+                )
                 max_peak_idx = np.argmax(post_cue_data, axis=1)
                 max_peak_time = (
                     post_time_data[max_peak_idx] - lap_start_time
@@ -483,6 +512,64 @@ class TwoOdorDecoder(BC):
             "Applying normalizing to features array (OdorPeaksNTimes -> normOdorPeaksNTimes)"
         )
         self.normOdorPeaksNTimes = self.dep.feature_normalization(self.OdorPeaksNTimes)
+
+        fig, ax = self.fig_tools.create_plt_subplots()
+        labels2use = self.Labels["ODORSwSWITCH"]
+        cmap4cellTypes = self.plot_params["cmap"]["odors"]
+        colors = [cmap4cellTypes(int(idx)) for idx in range(len(np.unique(labels2use)))]
+
+        start_offset = -0.3
+        step_size = 0.2
+        stop_value = len(np.unique(labels2use))
+        base_seq = np.arange(start=start_offset, stop=stop_value, step=step_size)
+
+        for cidx, ctype in enumerate(self.cellTypes):
+            bar_pos = cidx + base_seq
+            cind = self.cellTypeInds[ctype]
+            OPT2use = self.get_pkvals_from_OPT(self.normOdorPeaksNTimes, cind)
+            pks = OPT2use[:, ::2]
+            # locs = OPT2use[:, 1::2]
+            for lidx, label in enumerate(np.unique(labels2use)):
+                idx2use = np.where(labels2use == label)[0]
+                meanVals = np.mean(pks[idx2use], axis=0)
+                self.fig_tools.bar_plot(
+                    ax=ax,
+                    X=bar_pos[lidx],
+                    Y=np.mean(meanVals),
+                    yerr=np.std(meanVals) / np.sqrt(len(meanVals)),
+                    color=colors[lidx],
+                    alpha=self.plot_params["bar"]["alpha"],
+                    width=self.plot_params["bar"]["width"],
+                )
+                self.fig_tools.scatter_plot(
+                    ax=ax,
+                    X=bar_pos[lidx] * np.ones(len(meanVals)),
+                    Y=meanVals,
+                    color=colors[lidx],
+                    alpha=self.plot_params["scatter"]["alpha"],
+                    s=self.plot_params["scatter"]["s_large"],
+                    jitter=0.001,
+                )
+        ax.set_xticks(np.arange(len(self.cellTypes)))
+        ax.set_xticklabels(self.cellTypes)
+        ax.set_xlabel("Cell Type", fontsize=self.plot_params["fsize"]["axis"])
+        ax.set_ylabel(
+            "Peak Value (baseline-subtracted)",
+            fontsize=self.plot_params["fsize"]["axis"],
+        )
+
+        facecolors = colors
+        legend_elements = self.fig_tools.create_legend_patch_fLoop(
+            facecolor=facecolors,
+            label=self.Label_Names["ODORSwSWITCH"],
+            edgecolor=colors,
+            marker=["o"] * len(facecolors),
+        )
+        ax.legend(handles=legend_elements, loc="upper left", bbox_to_anchor=(1, 1))
+
+        self.fig_tools.save_figure(
+            fig, "OdorPeaks_by_cellType", figure_save_path=self.FigPath
+        )
 
         self.print_done_small_proc()
 
@@ -623,16 +710,28 @@ class TwoOdorDecoder(BC):
                 minDiffs[key].append(minD)
                 maxDiffs_loc[key].append(maxDloc)
                 minDiffs_loc[key].append(minDloc)
-                # minmaxDiffs[key].append(
-                #     (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
-                # )
-                minmaxDiffs[key].append(np.mean(diff[c, loc_slice]))
+                minmaxDiffs[key].append(
+                    (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
+                )
+                # minmaxDiffs[key].append(np.mean(diff[c, loc_slice]))
                 diffAUCs[key].append(diffAUC)
-        maxDiffs = {key: np.array(maxDiffs[key]) for key in loc_keys}
-        minDiffs = {key: np.array(minDiffs[key]) for key in loc_keys}
-        minmaxDiffs = {key: np.array(minmaxDiffs[key]) for key in loc_keys}
+
+        # convert lists to arrays
+        for x in [
+            maxDiffs,
+            minDiffs,
+            minmaxDiffs,
+            maxDiffs_loc,
+            minDiffs_loc,
+            diffAUCs,
+        ]:
+            for key in loc_keys:
+                x[key] = np.array(x[key])
+
         maxDiffs_loc = {key: np.array(maxDiffs_loc[key]) for key in loc_keys}
         minDiffs_loc = {key: np.array(minDiffs_loc[key]) for key in loc_keys}
+        diffAUCs = {key: np.array(diffAUCs[key]) for key in loc_keys}
+
         self.print_done_small_proc()
 
         self.rprint("Performing clustering on distance maps")
@@ -782,20 +881,9 @@ class TwoOdorDecoder(BC):
                 The accuracy of the decoder.
 
             """
-            OPT2use = self.normOdorPeaksNTimes.copy()
+            OPT2use = self.get_pkvals_from_OPT(self.normOdorPeaksNTimes, ind4ct)
             label2use = label.copy()
-            if ind4ct is not None:
-                ind1_4ct = [
-                    ind * 2 for ind in ind4ct
-                ]  # multiply by 2 give peak time & height columns
-                ind2_4ct = [
-                    ind + 1 for ind in ind1_4ct
-                ]  # add 1 to get 2nd column for each cell
-                ind3_4ct = np.concatenate(
-                    [ind1_4ct, ind2_4ct]
-                )  # concatenate to get all columns
-                ind3_4ct = np.sort(ind3_4ct)  # sort to get correct order
-                OPT2use = OPT2use[:, ind3_4ct]
+
             accuracy, conf_matrices, _ = GeneralDecoder.run_Decoder(
                 data_arr=OPT2use,
                 label_arr=np.array(label2use),
@@ -1331,7 +1419,7 @@ class TwoOdorDecoder(BC):
                 embedding[inds, 0],
                 embedding[inds, 1],
                 color=colors[label],
-                s=self.plot_params["scatter"]["s_small"],
+                s=self.plot_params["scatter"]["s_large"],
                 alpha=self.plot_params["scatter"]["alpha"],
             )
 
@@ -1374,18 +1462,15 @@ class TwoOdorDecoder(BC):
         # extract UMAP embedding
         embedding = self.dep.UMAP_fit2distMatrix(distance_matrix)
 
-        embedding_by_ct = {}
-        for ctype in self.cellTypes:
-            OPT2use = self.normOdorPeaksNTimes.copy()
-            ind4ct = self.cellTypeInds[ctype]
-            ind1_4ct = [ind * 2 for ind in ind4ct]
-            ind2_4ct = [ind + 1 for ind in ind1_4ct]
-            ind3_4ct = np.sort(np.concatenate([ind1_4ct, ind2_4ct]))
-            OPT2use = OPT2use[:, ind3_4ct]
-            simMat4ct = self.dep.calc_simMatrix(OPT2use)
-            embedding_by_ct[ctype] = self.dep.UMAP_fit2distMatrix(
-                self.dep.create_distance_matrix_from_similarity_matrix(simMat4ct)
-            )
+        # embedding_by_ct = {}
+        # for ctype in self.cellTypes:
+        #     OPT2use = self.get_pkvals_from_OPT(
+        #         self.normOdorPeaksNTimes, self.cellTypeInds[ctype]
+        #     )
+        #     simMat4ct = self.dep.calc_simMatrix(OPT2use)
+        #     embedding_by_ct[ctype] = self.dep.UMAP_fit2distMatrix(
+        #         self.dep.create_distance_matrix_from_similarity_matrix(simMat4ct)
+        #     )
 
         for idx, (ax, label_cat) in enumerate(zip(axes, self.Labels.keys())):
             cmap4labels = self.plot_params["cmap"]["odors"]
@@ -1826,7 +1911,7 @@ class TwoOdorDecoder(BC):
                         Y=d2plot,
                         color=colors[cidx],
                         s=self.plot_params["scatter"]["s_small"],
-                        jitter=0,
+                        jitter=0.01,
                     )
                 # bar2_ax.plot(
                 #     [
@@ -1863,7 +1948,26 @@ class TwoOdorDecoder(BC):
                 )
 
         self.fig_tools.save_figure(
-            fig, "MinMaxDiff_BCSW_ByLocation", figure_save_path=self.FigPath
+            fig, "minmaxDiff_BCSW_ByLocation", figure_save_path=self.FigPath
+        )
+
+        # fig, ax = self.fig_tools.create_plt_subplots(ncols=3, flatten=True)
+        fig, ax = self.fig_tools.create_plt_subplots()
+
+        ax.set_title("L1 vs L2 - Diff AUC")
+        ax.set_xlabel("L1")
+        ax.set_ylabel("L2")
+
+        for cidx, (ctype, cind) in enumerate(self.cellTypeInds.items()):
+            ax.scatter(
+                self.BCSW_comparison["DIFFAUC"]["L1"][cind],
+                self.BCSW_comparison["DIFFAUC"]["L2"][cind],
+                color=colors[cidx],
+                s=self.plot_params["scatter"]["s_large"],
+            )
+
+        self.fig_tools.save_figure(
+            fig, "DiffAUC_Scatter", figure_save_path=self.FigPath
         )
 
     def analyzing_BCSwitchTuning(self) -> None:
@@ -1916,115 +2020,115 @@ class TwoOdorDecoder(BC):
 
         self.fig_tools.save_figure(fig, "BCSW_Heatmap", figure_save_path=self.FigPath)
 
-    def analyze_tuning_similarity_by_cell_type(self):
-        """
-        Calculates and compares the average spatial tuning similarity (from concatenated
-        tuning curves across lap types) within and between different cell types
-        (Cue, Place, NA).
-        """
+    # def analyze_tuning_similarity_by_cell_type(self):
+    #     """
+    #     Calculates and compares the average spatial tuning similarity (from concatenated
+    #     tuning curves across lap types) within and between different cell types
+    #     (Cue, Place, NA).
+    #     """
 
-        def get_similarity_values(indices1, indices2, matrix):
-            """Extracts similarity values between two sets of indices."""
-            if len(indices1) == 0 or len(indices2) == 0:
-                # return empty array if no cells in one group
-                return np.array([])
+    #     def get_similarity_values(indices1, indices2, matrix):
+    #         """Extracts similarity values between two sets of indices."""
+    #         if len(indices1) == 0 or len(indices2) == 0:
+    #             # return empty array if no cells in one group
+    #             return np.array([])
 
-            sub_matrix = matrix[np.ix_(indices1, indices2)]
+    #         sub_matrix = matrix[np.ix_(indices1, indices2)]
 
-            if np.array_equal(indices1, indices2):
-                # Within-group: get upper triangle excluding diagonal (k=1)
-                if sub_matrix.shape[0] < 2:
-                    return np.array([])  # Need at least 2 cells for pairwise similarity
-                vals = sub_matrix[np.triu_indices_from(sub_matrix, k=1)]
-            else:
-                # Between-group: get all values from the rectangular submatrix
-                vals = sub_matrix.flatten()
-            return vals[~np.isnan(vals)]  # Remove NaNs if any
+    #         if np.array_equal(indices1, indices2):
+    #             # Within-group: get upper triangle excluding diagonal (k=1)
+    #             if sub_matrix.shape[0] < 2:
+    #                 return np.array([])  # Need at least 2 cells for pairwise similarity
+    #             vals = sub_matrix[np.triu_indices_from(sub_matrix, k=1)]
+    #         else:
+    #             # Between-group: get all values from the rectangular submatrix
+    #             vals = sub_matrix.flatten()
+    #         return vals[~np.isnan(vals)]  # Remove NaNs if any
 
-        def print_stats(name: str, data: np.ndarray) -> None:
-            if len(data) > 0:
-                self.print_wFrm(
-                    f"  {name:<15}: {np.mean(data):.3f} +/- {np.std(data) / np.sqrt(len(data)):.3f} (n={len(data)})",
-                    frame_num=2,
-                )
+    #     def print_stats(name: str, data: np.ndarray) -> None:
+    #         if len(data) > 0:
+    #             self.print_wFrm(
+    #                 f"  {name:<15}: {np.mean(data):.3f} +/- {np.std(data) / np.sqrt(len(data)):.3f} (n={len(data)})",
+    #                 frame_num=2,
+    #             )
 
-        def print_comparison(name: str, data1: np.ndarray, data2: np.ndarray) -> None:
-            if len(data1) > 0 and len(data2) > 0:
-                self.print_wFrm(
-                    f"  {name:<25}: p = {mannwhitneyu(data1, data2, alternative='two-sided').pvalue:.4f}",
-                    frame_num=2,
-                )
+    #     def print_comparison(name: str, data1: np.ndarray, data2: np.ndarray) -> None:
+    #         if len(data1) > 0 and len(data2) > 0:
+    #             self.print_wFrm(
+    #                 f"  {name:<25}: p = {mannwhitneyu(data1, data2, alternative='two-sided').pvalue:.4f}",
+    #                 frame_num=2,
+    #             )
 
-        self.rprint("Analyzing spatial tuning similarity by cell type:")
+    #     self.rprint("Analyzing spatial tuning similarity by cell type:")
 
-        sim_matrix = self.simMat4PRClustering.get("concat", None)
-        cell_dict = self.CueCellTableDict
+    #     sim_matrix = self.simMat4PRClustering.get("concat", None)
+    #     cell_dict = self.CueCellTableDict
 
-        if sim_matrix is None:
-            self.print_wFrm(
-                "Concatenated similarity matrix not found. Skipping analysis.",
-                frame_num=1,
-            )
-            return None
+    #     if sim_matrix is None:
+    #         self.print_wFrm(
+    #             "Concatenated similarity matrix not found. Skipping analysis.",
+    #             frame_num=1,
+    #         )
+    #         return None
 
-        if not cell_dict:
-            self.print_wFrm(
-                "CueCellTableDict not found. Skipping analysis.", frame_num=1
-            )
-            return None
+    #     if not cell_dict:
+    #         self.print_wFrm(
+    #             "CueCellTableDict not found. Skipping analysis.", frame_num=1
+    #         )
+    #         return None
 
-        cue_indices = np.array(cell_dict.get("CUE_IDX", []))
-        place_indices = np.array(cell_dict.get("PLACE_IDX", []))
-        n_cells = sim_matrix.shape[0]
-        all_indices = np.arange(n_cells)
-        na_indices = np.setdiff1d(
-            all_indices, np.concatenate((cue_indices, place_indices))
-        )
+    #     cue_indices = np.array(cell_dict.get("CUE_IDX", []))
+    #     place_indices = np.array(cell_dict.get("PLACE_IDX", []))
+    #     n_cells = sim_matrix.shape[0]
+    #     all_indices = np.arange(n_cells)
+    #     na_indices = np.setdiff1d(
+    #         all_indices, np.concatenate((cue_indices, place_indices))
+    #     )
 
-        self.print_wFrm(
-            f"Found {len(cue_indices)} Cue, {len(place_indices)} Place, {len(na_indices)} NA cells.",
-            frame_num=1,
-        )
+    #     self.print_wFrm(
+    #         f"Found {len(cue_indices)} Cue, {len(place_indices)} Place, {len(na_indices)} NA cells.",
+    #         frame_num=1,
+    #     )
 
-        results = {}
+    #     results = {}
 
-        # --- 3. Calculate Within-Group Similarities ---
-        sim_within_cue = get_similarity_values(cue_indices, cue_indices, sim_matrix)
-        sim_within_place = get_similarity_values(
-            place_indices, place_indices, sim_matrix
-        )
-        sim_within_na = get_similarity_values(na_indices, na_indices, sim_matrix)
+    #     # --- 3. Calculate Within-Group Similarities ---
+    #     sim_within_cue = get_similarity_values(cue_indices, cue_indices, sim_matrix)
+    #     sim_within_place = get_similarity_values(
+    #         place_indices, place_indices, sim_matrix
+    #     )
+    #     sim_within_na = get_similarity_values(na_indices, na_indices, sim_matrix)
 
-        results["Within_Cue_Sim"] = sim_within_cue
-        results["Within_Place_Sim"] = sim_within_place
-        results["Within_NA_Sim"] = sim_within_na
+    #     results["Within_Cue_Sim"] = sim_within_cue
+    #     results["Within_Place_Sim"] = sim_within_place
+    #     results["Within_NA_Sim"] = sim_within_na
 
-        # --- 4. Calculate Between-Group Similarities ---
-        sim_cue_place = get_similarity_values(cue_indices, place_indices, sim_matrix)
-        sim_cue_na = get_similarity_values(cue_indices, na_indices, sim_matrix)
-        sim_place_na = get_similarity_values(place_indices, na_indices, sim_matrix)
+    #     # --- 4. Calculate Between-Group Similarities ---
+    #     sim_cue_place = get_similarity_values(cue_indices, place_indices, sim_matrix)
+    #     sim_cue_na = get_similarity_values(cue_indices, na_indices, sim_matrix)
+    #     sim_place_na = get_similarity_values(place_indices, na_indices, sim_matrix)
 
-        results["Cue_Place_Sim"] = sim_cue_place
-        results["Cue_NA_Sim"] = sim_cue_na
-        results["Place_NA_Sim"] = sim_place_na
+    #     results["Cue_Place_Sim"] = sim_cue_place
+    #     results["Cue_NA_Sim"] = sim_cue_na
+    #     results["Place_NA_Sim"] = sim_place_na
 
-        # --- 5. Report Mean Similarities ---
-        self.print_wFrm("Mean Similarities (Concatenated Tuning Curves):", frame_num=1)
-        print_stats("Within Cue", sim_within_cue)
+    #     # --- 5. Report Mean Similarities ---
+    #     self.print_wFrm("Mean Similarities (Concatenated Tuning Curves):", frame_num=1)
+    #     print_stats("Within Cue", sim_within_cue)
 
-        print_stats("Within Cue", sim_within_cue)
-        print_stats("Within Place", sim_within_place)
-        print_stats("Within NA", sim_within_na)
-        print_stats("Cue vs Place", sim_cue_place)
-        print_stats("Cue vs NA", sim_cue_na)
-        print_stats("Place vs NA", sim_place_na)
+    #     print_stats("Within Cue", sim_within_cue)
+    #     print_stats("Within Place", sim_within_place)
+    #     print_stats("Within NA", sim_within_na)
+    #     print_stats("Cue vs Place", sim_cue_place)
+    #     print_stats("Cue vs NA", sim_cue_na)
+    #     print_stats("Place vs NA", sim_place_na)
 
-        self.print_wFrm("Statistical Comparisons (Mann-Whitney U):", frame_num=1)
-        print_comparison("Within-Cue vs Cue-Place", sim_within_cue, sim_cue_place)
-        print_comparison("Within-Place vs Cue-Place", sim_within_place, sim_cue_place)
-        print_comparison("Within-Cue vs Within-Place", sim_within_cue, sim_within_place)
+    #     self.print_wFrm("Statistical Comparisons (Mann-Whitney U):", frame_num=1)
+    #     print_comparison("Within-Cue vs Cue-Place", sim_within_cue, sim_cue_place)
+    #     print_comparison("Within-Place vs Cue-Place", sim_within_place, sim_cue_place)
+    #     print_comparison("Within-Cue vs Within-Place", sim_within_cue, sim_within_place)
 
-        self.print_done_small_proc()
+    #     self.print_done_small_proc()
 
     def _print_acc_results(self, accu: np.ndarray, key: str, max_length: int) -> str:
         """
