@@ -16,14 +16,19 @@ class CRwROI_plots(BC):
             self.color_dict["blue_base_rgb"],
             self.color_dict["green_base_rgb"],
         ]
+
+        # self.cmap4celltypes = self.fig_tools.create_cmap4categories(
+        #     num_categories=10, cmap_name="tab20"
+        # )
+
         self.sim_rel_size = (20, 7)
         self.FOV_cluster_size = (20, 15)
-        self.cue_cell_color = self.fig_tools.hex_to_rgba(
-            self.color_dict["red"], wAlpha=False
-        )
-        self.non_cue_cell_color = self.fig_tools.hex_to_rgba(
-            self.color_dict["blue"], wAlpha=False
-        )
+        # self.cue_cell_color = self.fig_tools.hex_to_rgba(
+        #     self.color_dict["red"], wAlpha=False
+        # )
+        # self.non_cue_cell_color = self.fig_tools.hex_to_rgba(
+        #     self.color_dict["blue"], wAlpha=False
+        # )
 
         self.numSess = numSess
         self.CRkey = CRkey
@@ -79,7 +84,7 @@ class CRwROI_plots(BC):
         for i, _ in enumerate(footprints):
             color4legend = self.RBG[i % len(self.RBG)]
             legend_handles = self.fig_tools.create_legend_patch(
-                legend2patch=legend_handles, facecolor=color4legend, label=f"S{i+1}"
+                legend2patch=legend_handles, facecolor=color4legend, label=f"S{i + 1}"
             )
         ax.legend(handles=legend_handles, loc="upper right", fontsize=10)
         self.fig_tools.save_figure(fig, save_title, self.CRkey["FIG_FOLDER"])
@@ -269,7 +274,7 @@ class CRwROI_plots(BC):
         subj_id: str,
         FOV_clusters: list,
         cluster_info: dict,
-        isPC2plot: list,
+        isCell2plot: list,
         PC_dict: dict,
         rectangular: bool = False,
         circular: bool = False,
@@ -283,7 +288,7 @@ class CRwROI_plots(BC):
             subj_id (str): Subject ID.
             FOV_clusters (list): List of FOV clusters.
             cluster_info (dict): Cluster information.
-            isPC2plot (list): List of boolean values indicating whether a cell is a PC or not.
+            isCell2plot (list): List of boolean values indicating whether a cell is a PC or not.
             PC_dict (dict): Dictionary containing PC information.
             rectangular (bool, optional): Whether to plot rectangular bounding boxes. Defaults to False.
             circular (bool, optional): Whether to plot circular patches. Defaults to False.
@@ -292,6 +297,11 @@ class CRwROI_plots(BC):
         Returns:
             None
         """
+        if not preQC:
+            QC2use = "POST_QC"
+        else:
+            QC2use = "PRE_QC"
+
         # init total_sess var for legibility
         total_sess = self.numSess
 
@@ -304,9 +314,31 @@ class CRwROI_plots(BC):
             self.CRkey["ACLUSTERS_QC"] if not preQC else self.CRkey["ACLUSTERS"]
         )
 
-        numPC = [PC.sum() for PC in isPC2plot]
-        numNonPC = [cluster_info[clusterkey2use] - PC.sum() for PC in isPC2plot]
-        total4PC = [PC + nonPC for PC, nonPC in zip(numPC, numNonPC)]
+        ctkeys2use = [
+            key
+            for key in isCell2plot.keys()
+            if key in ["CUE1", "CUE2", "BOTH", "PLACE"]
+        ]
+
+        ctkeysall = ctkeys2use + ["NON"]
+
+        cell_totals = []
+        for sess in range(total_sess):
+            # total_cells = len(isCell2plot["CUE1"][QC2use][sess])
+            cue1 = isCell2plot["CUE1"][QC2use][sess].sum()
+            cue2 = isCell2plot["CUE2"][QC2use][sess].sum()
+            both = isCell2plot["BOTH"][QC2use][sess].sum()
+            place = isCell2plot["PLACE"][QC2use][sess].sum()
+            non = isCell2plot["NON"][QC2use][sess].sum()
+            total_dict = {
+                "CUE1": cue1,
+                "CUE2": cue2,
+                "BOTH": both,
+                "PLACE": place,
+                "NON": non,
+                "TOTAL": cue1 + cue2 + both + place + non,
+            }
+            cell_totals.append(total_dict)
 
         # set up titles for each subplot to be the session number
         titles = []
@@ -339,61 +371,75 @@ class CRwROI_plots(BC):
             yticks=ticks,
         )
 
-        if rectangular:
-            PC_bounds = PC_dict[self.CRkey["BOUND"]]
-            for idx, bounding_box in enumerate(PC_bounds):
-                self.fig_tools.plot_bounding_box(
-                    axis=axes[0, idx],
-                    bounding_box=bounding_box,
-                    edgecolor=self.cue_cell_color,
-                )
-        elif circular:
-            PC_centroids = PC_dict[self.CRkey["CENT"]]
-            PC_radii = PC_dict[self.CRkey["MIN_D"]]
-            for idx, (centroids, radii) in enumerate(zip(PC_centroids, PC_radii)):
-                for cent, rad in zip(centroids, radii):
-                    self.fig_tools.plot_circle_patch(
-                        axes[0, idx],
-                        cent,
-                        rad,
-                        edgecolor=self.cue_cell_color,
-                    )
-        elif contour:
-            PC_contours = PC_dict[self.CRkey["CONTOUR"]]
-            for idx, sess_ctrs in enumerate(PC_contours):
-                for cell_ctrs in sess_ctrs:
-                    for ctrs in cell_ctrs:
-                        self.fig_tools.plot_contour(
-                            axes[0, idx],
-                            ctrs,
-                            edgecolor=self.cue_cell_color,
-                        )
+        cmap4ct = self.fig_tools.create_cmap4categories(
+            num_categories=len(ctkeysall), cmap_name="tab20"
+        )
+        colors = {ctkey: cmap4ct(i) for i, ctkey in enumerate(ctkeysall)}
 
-        for i, (PC, nonPC, total) in enumerate(zip(numPC, numNonPC, total4PC)):
-            # Calculate proportions
-            proportions = [PC / total, nonPC / total]
-            labels = ["CUE", "NONCUE"]
-            colors = [self.cue_cell_color, self.non_cue_cell_color]
+        if rectangular:
+            for cidx, cellType in enumerate(ctkeys2use):
+                PC_bounds = PC_dict[cellType][self.CRkey["BOUND"]]
+                for idx, bounding_box in enumerate(PC_bounds):
+                    self.fig_tools.plot_bounding_box(
+                        axis=axes[0, idx],
+                        bounding_box=bounding_box,
+                        edgecolor=colors[cellType],
+                    )
+        elif circular:
+            for cidx, cellType in enumerate(ctkeys2use):
+                PC_centroids = PC_dict[cellType][self.CRkey["CENT"]]
+                PC_radii = PC_dict[cellType][self.CRkey["MIN_D"]]
+                for idx, (centroids, radii) in enumerate(zip(PC_centroids, PC_radii)):
+                    for cent, rad in zip(centroids, radii):
+                        self.fig_tools.plot_circle_patch(
+                            axes[0, idx],
+                            cent,
+                            rad,
+                            edgecolor=colors[cellType],
+                        )
+        elif contour:
+            for cidx, cellType in enumerate(ctkeys2use):
+                PC_contours = PC_dict[cellType][self.CRkey["CONTOUR"]]
+                for idx, sess_ctrs in enumerate(PC_contours):
+                    for cell_ctrs in sess_ctrs:
+                        for ctrs in cell_ctrs:
+                            self.fig_tools.plot_contour(
+                                axes[0, idx],
+                                ctrs,
+                                edgecolor=colors[cellType],
+                            )
+
+        for i, ctotal in enumerate(cell_totals):
+            props = []
+            labels = []
+            labels4plot = []
+            for ctkey in ctotal.keys():
+                if ctkey == "TOTAL":
+                    continue
+                labels4plot.append(f"{ctkey}: {ctotal[ctkey]}")
+                labels.append(ctkey)
+                props.append(ctotal[ctkey] / ctotal["TOTAL"])
+            colors4plot = [colors[ctkey] for ctkey in labels]
 
             # Create pie chart
             wedges, _, _ = axes[1, i].pie(
-                proportions,
-                labels=None,
-                colors=colors,
+                props,
+                labels=labels4plot,
+                colors=colors4plot,
                 autopct="%1.1f%%",
                 startangle=140,
                 wedgeprops={"alpha": 0.8},
             )
             axes[1, i].set_aspect("equal")
 
-        if total_sess < 4:
-            axes[1, -1].legend(
-                wedges,
-                labels,
-                title=f"Total: {cluster_info[clusterkey2use]}",
-                loc="upper right",
-                fontsize=self.axis_fs,
-            )
+        # if total_sess < 4:
+        #     axes[1, -1].legend(
+        #         wedges,
+        #         labels,
+        #         title=f"Total: {cluster_info[clusterkey2use]}",
+        #         loc="upper right",
+        #         fontsize=self.axis_fs,
+        #     )
         # axes[1, 0].set_ylabel("Proportion of Tracked Cells")
 
         save_title = "FOV_clusters" if not preQC else "FOV_clusters_preQC"
