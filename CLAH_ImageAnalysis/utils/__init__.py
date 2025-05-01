@@ -13,6 +13,7 @@ __all__ = [
     "mdata_extractor",
     "parser_utils",
     "Streamlit_utils",
+    "isx_utils",
     "db_utils",
     "selector",
     "iter_utils",
@@ -50,6 +51,7 @@ if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from . import parser_utils
     from . import db_utils
     from . import Streamlit_utils
+    from . import isx_utils
     from .selector import *
     from . import iter_utils
     from . import image_utils

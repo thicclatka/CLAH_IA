@@ -189,6 +189,8 @@ def init_session_state():
         st.session_state.use_PREV_JSON_checkbox_result = False
     if "show_eval_results_bool" not in st.session_state:
         st.session_state.show_eval_results_bool = False
+    if "best_params" not in st.session_state:
+        st.session_state.best_params = {}
 
 
 def file_check4dbCreation(filenames: list[str]):
@@ -623,23 +625,44 @@ def NNsectionHandler(selected_session: str, model_name: str = ""):
                 with st.spinner("Initializing model..."):
                     model_runner = GeneralModelRunner(
                         model=NNModel4BinaryClassification(
-                            feature_size=int(len(feature_extractor.features_order))
+                            feature_size=int(len(feature_extractor.features_order)),
                         ),
                         features_order=feature_extractor.features_order,
                     )
+                with st.spinner("Optimizing hyperparameters..."):
+                    best_params = model_runner.optimize_hyperparameters(
+                        features_vector=features_vector,
+                        labels_vector=labels_vector,
+                    )
+                    st.warning(best_params)
+                with st.spinner(
+                    "Reinitializing model with optimized hyperparameters..."
+                ):
+                    optimized_model_runner = GeneralModelRunner(
+                        model=NNModel4BinaryClassification(
+                            feature_size=int(len(feature_extractor.features_order)),
+                            layer_sizes=best_params["layer_sizes"],
+                            dropout_rates=best_params["dropout_rates"],
+                        ),
+                        features_order=feature_extractor.features_order,
+                        learning_rate=best_params["learning_rate"],
+                        batch_size=best_params["batch_size"],
+                        weight_decay=best_params["weight_decay"],
+                    )
                 with st.spinner("Cross-validating model..."):
-                    model_runner.cross_validate(
+                    optimized_model_runner.cross_validate(
                         features_vector=features_vector,
                         labels_vector=labels_vector,
                         metadata=metadata,
                     )
                     st.session_state.nn_success_bool = True
-                    st.session_state.model_runner = model_runner
+                    st.session_state.model_runner = optimized_model_runner
                     st.session_state.feature_extractor = feature_extractor
                     st.session_state.features_vector = features_vector
                     st.session_state.labels_vector = labels_vector
                     st.session_state.metadata = metadata
                     st.session_state.model_name2load = "New Model (unsaved)"
+                    st.session_state.best_params = best_params
                     st.rerun()
             if st.session_state.nn_success_bool:
                 create_model_performance_string(
@@ -1708,6 +1731,7 @@ def _refresh_NN_settings():
     st.session_state.feature_extractor = None
     st.session_state.features_vector = None
     st.session_state.save_model_bool = False
+    st.session_state.best_params = {}
     st.session_state.load_model_bool = False
     st.session_state.selected_model_dict = {}
     st.session_state.run_train_model_bool = False

@@ -16,6 +16,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from matplotlib.colors import Normalize
 from typing import Any
+import matplotlib.gridspec as gridspec
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 # import plotly.tools as tls
 # import plotly.io as pio
 
@@ -32,6 +34,16 @@ if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
     )
 
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+
+def interactive_mode(plt_on: bool = False) -> None:
+    """
+    Set the interactive mode for matplotlib.
+    """
+    if plt_on:
+        plt.ion()
+    else:
+        plt.ioff()
 
 
 def check_color_format(color: str | tuple) -> str:
@@ -88,6 +100,19 @@ def determine_font2use(font_family: str) -> str:
             font2use = "sans-serif"
 
     return font2use
+
+
+def tighten_layoutWspecific_axes(
+    coords2tighten: list,
+) -> None:
+    """
+    Tighten the layout of the figure for specific axes.
+
+    Parameters:
+        plt_figure (matplotlib.figure.Figure): The figure to be tightened.
+        coords2tighten (list): The coordinates of the axes to be tightened.
+    """
+    plt.tight_layout(rect=coords2tighten)
 
 
 def save_figure(
@@ -253,6 +278,27 @@ def make_segmented_colormap(
     )
 
 
+def create_cmap4categories(num_categories: int, cmap_name: str | None = None):
+    """
+    Create a colormap for a given number of categories.
+
+    Parameters:
+        num_categories (int): The number of categories.
+        cmap_name (str, optional): The name of the colormap to use. Defaults to "tab10".
+
+    Returns:
+        cmap (matplotlib.colors.LinearSegmentedColormap): The created colormap.
+    """
+    if cmap_name is None:
+        cmap_name = "tab10"
+
+    if cmap_name not in plt.colormaps():
+        raise ValueError(f"Colormap {cmap_name} not found.")
+
+    cmap = plt.get_cmap(cmap_name, num_categories)
+    return cmap
+
+
 def make_segmented_colormap_wOverlap(
     colors: list, num_categories: int, base: int
 ) -> mcolors.LinearSegmentedColormap:
@@ -334,8 +380,8 @@ def create_legend_patch(
     facecolor = facecolor if isinstance(facecolor, tuple) else hex_to_rgba(facecolor)
 
     if marker is not None:
-        facecolor = color_dict()["black"]
-        edgecolor = color_dict()["black"]
+        facecolor = color_dict()["black"] if facecolor is None else facecolor
+        edgecolor = color_dict()["black"] if edgecolor is None else edgecolor
         legend2patch.append(
             Line2D(
                 [0],
@@ -430,15 +476,54 @@ def create_plt_subplots(
         ax (matplotlib.axes.Axes): The created axes.
     """
 
-    if plt_on:
-        plt.ion()
-    else:
-        plt.ioff()
+    interactive_mode(plt_on)
 
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
     if flatten and nrows * ncols > 1:
         ax = ax.flatten()
     return fig, ax
+
+
+def create_plt_GridSpec(
+    nrows: int = 1,
+    ncols: int = 1,
+    figsize: tuple = (10, 10),
+    height_ratios: list = None,
+    width_ratios: list = None,
+    plt_on: bool = False,
+) -> tuple:
+    """
+    Create a matplotlib figure and axes with the specified figsize.
+    """
+
+    interactive_mode(plt_on)
+
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(
+        nrows, ncols, height_ratios=height_ratios, width_ratios=width_ratios
+    )
+    return fig, gs
+
+
+def add_suplot_to_figViaGridSpec(
+    fig: plt.Figure,
+    gs: gridspec.GridSpec,
+) -> None:
+    """
+    Add a suplot to a figure via GridSpec.
+
+    Parameters:
+        fig (plt.Figure): The figure to add the subplot to.
+        gs (gridspec.GridSpec): The GridSpec to add the subplot to.
+
+    Returns:
+        axes (list): The list of axes. The size of the list is the same as the number of subplots. Organized by row-major order, so the first element is the first row and the first column, the second element is the first row and the second column, etc.
+    """
+    axes = []
+    for i in range(gs.nrows):
+        for j in range(gs.ncols):
+            axes.append(fig.add_subplot(gs[i, j]))
+    return axes
 
 
 def plot_imshow(
@@ -594,6 +679,29 @@ def set_cbar_location(
     cbar = fig.colorbar(cbar_ref, cax=cbar_ax)
     cbar.ax.yaxis.set_ticks_position(position)
     cbar.ax.yaxis.set_label_position(position)
+
+
+def makeAxesLocatable(
+    ax: plt.Axes,
+) -> object:
+    """
+    Make an axes locatable object.
+    """
+    return make_axes_locatable(ax)
+
+
+def append_axes2locator(
+    locator: object,
+    position: str,
+    size: str,
+    pad: float,
+    sharex: plt.Axes | None = None,
+    sharey: plt.Axes | None = None,
+) -> None:
+    locatorWaxes = locator.append_axes(
+        position=position, size=size, pad=pad, sharex=sharex, sharey=sharey
+    )
+    return locatorWaxes
 
 
 def plot_bounding_box(
@@ -936,7 +1044,7 @@ def line_plot(
 
 def scatter_plot(
     ax: plt.Axes,
-    X: np.ndarray,
+    X: np.ndarray | float | int,
     Y: np.ndarray,
     color: str = None,
     edgecolor: str = None,
@@ -1238,6 +1346,8 @@ def create_sig_2samp_annotate(
     arr0: np.ndarray,
     arr1: np.ndarray,
     coords: tuple,
+    twoSamp: bool = True,
+    paired: bool = False,
     parametric: bool = True,
     xytext: tuple = (0, 0),
     textcoords: str = "offset points",
@@ -1265,11 +1375,19 @@ def create_sig_2samp_annotate(
         color (str, optional): The color of the annotation text. Default is "black".
         return_Pval (bool, optional): If True, return the p-value. Default is False.
     """
+    if paired:
+        twoSamp = False
 
     if parametric:
-        from scipy.stats import ttest_ind
+        if twoSamp:
+            from scipy.stats import ttest_ind
 
-        _, pVal = ttest_ind(arr0, arr1, nan_policy="omit")
+            _, pVal = ttest_ind(arr0, arr1, nan_policy="omit")
+        elif paired:
+            from scipy.stats import ttest_rel
+
+            _, pVal = ttest_rel(arr0, arr1, nan_policy="omit")
+
     else:
         from scipy.stats import mannwhitneyu
 
@@ -1290,11 +1408,12 @@ def create_sig_2samp_annotate(
         coords2use = coords
 
     if pVal < 0.05:
-        mkr_sig = f"*\np={pVal:.3f}"
+        # mkr_sig = f"*\np={pVal:.3f}"
+        mkr_sig = "*"
         if pVal < 0.01:
-            mkr_sig = f"**\np={pVal:.4f}"
-            if mkr_sig.endswith("0"):
-                mkr_sig = "***\np<0.0001"
+            mkr_sig = "**"
+            if pVal < 0.001:
+                mkr_sig = "***"
         ax.annotate(
             mkr_sig,
             coords2use,
@@ -1320,3 +1439,36 @@ def delete_axes(fig: plt.Figure) -> None:
     for ax in fig.get_axes():
         if not ax.get_children():
             ax.remove()
+
+
+def format_axes4UMAP(
+    ax: plt.Axes, fontsize: int = 14, fontweight: str = "bold"
+) -> None:
+    """
+    Format axis labels and remove spines for UMAP plots.
+
+    Parameters:
+        ax (plt.Axes): The axis to format.
+        fontsize (int, optional): The font size of the axis labels. Default is 14.
+        fontweight (str, optional): The font weight of the axis labels. Default is "bold".
+    """
+
+    # name labels
+    ax.set_xlabel(
+        "UMAP 1",
+        fontsize=fontsize,
+        fontweight=fontweight,
+    )
+    ax.set_ylabel(
+        "UMAP 2",
+        fontsize=fontsize,
+        fontweight=fontweight,
+    )
+
+    # remove spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    # Remove tick labels (numbers) and tick marks from axes
+    ax.tick_params(axis="x", labelbottom=False, bottom=False)
+    ax.tick_params(axis="y", labelleft=False, left=False)

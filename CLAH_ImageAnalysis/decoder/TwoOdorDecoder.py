@@ -287,7 +287,7 @@ class TwoOdorDecoder(BC):
         self.lapCue = self.CSS["lapCue"]
 
         # extract C & zscore it
-        self.C_Temp = self.SD["C_Temporal"]
+        self.C_Temp = self.SD["C"]
 
         if self.useZscore:
             self.print_wFrm("Z-scoring Temporal Data", frame_num=1)
@@ -394,11 +394,11 @@ class TwoOdorDecoder(BC):
         """
         self.rprint("Organizing Times & Labels by trial epochs:")
         self.print_wFrm(
-            f"{int(self.trial_dur/self.sampling_rate)} second windows: {self.pre_cue_time} sec pre-cue; {self.post_cue_time} sec post-cue"
+            f"{int(self.trial_dur / self.sampling_rate)} second windows: {self.pre_cue_time} sec pre-cue; {self.post_cue_time} sec post-cue"
         )
         adjFrTimes = np.array(self.TBD["adjFrTimes"])
 
-        # Trial epochs needs shape of trials x neurons x time
+        # Trial epochs needs shape of cells x time x trials
         self.TrialEpochs = np.full(
             (self.C_Temp.shape[0], self.trial_dur, self.OdorTimes.shape[0]),
             np.nan,
@@ -522,9 +522,11 @@ class TwoOdorDecoder(BC):
                 self.TrialEpochs,
                 np.array(self.Labels["ODORS"]),
                 num_folds=self.num_folds,
-                kernel_type=self.kernel_type,
-                gamma=self.gamma,
+                kernel_type=self.params4decoder["kernel_type"],
+                gamma=self.params4decoder["gamma"],
+                weight=self.params4decoder["weight"],
             )
+            self.params4decoder["C"] = self.cost_param
             self.print_wFrm(f"Best cost parameter: {self.cost_param}\n")
         elif self.cost_param is not None and self.decoder_type == "SVC":
             self.rprint(f"Using cost parameter set by parser: {self.cost_param}")
@@ -708,7 +710,7 @@ class TwoOdorDecoder(BC):
             text=pval_text,
             transform=axis.transAxes,
             fontsize=12,
-            verticalalignment="top",
+            va="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
         )
         axis.legend()
@@ -846,7 +848,7 @@ class TwoOdorDecoder(BC):
                 text=textstr,
                 fontsize=8,
                 transform=axes[plt_idx_metrics].transAxes,
-                verticalalignment="top",
+                va="top",
                 bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
             )
 

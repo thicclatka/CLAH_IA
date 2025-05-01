@@ -1,207 +1,242 @@
-import streamlit as st
-from streamlit_cropper import st_cropper
+import os
 import cv2
 import numpy as np
 import isx
-import os
 import json
-from PIL import Image
-from CLAH_ImageAnalysis.utils import Streamlit_utils
-from CLAH_ImageAnalysis.utils import findLatest
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from multiprocessing import cpu_count
+from concurrent.futures import ThreadPoolExecutor
+from CLAH_ImageAnalysis.utils import paths
+from CLAH_ImageAnalysis.utils import text_dict
+from tqdm import tqdm
+import io
+import base64
+
+app = FastAPI()
+
+file_tag = text_dict()["file_tag"]
+
+# Allow CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust this to your frontend's URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Get the repo root directory
+PROJECT_ROOT = paths.get_directory_of_repo_from_file()
+
+# Get the TSX output directory
+TSX_OUTPUT_DIR = PROJECT_ROOT / "frontend4WA" / "Cropper" / "dist"
+
+# Mount static files
+app.mount(
+    "/dist",
+    StaticFiles(directory=str(TSX_OUTPUT_DIR)),
+    name="dist",
+)
+app.mount(
+    "/assets",
+    StaticFiles(directory=str(TSX_OUTPUT_DIR / "assets")),
+    name="assets",
+)
+app.mount(
+    "/docs",
+    StaticFiles(directory=str(PROJECT_ROOT / "docs")),
+    name="docs",
+)
 
 
-class MovieCropper:
-    def __init__(self, file_path: str = None):
-        self.isxd_tag = ".isxd"
-        self.file_path = file_path
-        self.crop_coords = []
-        self.crop_dims_json = "crop_dims.json"
+class CropCoordinates(BaseModel):
+    x1: int
+    y1: int
+    x2: int
+    y2: int
 
-    def load_isx(self):
-        self.movie = isx.Movie.read(self.file_path)
-        self.total_frames = self.movie.timing.num_samples
-        self.data_type = self.movie.data_type
-        self.timing = self.movie.timing
-        self.spacing = self.movie.spacing
 
-    def normalize_frame(self, frame):
-        normalized_frame = cv2.normalize(
-            frame, None, 0, np.iinfo(np.uint8).max, cv2.NORM_MINMAX
-        ).astype(np.uint8)
-        return cv2.cvtColor(normalized_frame, cv2.COLOR_GRAY2BGR)
+@app.get("/api/list_isxd_files/")
+def list_isxd_files(directory: str):
+    try:
+        files = [
+            f for f in os.listdir(directory) if f.endswith(".isxd") and "CNMF" not in f
+        ]
+        return {"files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    def export_crop_coords(self):
-        json_fname = os.path.join(os.path.dirname(self.file_path), self.crop_dims_json)
-        if self.crop_coords:
-            with open(json_fname, "w") as f:
-                json.dump(self.crop_coords, f)
-            st.success(f"Crop coordinates exported to: {json_fname}")
 
-    @staticmethod
-    def list_isxd_files(directory):
-        """List all .isxd files in the given directory"""
-        isxd_files = []
+@app.get("/api/load_isxd/")
+def load_isxd(file_path: str):
+    try:
+        movie = isx.Movie.read(file_path)
+        return {"total_frames": movie.timing.num_samples}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/get_frame/")
+def get_frame(file_path: str, frame_idx: int):
+    try:
+        movie = isx.Movie.read(file_path)
+        frame = movie.get_frame_data(frame_idx)
+        # Normalize and convert to RGB
+        normalized_frame = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX).astype(
+            np.uint8
+        )
+        frame_rgb = cv2.cvtColor(normalized_frame, cv2.COLOR_GRAY2RGB)
+        _, buffer = cv2.imencode(file_tag["JPG"], frame_rgb)
+
+        # Create a BytesIO object and write the image data to it
+        img_io = io.BytesIO(buffer.tobytes())
+
+        # Return the image as a streaming response with proper content type
+        return StreamingResponse(img_io, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def process_frame(args):
+    """Process a single frame and return the base64 encoded JPEG string"""
+    try:
+        movie, frame_idx = args
+        frame = movie.get_frame_data(frame_idx)
+        normalized_frame = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX).astype(
+            np.uint8
+        )
+        frame_rgb = cv2.cvtColor(normalized_frame, cv2.COLOR_GRAY2RGB)
+        _, buffer = cv2.imencode(file_tag["JPG"], frame_rgb)
+        # Convert to base64 string
+        return base64.b64encode(buffer.tobytes()).decode("utf-8")
+    except Exception as e:
+        print(f"Error processing frame {frame_idx}: {str(e)}")
+        return None
+
+
+@app.get("/api/import_movie/")
+def import_movie(file_path: str):
+    try:
+        # Load movie once
+        movie = isx.Movie.read(file_path)
+        total_frames = movie.timing.num_samples
+        total_frames2import = min(500, total_frames)  # Limit to first 500 frames
+
+        # Create tasks for parallel processing
+        tasks = [(movie, frame_idx) for frame_idx in range(total_frames2import)]
+
+        # Process frames in parallel using all available CPU cores
+        num_workers = cpu_count()
+        frames = []
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            # Use tqdm to show progress
+            for frame_data in tqdm(
+                executor.map(process_frame, tasks),
+                total=total_frames2import,
+                desc="Processing frames",
+            ):
+                if frame_data is not None:  # Only append valid frames
+                    frames.append(frame_data)
+
+        if not frames:
+            raise HTTPException(status_code=500, detail="Failed to process any frames")
+
+        return {"total_frames": total_frames2import, "frames": frames}
+    except Exception as e:
+        print(f"Error importing movie: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export_crop_coords/")
+def export_crop_coords(file_path: str, coords: CropCoordinates):
+    try:
+        # Get the directory of the ISXD file
+        target_dir = os.path.dirname(file_path)
+
+        # Check if directory exists and is writable
+        if not os.path.exists(target_dir):
+            raise HTTPException(
+                status_code=400, detail=f"Directory does not exist: {target_dir}"
+            )
+
+        if not os.access(target_dir, os.W_OK):
+            raise HTTPException(
+                status_code=403,
+                detail=f"No write permission in directory: {target_dir}",
+            )
+
+        # Create the output file path
+        json_fname = os.path.join(target_dir, "crop_dims.json")
+
+        # Try to write the file
         try:
-            for file in os.listdir(directory):
-                if file.endswith(".isxd") and "CNMF" not in file:
-                    isxd_files.append(os.path.join(directory, file))
-        except Exception as e:
-            st.error(f"Error accessing directory: {e}")
-        return isxd_files
+            with open(json_fname, "w") as f:
+                json.dump([(coords.x1, coords.y1), (coords.x2, coords.y2)], f)
+        except IOError as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to write crop coordinates: {str(e)}"
+            )
+
+        return {"message": f"Crop coordinates exported successfully to {json_fname}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-def init_session_state():
-    # Initialize session state variables for coordinates
-    if "start_point" not in st.session_state:
-        st.session_state.start_point = None
-    if "end_point" not in st.session_state:
-        st.session_state.end_point = None
-    if "drawing" not in st.session_state:
-        st.session_state.drawing = False
+@app.get("/api/list_directory/")
+def list_directory(directory: str):
+    try:
+        entries = os.listdir(directory)
+        entries.sort()
+        if directory == "/":
+            entries = [entry for entry in entries if entry in ["home", "mnt"]]
+
+        directories = [
+            entry for entry in entries if os.path.isdir(os.path.join(directory, entry))
+        ]
+        files = [
+            entry for entry in entries if os.path.isfile(os.path.join(directory, entry))
+        ]
+        files = [
+            entry
+            for entry in files
+            if entry.endswith(file_tag["ISXD"]) and "cnmf" not in entry.lower()
+        ]
+
+        crop_dim_files = [
+            f for f in os.listdir(directory) if f.endswith("crop_dims.json")
+        ]
+        crop_dim_coords = []
+
+        if crop_dim_files:
+            try:
+                with open(os.path.join(directory, crop_dim_files[0]), "r") as f:
+                    crop_dim_coords = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error reading crop dimensions: {str(e)}")
+
+        return {
+            "directories": directories,
+            "files": files,
+            "crop_dim_coords": crop_dim_coords,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/")
+async def read_root():
+    return FileResponse(str(TSX_OUTPUT_DIR / "index.html"))
 
 
 def main():
-    Streamlit_utils.setup_page_config(
-        app_name="Movie Cropper for 1 Photon Imaging",
-        app_abbrv="Cropper",
-        init_session_state_func=init_session_state,
-    )
-
-    # Directory navigation
-    if "current_dir" not in st.session_state:
-        # st.session_state.current_dir = os.getcwd()
-        st.session_state.current_dir = "/"
-
-    # Show current directory
-    st.text(f"Current directory: {st.session_state.current_dir}")
-
-    # Directory navigation buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬆️ Up one level"):
-            st.session_state.current_dir = os.path.dirname(st.session_state.current_dir)
-            # selected = setup_fb()
-            st.rerun()
-
-    with col2:
-        new_dir = st.text_input("Enter directory path:", st.session_state.current_dir)
-        if new_dir != st.session_state.current_dir and os.path.isdir(new_dir):
-            st.session_state.current_dir = new_dir
-            # selected = setup_fb()
-            st.rerun()
-
-    try:
-        # List ISXD files
-        isxd_files = MovieCropper.list_isxd_files(st.session_state.current_dir)
-        if not isxd_files:
-            selected_file = []
-            st.warning(
-                "No ISXD files found in current directory. Either go up one level or select a subdirectory."
-            )
-            current_entries = [
-                d
-                for d in os.listdir(st.session_state.current_dir)
-                if not d.startswith(".")
-            ]
-            current_entries.sort()
-            if st.session_state.current_dir == "/":
-                current_entries = [d for d in current_entries if d in ["home", "mnt"]]
-            st.write("Current entries:")
-            for entry in current_entries:
-                full_path = os.path.join(st.session_state.current_dir, entry)
-                if os.path.isdir(full_path):
-                    # Directory with folder icon
-                    if st.button(
-                        f"📁 {entry}", key=f"dir_{entry}", use_container_width=True
-                    ):
-                        st.session_state.current_dir = full_path
-                        st.rerun()
-                else:
-                    # File with file icon
-                    if entry.endswith(".isxd") and "CNMF" not in entry:
-                        if st.button(
-                            f"📄 {entry}", key=f"file_{entry}", use_container_width=True
-                        ):
-                            st.session_state.selected_file = full_path
-        else:
-            if len(isxd_files) == 1:
-                st.write(f"Found ISXD file: {os.path.basename(isxd_files[0])}")
-                selected_file = isxd_files[0]
-            else:
-                selected_file = st.selectbox(
-                    "Found multiple ISXD files. Please select one:", isxd_files
-                )
-            st.write(
-                "To select a different file or start over, click the '⬆️ Up one level' button."
-            )
-
-        if selected_file:
-            #     selected_file = selected["path"]
-            #     st.write(f"selected_file: {selected_file}")
-
-            cropper = MovieCropper(selected_file)
-            cropper.load_isx()
-
-            # Frame selection slider
-            frame_idx = st.slider("Select Frame", 0, cropper.total_frames - 1, 0)
-
-            # Get and normalize frame
-            frame = cropper.normalize_frame(cropper.movie.get_frame_data(frame_idx))
-
-            # Convert to RGB for display
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Convert to PIL Image
-            pil_image = Image.fromarray(frame_rgb)
-
-            # Cropper options
-            # st.sidebar.header("Cropper Options")
-            # realtime_update = st.sidebar.checkbox("Update in Real Time", value=True)
-            # box_color = st.sidebar.color_picker("Box Color", value="#00FF00")
-            # aspect_choice = st.sidebar.radio(
-            #     "Aspect Ratio", ["Free", "1:1", "16:9", "4:3", "2:3"]
-            # )
-            # aspect_dict = {
-            #     "1:1": (1, 1),
-            #     "16:9": (16, 9),
-            #     "4:3": (4, 3),
-            #     "2:3": (2, 3),
-            #     "Free": None,
-            # }
-            # aspect_ratio = aspect_dict[aspect_choice]
-
-            # Get cropped image
-            cropped_img = st_cropper(
-                pil_image,
-                return_type="box",
-                # realtime_update=realtime_update,
-                # box_color=box_color,
-                # aspect_ratio=aspect_ratio,
-            )
-
-            if cropped_img:
-                # Extract coordinates from the dictionary
-                left = int(cropped_img["left"])
-                top = int(cropped_img["top"])
-                width = int(cropped_img["width"])
-                height = int(cropped_img["height"])
-
-                # Calculate bottom-right coordinates
-                x1, y1 = left, top
-                x2, y2 = left + width, top + height
-
-                # Display coordinates
-                st.write(f"Crop Coordinates: ({x1}, {y1}) to ({x2}, {y2})")
-
-                # Export button
-                if st.button("Export Crop Coordinates"):
-                    cropper.crop_coords = [(x1, y1), (x2, y2)]
-                    cropper.export_crop_coords()
-
-    except Exception as e:
-        st.error(f"Error in st_canvas: {str(e)}")
-        st.error(f"Error location: {e.__traceback__.tb_lineno}")
-        raise e
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
 
 
 if __name__ == "__main__":

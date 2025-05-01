@@ -362,13 +362,13 @@ class CRwROI_utils(BC):
         day_labels = labelBySess[1]
         week_labels = labelBySess[2] if len(labelBySess) >= 3 else None
 
-        ref_TC = isCell["TC"][0]
-        day_TC = isCell["TC"][1]
-        week_TC = isCell["TC"][2] if len(isCell["TC"]) >= 3 else None
+        ref_TC = isCell["PLACE"][0]
+        day_TC = isCell["PLACE"][1]
+        week_TC = isCell["PLACE"][2] if len(isCell["PLACE"]) >= 3 else None
 
-        ref_CC = isCell["CC"][0]
-        day_CC = isCell["CC"][1]
-        week_CC = isCell["CC"][2] if len(isCell["CC"]) >= 3 else None
+        ref_CC = isCell["CUE"][0]
+        day_CC = isCell["CUE"][1]
+        week_CC = isCell["CUE"][2] if len(isCell["CUE"]) >= 3 else None
 
         for cid in ref_ids:
             if cid == rejected_label:
@@ -736,33 +736,11 @@ class CRwROI_utils(BC):
             self.CRkey["ACLUSTERS_QC"]: alpha_labels.sum(),
             self.CRkey["DISCARD"]: discard,
             self.CRkey["DISCARD_QC"]: discard_qc,
-            self.CRkey["UNT_TC"]: 0,
-            self.CRkey["UNT_CC"]: 0,
-            self.CRkey["U_TC"]: 0,
-            self.CRkey["U_CC"]: 0,
-            self.CRkey["T_TC"]: 0,
-            self.CRkey["T_CC"]: 0,
-            self.CRkey["TR_D"]: count_dict[self.CRkey["D2D"]],
-            self.CRkey["TR_W"]: count_dict[self.CRkey["W2W"]],
-            self.CRkey["TR_W2"]: count_dict[self.CRkey["W2W2"]],
-            self.CRkey["TR_AS"]: count_dict[self.CRkey["ALLSESS"]],
-            self.CRkey["TR_D_C"]: count_dict[self.CRkey["D2D_CC"]],
-            self.CRkey["TR_W_C"]: count_dict[self.CRkey["W2W_CC"]],
-            self.CRkey["TR_W2_C"]: count_dict[self.CRkey["W2W2_CC"]],
-            self.CRkey["TR_D_T"]: count_dict[self.CRkey["D2D_TC"]],
-            self.CRkey["TR_W_T"]: count_dict[self.CRkey["W2W_TC"]],
-            self.CRkey["TR_W2_T"]: count_dict[self.CRkey["W2W2_TC"]],
-            self.CRkey["TR_D_QC"]: count_dict[self.CRkey["D2D_QC"]],
-            self.CRkey["TR_W_QC"]: count_dict[self.CRkey["W2W_QC"]],
-            self.CRkey["TR_W2_QC"]: count_dict[self.CRkey["W2W2_QC"]],
-            self.CRkey["TR_AS_QC"]: count_dict[self.CRkey["ALLSESS_QC"]],
-            self.CRkey["TR_D_C_QC"]: count_dict[self.CRkey["D2D_CC_QC"]],
-            self.CRkey["TR_W_C_QC"]: count_dict[self.CRkey["W2W_CC_QC"]],
-            self.CRkey["TR_W2_C_QC"]: count_dict[self.CRkey["W2W2_CC_QC"]],
-            self.CRkey["TR_D_T_QC"]: count_dict[self.CRkey["D2D_TC_QC"]],
-            self.CRkey["TR_W_T_QC"]: count_dict[self.CRkey["W2W_TC_QC"]],
-            self.CRkey["TR_W2_T_QC"]: count_dict[self.CRkey["W2W2_TC_QC"]],
         }
+        for key in isCell_post_cluster.keys():
+            cluster_info[f"UNTRACKED_{key}"] = 0
+            cluster_info[f"UNDERLYING_{key}"] = 0
+            cluster_info[f"TRACKED_{key}"] = 0
 
         # iterate through each session to find PC cells and add to dict accordingly
         for cellType in isCell_post_cluster.keys():
@@ -772,18 +750,18 @@ class CRwROI_utils(BC):
                     isCell_post_cluster[cellType]["POST_QC"],
                 )
             ):
-                cluster_info[self.CRkey[f"{cellType}_S{i+1}"]] = pre.sum()
-                cluster_info[self.CRkey[f"{cellType}_S{i+1}_QC"]] = post.sum()
+                cluster_info[f"{cellType}_S{i + 1}"] = pre.sum()
+                cluster_info[f"{cellType}_S{i + 1}_QC"] = post.sum()
 
-        for cellType in isCell_pre_cluster.keys():
+        for cellType in isCell_post_cluster.keys():
             tracked_cells = 0
             for sess in range(self.numSess):
                 isCell2check = isCell_pre_cluster[cellType][sess]
                 isCell2check_clust = isCell_post_cluster[cellType]["PRE_QC"][sess]
-                trkd = cluster_info[self.CRkey[f"{cellType}_S{sess+1}"]]
+                trkd = cluster_info[f"{cellType}_S{sess + 1}"]
 
                 # find cells not tracked between sessions
-                cluster_info[self.CRkey[f"UNT_{cellType}"]] += sum(
+                cluster_info[f"UNTRACKED_{cellType}"] += sum(
                     [
                         1 if pre == 1 and post == 0 else 0
                         for pre, post in zip(isCell2check, isCell2check_clust)
@@ -792,21 +770,21 @@ class CRwROI_utils(BC):
                 # sum cells tracked between sessions
                 tracked_cells += trkd
 
-            untracked_cells = cluster_info[self.CRkey[f"UNT_{cellType}"]]
+            untracked_cells = cluster_info[f"UNTRACKED_{cellType}"]
             underlying_cells = untracked_cells + tracked_cells
-            cluster_info[self.CRkey[f"T_{cellType}"]] = tracked_cells
-            cluster_info[self.CRkey[f"U_{cellType}"]] = underlying_cells
+            cluster_info[f"TRACKED_{cellType}"] = tracked_cells
+            cluster_info[f"UNDERLYING_{cellType}"] = underlying_cells
 
         total_cells = cluster_info[UCELL]
 
-        patterns_to_remove = ["CC_SX", "CC_SX_QC", "TC_SX", "TC_SX_QC"]
+        # patterns_to_remove = ["CC_SX", "CC_SX_QC", "TC_SX", "TC_SX_QC"]
 
         # Create a new version of self.CRprt without the specified patterns
-        CRprt4verbosePrint = {
-            key: value
-            for key, value in self.CRprt.items()
-            if not any(key.startswith(pattern) for pattern in patterns_to_remove)
-        }
+        # CRprt4verbosePrint = {
+        #     key: value
+        #     for key, value in self.CRprt.items()
+        #     if not any(key.startswith(pattern) for pattern in patterns_to_remove)
+        # }
 
         # ordered_cluster_info = OrderedDict()
         # for key4CI in self.CRkey.values():
@@ -814,19 +792,19 @@ class CRwROI_utils(BC):
         #         ordered_cluster_info[key4CI] = cluster_info[key4CI]
 
         # TODO: need to fix this
-        if verbose:
-            print("Clustering count results:")
-            for cluster_key, print_key in zip(cluster_info, CRprt4verbosePrint):
-                if cluster_key in [UCELL]:
-                    self.print_wFrm(
-                        f"{self.CRprt[print_key]} {cluster_info[cluster_key]}"
-                    )
-                else:
-                    self.print_wFrm(
-                        f"{self.CRprt[print_key]} {find_percNprint(cluster_info[cluster_key], total_cells)}"
-                    )
-            print(
-                "Note: All percentages are based on dividing by underlying cell count"
-            )
+        # if verbose:
+        #     print("Clustering count results:")
+        #     for cluster_key, print_key in zip(cluster_info, CRprt4verbosePrint):
+        #         if cluster_key in [UCELL]:
+        #             self.print_wFrm(
+        #                 f"{self.CRprt[print_key]} {cluster_info[cluster_key]}"
+        #             )
+        #         else:
+        #             self.print_wFrm(
+        #                 f"{self.CRprt[print_key]} {find_percNprint(cluster_info[cluster_key], total_cells)}"
+        #             )
+        #     print(
+        #         "Note: All percentages are based on dividing by underlying cell count"
+        #     )
 
         return cluster_info

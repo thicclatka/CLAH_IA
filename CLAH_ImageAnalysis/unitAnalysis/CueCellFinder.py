@@ -116,15 +116,15 @@ class CueCellFinder(CCF_Utils):
         # create CueCellInd
         self._init_CueCellInd_for_Start_n_Mid()
 
-        for cc_types in self.CueCellInd:
-            if self.CueCellInd[cc_types].size > 0:
-                self.Plotter.plotUnitByTuning(
-                    posRatesRef=self.posRatesRef,
-                    posRatesNonRef=self.posRatesNonRef,
-                    IndToPlot=self.CueCellInd[cc_types],
-                    CC_Type=cc_types,
-                    fig_name=f"{cc_types}CueCells",
-                )
+        # for cc_types in self.CueCellInd:
+        #     if self.CueCellInd[cc_types].size > 0:
+        #         self.Plotter.plotUnitByTuning(
+        #             posRatesRef=self.posRatesRef,
+        #             posRatesNonRef=self.posRatesNonRef,
+        #             IndToPlot=self.CueCellInd[cc_types],
+        #             CC_Type=cc_types,
+        #             fig_name=f"{cc_types}CueCells",
+        #         )
 
     def _find_midFR_2xMethod(self, edge: int = 5, isInfRatio: int = 25) -> None:
         """
@@ -268,10 +268,10 @@ class CueCellFinder(CCF_Utils):
         if self.cueAmp:
             # plot cueAmp boxplots
             self.print_wFrm(
-                "cueAmp (1 Fig; suplots by cell with cueAmp Violin Plots by cueType)"
+                "cueAmp (2 Figs; 1) plots by cell with post cue Amplitude by cueType; 2) plots by cell type (both Violin plots))"
             )
             self.Plotter.plot_cueTrigSig_OR_cueAmp(
-                self.cueAmp, "cueAmp", ind=self.ind, VIO=True
+                self.cueAmp, "cueAmp", ind=self.ind, VIO=True, plot_by_cell_type=True
             )
             # export stats results to csv
             self.print_wFrm(
@@ -374,29 +374,33 @@ class CueCellFinder(CCF_Utils):
 
     def plot_cTS(self) -> None:
         """
-        Plots the cue-triggered signals.
+        Plots the cue-triggered signals. First it classifies the cells into CUE, PLACE, START, NON, and MOSSY. Then it plots the cue-triggered signals accordingly.
         """
 
-        cue2use = self.cues[0]
+        sigArr = []
+        dirArr = []
+        dtmArr = []
+        for cue in self.cues:
+            omit2use = f"OMIT{cue}"
+            if self.twoOdor_oneLoc:
+                omit2use = "OMITBOTH"
+            sig = np.array(self.RankSumDict[cue][omit2use][:, self.CCF_Stats.sig_idx])
+            direction = np.array(
+                self.RankSumDict[cue][omit2use][:, self.CCF_Stats.dir_idx]
+            )
+            sigArr.append(sig)
+            dirArr.append(direction)
+            dtmArr.append((sig == 1) & (direction == 1))
 
-        if len(self.cues) == 1:
-            omit2use = "OMITCUE1"
-        elif len(self.cues) == 2:
-            omit2use = "OMITBOTH"
-        elif len(self.cues) == 3:
-            omit2use = "OMITALL"
-        # omit2use = "OMITCUE1"
+        dtmArr = np.any(np.column_stack(dtmArr), axis=1)
 
-        if omit2use not in self.RankSumDict[cue2use].keys():
-            omit2use = "OMITCUE1"
+        MidSigInd = self.CueCellInd["MID"][np.where(dtmArr)[0]]
 
-        sigArr = np.array(
-            self.RankSumDict[cue2use][omit2use][:, self.CCF_Stats.sig_idx]
-        )
-        dirArr = np.array(
-            self.RankSumDict[cue2use][omit2use][:, self.CCF_Stats.dir_idx]
-        )
-        MidSigInd = self.CueCellInd["MID"][np.where((sigArr == 1) & (dirArr == 1))[0]]
+        cueSigInd = {cue: None for cue in self.cues}
+        for sig, direction, cue in zip(sigArr, dirArr, self.cues):
+            cueSigInd[cue] = self.CueCellInd["MID"][
+                np.where((sig == 1) & (direction == 1))[0]
+            ]
 
         # find index for Mossy Cells if txt file exists
         MossyCellList = []
@@ -408,7 +412,7 @@ class CueCellFinder(CCF_Utils):
                 MossyCellList = [int(line.strip()) for line in f]
 
         # Initialize counts and index lists
-        cellCategories = ["CUE", "PLACE", "START", "NON"]
+        cellCategories = ["CUE", "PLACE", "START", "NON"] + list(self.cues)
         if MossyFile:
             # Add MOSSY category if MossyCellList is not empty
             cellCategories.append("MOSSY")
@@ -417,36 +421,45 @@ class CueCellFinder(CCF_Utils):
         self.CueCellTable.update({f"{cat}_IDX": [] for cat in cellCategories})
         self.CueCellTable["TOTAL"] = len(self.allTrigSig.keys())
 
-        # Define conditions and corresponding categories
-        cond4cellClassification = [
-            (
-                lambda cell_num: cell_num in self.CueCellInd["PC"]
-                and cell_num not in MidSigInd
-                and cell_num not in MossyCellList,
-                "PLACE",
-            ),
-            (
-                lambda cell_num: cell_num in MidSigInd
-                and cell_num not in MossyCellList,
-                "CUE",
-            ),
-            (
-                lambda cell_num: cell_num in self.CueCellInd["START"]
-                and cell_num not in MossyCellList,
-                "START",
-            ),
-            (lambda cell_num: cell_num in MossyCellList, "MOSSY"),
-        ]
+        # Ensure MossyCellList exists or is empty
+        MossyCellList = []
+        MossyFile = self.utils.findLatest(
+            [self.file_tag["MOSSY"], self.file_tag["TXT"]]
+        )
+        if MossyFile:
+            with open(MossyFile, "r") as f:
+                MossyCellList = [int(line.strip()) for line in f]
 
+        # Classify each cell into ONE Layer 1 category
         for cell in self.allTrigSig.keys():
             cell_num = int(cell.split("_")[-1])
-            category = "NON"  # Default category
-            for condition, cat in cond4cellClassification:
-                if condition(cell_num):
-                    category = cat
-                    break
-            self.CueCellTable[category] += 1
-            self.CueCellTable[f"{category}_IDX"].append(cell_num)
+            assigned_category = "NON"  # Default
+            assigned_category_sublevel = {}
+
+            # Prioritize MOSSY first
+            if cell_num in MossyCellList:
+                assigned_category = "MOSSY"
+            elif cell_num in MidSigInd:
+                assigned_category = "CUE"
+            elif cell_num in self.CueCellInd["PC"]:
+                assigned_category = "PLACE"
+            elif cell_num in self.CueCellInd["START"]:
+                assigned_category = "START"
+
+            for cue in self.cues:
+                if cell_num in cueSigInd[cue]:
+                    if cue not in assigned_category_sublevel.keys():
+                        assigned_category_sublevel[cue] = cue
+
+            self.CueCellTable[assigned_category] += 1
+            self.CueCellTable[f"{assigned_category}_IDX"].append(cell_num)
+
+            if assigned_category_sublevel:
+                for cue in assigned_category_sublevel.keys():
+                    self.CueCellTable[assigned_category_sublevel[cue]] += 1
+                    self.CueCellTable[f"{assigned_category_sublevel[cue]}_IDX"].append(
+                        cell_num
+                    )
 
         for cellType in cellCategories:
             self.CueCellTable[f"{cellType}_prop"] = (
@@ -474,10 +487,14 @@ class CueCellFinder(CCF_Utils):
                 self.cueTrigSig.copy(), "cueTrigSig", ind=self.ind
             )
             self.print_wFrm(
-                "Mean cueTrigSig (1 Fig; subplots by cell with avgCTS by cueType)"
+                "Mean cueTrigSig (2 Figs; 1) subplots by cell with avgCTS by cueType; 2) avgCTS by cell type)"
             )
             self.Plotter.plot_cueTrigSig_OR_cueAmp(
-                self.cueTrigSig.copy(), "cueTrigSig", ind=self.ind, SEM=True
+                self.cueTrigSig.copy(),
+                "cueTrigSig",
+                ind=self.ind,
+                SEM=True,
+                plot_by_cell_type=True,
             )
         else:
             self.print_wFrm("No cueTrigSig to plot...skipping")

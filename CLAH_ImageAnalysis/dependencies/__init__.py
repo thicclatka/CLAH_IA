@@ -8,6 +8,7 @@ __all__ = [
     "normalization_utils",
     "filter_utils",
     "geometric_tools",
+    "similarity_tools",
     "CUDA_utils",
     # "GPU_SignalProc",
     # "GPU_Tools",
@@ -23,6 +24,7 @@ if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from .filter_utils import *
     from .normalization_utils import *
     from .geometric_tools import *
+    from .similarity_tools import *
     from .CUDA_utils import *
     # from .GPU_SignalProc import *
     # from .GPU_Tools import *

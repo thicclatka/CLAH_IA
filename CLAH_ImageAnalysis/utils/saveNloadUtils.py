@@ -438,7 +438,6 @@ def load_file(
 def load_segDict(
     filename: str,
     all: bool = False,
-    keep_A_sparse: bool = False,
     print_prev_bool: bool = True,
     **kwargs,
 ) -> list | np.ndarray | None:
@@ -449,8 +448,6 @@ def load_segDict(
         filename (str): The path to the file containing the segmentation dictionary.
         all (bool, optional): If True, return all data in the order they are defined in the dictionary.
             If False (default), return only the requested data.
-        keep_A_sparse (bool, optional): If True, keep the 'A_SPATIAL' data as a sparse matrix.
-            If False (default), convert the 'A_SPATIAL' data to a dense ndarray.
         **kwargs: Additional keyword arguments used to filter the output dictionary.
 
     Returns:

@@ -31,6 +31,31 @@ class CCF_Dep:
         return maxVal
 
     @staticmethod
+    def findAUC_fromTrigSig(TrigSig: np.ndarray, ind: list) -> float:
+        """
+        Finds the Area Under the Curve (AUC) - calculated as the sum of raw signal values -
+        within the post-event window.
+
+        Parameters:
+            TrigSig (np.ndarray): The trigger signal snippet (pre and post event). NaNs indicate times outside the valid recording period.
+            ind (list): The indices defining the window relative to the event (e.g., [-10, 20]).
+
+        Returns:
+            auc (float): The raw AUC (sum of values). Returns NaN if signal is all NaN in the window.
+        """
+        if np.all(np.isnan(TrigSig)):
+            return np.nan
+
+        pre_event_len = abs(ind[0])
+        # Define indices for the response (post-event) period
+        response_indices = slice(pre_event_len, pre_event_len + (ind[-1] - 29))
+
+        # Calculate raw AUC (sum of values in the response window, ignoring NaNs)
+        auc = np.nansum(TrigSig[response_indices])
+
+        return auc
+
+    @staticmethod
     def bootstrap2findSTD(
         cue1: np.ndarray,
         cue2: np.ndarray,

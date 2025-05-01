@@ -65,13 +65,18 @@ def create_service_files(service_user: str):
         run_script_path = output_dir / "shell_scripts" / f"run{app_name}.sh"
         run_script_path.parent.mkdir(parents=True, exist_ok=True)
 
+        command2use = app_settings["command"].format(
+            base_url=app_settings["base_url"],
+            port=app_settings["port"],
+        )
+
         run_script_content = shell_template.format(
             clah_path=repo_dir,
-            app_name=app_name,
+            repo_dir=repo_dir,
             gui_path=app_settings["gui_path"],
-            port=app_settings["port"],
-            base_url=app_settings["base_url"],
+            app_name=app_name,
             env_name=paths.get_python_env(),
+            command=command2use,
         )
 
         with open(run_script_path, "w") as f:

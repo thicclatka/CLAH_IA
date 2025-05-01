@@ -4,6 +4,7 @@ import os
 from skimage.transform import resize
 from CLAH_ImageAnalysis.utils import fig_tools
 from CLAH_ImageAnalysis.utils import text_dict
+from scipy.interpolate import interp1d
 
 
 def read_image(path_to_image: str) -> np.ndarray:
@@ -302,3 +303,124 @@ def find_near_square_dims(length: int) -> tuple[int, int]:
             best_w = w
 
     return best_h, best_w
+
+
+def get_frame_timestamp_from_movie(movie_path: str) -> tuple[np.ndarray, float]:
+    """
+    Get the frame timestamp from a movie file.
+    """
+
+    cap = cv2.VideoCapture(movie_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    frame_times = np.zeros(total_frames)
+    frame_idx = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        frame_times[frame_idx] = timestamp
+        frame_idx += 1
+
+    cap.release()
+    return frame_times, fps
+
+
+def sync_N_downsample_timestamps(
+    high_freq_timestamps: np.ndarray,
+    low_freq_timestamps: np.ndarray,
+    sync_pulses: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Sync and downsample timestamps from high-frequency to low-frequency.
+
+    Parameters:
+        high_freq_timestamps: Array of high frequency timestamps (e.g., 30Hz)
+        low_freq_timestamps: Array of low frequency timestamps (e.g., 20Hz)
+        sync_pulses: Array of sync pulse timestamps (e.g., 10Hz). Determines method of downsampling. If None, closest match timestamps are used. If provided, timestamps are interpolated between sync pulses.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: (frame_mapping, time_mapping)
+        frame_mapping: Array of frame indices in high_freq_timestamps that correspond to the low_freq_timestamps
+        time_mapping: Array of timestamps in high_freq_timestamps that correspond to the low_freq_timestamps
+    """
+    # Find the closest timestamps in low_freq_timestamps to sync_pulses
+    frame_mapping = []
+    time_mapping = []
+
+    if sync_pulses is not None:
+        for i in range(len(sync_pulses) - 1):
+            start_time = sync_pulses[i]
+            end_time = sync_pulses[i + 1]
+
+            mask_high_freq = (high_freq_timestamps >= start_time) & (
+                high_freq_timestamps <= end_time
+            )
+            mask_low_freq = (low_freq_timestamps >= start_time) & (
+                low_freq_timestamps <= end_time
+            )
+
+            high_indices = np.where(mask_high_freq)[0]
+            low_indices = np.where(mask_low_freq)[0]
+
+            interp_func = interp1d(
+                high_freq_timestamps[high_indices],
+                high_indices,
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            # Map low frequency timestamps to high frequency indices
+            for low_idx, low_time in zip(
+                low_indices, low_freq_timestamps[mask_low_freq]
+            ):
+                # Get the interpolated high frequency index
+                high_idx = interp_func(low_time)
+
+                # Store the mapping
+                frame_mapping.append(high_idx)
+                time_mapping.append(high_freq_timestamps[int(round(high_idx))])
+    else:
+        # Interpolate with no sync pulses
+        frame_mapping, time_mapping = closest_match_timestamps(
+            high_freq_timestamps, low_freq_timestamps
+        )
+
+    frame_mapping = np.array(frame_mapping)
+    time_mapping = np.array(time_mapping)
+
+    return frame_mapping, time_mapping
+
+
+def closest_match_timestamps(
+    high_freq_times: np.ndarray, low_freq_times: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Find closest high frequency timestamps for each low frequency timestamp.
+
+    Parameters:
+    - high_freq_times: Array of high frequency timestamps (e.g., 30Hz)
+    - low_freq_times: Array of low frequency timestamps (e.g., 20Hz)
+
+    Returns:
+    - closest_indices: Indices of closest high frequency timestamps
+    - closest_times: The actual closest high frequency timestamps
+    """
+    # Initialize arrays for results
+    closest_indices = np.zeros(len(low_freq_times), dtype=int)
+    closest_times = np.zeros(len(low_freq_times))
+
+    # For each low frequency timestamp
+    for i, low_time in enumerate(low_freq_times):
+        # Find absolute differences
+        diffs = np.abs(high_freq_times - low_time)
+        # Get index of minimum difference
+        closest_idx = np.argmin(diffs)
+        # Store results
+        closest_indices[i] = closest_idx
+        closest_times[i] = high_freq_times[closest_idx]
+
+    return closest_indices, closest_times

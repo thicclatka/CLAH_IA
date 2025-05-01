@@ -309,27 +309,43 @@ class CRwROI_manager(BC, Data_roicat):
             )
 
         # extract isTC array per session
-        self.isCell = {"CC": [], "TC": []}
-        for sess, refLap in zip(self.subj_sessions, self.refLapType):
-            isTC = self.multSessSegStruc[sess]["cueShiftStruc"]["PCLappedSess"][
-                f"lapType{refLap + 1}"
-            ]["Shuff"]["isPC"]
-            self.isCell["TC"].append(isTC)
 
         self.CueCellTable = []
         for sess in self.subj_sessions:
             CCT = self.multSessSegStruc[sess]["CueCellFinderDict"]["CueCellTable"]
             self.CueCellTable.append(CCT)
 
-        for sess in range(self.numSess):
-            isTC4sess = self.isCell["TC"][sess]
-            CC4sess = self.CueCellTable[sess]["CUE_IDX"]
+        keys2check = self.CueCellTable[0].keys()
+        keys2check = [key for key in keys2check if "_IDX" in key]
+        keys2check = [key for key in keys2check if "NOT" not in key]
 
-            updated_isTC4sess = [
-                1 if idx in CC4sess else 0 for idx in range(len(isTC4sess))
-            ]
-            self.isCell["CC"].append(np.array(updated_isTC4sess))
-        # self.isCell["CC"] = np.array(self.isCell["CC"])
+        self.isCell = {key.split("_")[0]: [] for key in keys2check}
+
+        for sess in range(self.numSess):
+            total_cells = self.CueCellTable[sess]["TOTAL"]
+            for key in keys2check:
+                key4isCell = key.split("_")[0]
+                cellidx = np.array(self.CueCellTable[sess][key], dtype=int)
+                isCell = np.zeros(total_cells, dtype=int)
+                isCell[cellidx] = 1
+                self.isCell[key4isCell].append(isCell)
+
+        keys2check4both = [key for key in self.isCell if "CUE" in key and len(key) > 3]
+        if len(keys2check4both) > 1:
+            self.isCell["BOTHCUES"] = []
+            for sess in range(self.numSess):
+                cue1 = self.isCell["CUE1"][sess]
+                cue2 = self.isCell["CUE2"][sess]
+                both = np.logical_and(cue1, cue2)
+                newcue1 = np.array(
+                    [1 if c1 and not both[i] else 0 for i, c1 in enumerate(cue1)]
+                )
+                newcue2 = np.array(
+                    [1 if c2 and not both[i] else 0 for i, c2 in enumerate(cue2)]
+                )
+                self.isCell["CUE1"][sess] = newcue1
+                self.isCell["CUE2"][sess] = newcue2
+                self.isCell["BOTHCUES"].append(both)
 
     ######################################################
     #  ROICaT funcs
@@ -1039,10 +1055,13 @@ class CRwROI_manager(BC, Data_roicat):
         # create colored FOV clusters
         footprints4coloredclusters = [r.power(sp_fp_exp) for r in aligned_ROIs]
 
-        # create contours for PC/cue cells
-        self.PC_dict = self._create_ROI_PC_box(
-            footprints4coloredclusters, isCell_post_cluster["CC"]["POST_QC"]
-        )
+        self.PC_dict = {}
+        for cellType in isCell_post_cluster.keys():
+            if cellType == "NON":
+                continue
+            self.PC_dict[cellType] = self._create_ROI_PC_box(
+                footprints4coloredclusters, isCell_post_cluster[cellType]["POST_QC"]
+            )
 
         # get FOVs post QC
         self.FOV_clusters = roicat.visualization.compute_colored_FOV(
@@ -1058,11 +1077,11 @@ class CRwROI_manager(BC, Data_roicat):
         self.CRPLOTTERS._plot_confidence_histograms(results=self.results)
         # plot colored FOV clusters
         self.CRPLOTTERS._plot_FOV_clusters(
-            self.ID,
-            self.FOV_clusters,
-            self.cluster_info,
-            isCell_post_cluster["CC"]["POST_QC"],
-            self.PC_dict,
+            subj_id=self.ID,
+            FOV_clusters=self.FOV_clusters,
+            cluster_info=self.cluster_info,
+            isCell2plot=isCell_post_cluster,
+            PC_dict=self.PC_dict,
             contour=True,
         )
 
@@ -1074,9 +1093,13 @@ class CRwROI_manager(BC, Data_roicat):
             self.cluster_info[self.CRkey["DISCARD"]]
             < self.cluster_info[self.CRkey["DISCARD_QC"]]
         ):
-            self.PC_dict_preQC = self._create_ROI_PC_box(
-                footprints4coloredclusters, isCell_post_cluster["CC"]["PRE_QC"]
-            )
+            self.PC_dict_preQC = {}
+            for cellType in isCell_post_cluster.keys():
+                if cellType == "NON":
+                    continue
+                self.PC_dict_preQC[cellType] = self._create_ROI_PC_box(
+                    footprints4coloredclusters, isCell_post_cluster[cellType]["PRE_QC"]
+                )
 
             self.FOV_clusters_preQC = roicat.visualization.compute_colored_FOV(
                 spatialFootprints=footprints4coloredclusters,
@@ -1090,11 +1113,11 @@ class CRwROI_manager(BC, Data_roicat):
             )
 
             self.CRPLOTTERS._plot_FOV_clusters(
-                self.ID,
-                self.FOV_clusters_preQC,
-                self.cluster_info,
-                isCell_post_cluster["CC"]["PRE_QC"],
-                self.PC_dict_preQC,
+                subj_id=self.ID,
+                FOV_clusters=self.FOV_clusters_preQC,
+                cluster_info=self.cluster_info,
+                isCell2plot=isCell_post_cluster,
+                PC_dict=self.PC_dict_preQC,
                 contour=True,
                 preQC=True,
             )

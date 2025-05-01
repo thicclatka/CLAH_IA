@@ -132,7 +132,9 @@ class tBD_lD_manager(BC):
             ]
             ftag2remove = self.file_tag["XML"]
         elif self.findLatest([self.file_tag["GPIO_SUFFIX"], self.file_tag["CSV"]]):
-            self.FRdict, data_fname = GPIOfrTimes.getGPIOfrTimes(self.folder_path)
+            self.FRdict, data_fname = GPIOfrTimes.getGPIOfrTimes(
+                self.folder_path, downsample=2
+            )
             self.key_list = [
                 self.GPIOkey["FR_KEY"],
                 self.GPIOkey["SYNC_KEY"],

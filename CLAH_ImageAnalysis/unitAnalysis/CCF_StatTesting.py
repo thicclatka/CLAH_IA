@@ -69,7 +69,10 @@ class CCF_StatTesting(BC):
                     self.cueTrigSig[cell][ct_key].shape[-1], np.nan
                 )
                 for cue_idx in range(self.cueTrigSig[cell][ct_key].shape[-1]):
-                    self.cueAmp[cell][ct_key][cue_idx] = CCF_Dep.findMax_fromTrigSig(
+                    # self.cueAmp[cell][ct_key][cue_idx] = CCF_Dep.findMax_fromTrigSig(
+                    #     TrigSig=self.cueTrigSig[cell][ct_key][:, cue_idx], ind=self.ind
+                    # )
+                    self.cueAmp[cell][ct_key][cue_idx] = CCF_Dep.findAUC_fromTrigSig(
                         TrigSig=self.cueTrigSig[cell][ct_key][:, cue_idx], ind=self.ind
                     )
                 # if ct_key == "CUE1" or ct_key == "OMITBOTH":
