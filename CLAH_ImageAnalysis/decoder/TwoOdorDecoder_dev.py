@@ -633,7 +633,7 @@ class TwoOdorDecoder(BC):
             ("PLACE", place_amount),
             ("OTHER", other_amount),
         ]:
-            self.print_wFrm(f"{ct}: {amt:>10d}", frame_num=1)
+            self.print_wFrm(f"{ct}: {amt:<10d}", frame_num=1)
         self.print_done_small_proc()
 
         self.rprint("Performing spectral clustering on concatenated tuning curves")
@@ -651,26 +651,28 @@ class TwoOdorDecoder(BC):
         self.DistanceMapBTW_BCnSW = None
         BC_idx = np.where(self.lapTypeName == "BOTHCUES")[0][0]
         SW_idx = np.where(self.lapTypeName == "SWITCH")[0][0]
-        OM_idx = np.where(self.lapTypeName == "OMITBOTH")[0][0]
+        # OM_idx = np.where(self.lapTypeName == "OMITBOTH")[0][0]
 
         rowwise_corr_coeffs = np.full(len(self.simMat4PRClustering["concat"]), np.nan)
         for c in range(N_cells):
             BC_row = TuningCurvesScaled[BC_idx][c]
             SW_row = TuningCurvesScaled[SW_idx][c]
-            OM_row = TuningCurvesScaled[OM_idx][c]
-            BCminOM = BC_row - OM_row
-            SWminOM = SW_row - OM_row
-            if np.std(BCminOM) > 0 and np.std(SWminOM) > 0:
-                rowwise_corr_coeffs[c] = np.corrcoef(BCminOM, SWminOM)[0, 1]
-            elif np.all(BCminOM == SWminOM):
+            # OM_row = TuningCurvesScaled[OM_idx][c]
+            # BCminOM = BC_row - OM_row
+            # SWminOM = SW_row - OM_row
+            if np.std(BC_row) > 0 and np.std(SW_row) > 0:
+                rowwise_corr_coeffs[c] = np.corrcoef(BC_row, SW_row)[0, 1]
+            elif np.all(BC_row == SW_row):
                 rowwise_corr_coeffs[c] = 1
             else:
                 rowwise_corr_coeffs[c] = 0
 
-        BCminOmit = TuningCurvesScaled[BC_idx] - TuningCurvesScaled[OM_idx]
-        SWminOmit = TuningCurvesScaled[SW_idx] - TuningCurvesScaled[OM_idx]
-        diff = BCminOmit - SWminOmit
-        prod = BCminOmit * SWminOmit
+        # BCminOmit = TuningCurvesScaled[BC_idx] - TuningCurvesScaled[OM_idx]
+        # SWminOmit = TuningCurvesScaled[SW_idx] - TuningCurvesScaled[OM_idx]
+        # diff = BCminOmit - SWminOmit
+        # prod = BCminOmit * SWminOmit
+        diff = TuningCurvesScaled[BC_idx] - TuningCurvesScaled[SW_idx]
+        prod = TuningCurvesScaled[BC_idx] * TuningCurvesScaled[SW_idx]
 
         self.print_wFrm("Finding euclidean, cosine, and 1-correlation distance maps")
         self.DistanceMapBTW_BCnSW = {
@@ -699,6 +701,7 @@ class TwoOdorDecoder(BC):
         maxDiffs_loc = {key: [] for key in loc_keys}
         minDiffs_loc = {key: [] for key in loc_keys}
         diffAUCs = {key: [] for key in loc_keys}
+        meanDiffs = {key: [] for key in loc_keys}
         for c in range(N_cells):
             for key, loc_slice in locations.items():
                 diffAUC = np.sum(diff[c, loc_slice])
@@ -713,7 +716,7 @@ class TwoOdorDecoder(BC):
                 minmaxDiffs[key].append(
                     (maxD - (np.abs(minD))) / (maxD + (np.abs(minD)) + 1e-10)
                 )
-                # minmaxDiffs[key].append(np.mean(diff[c, loc_slice]))
+                meanDiffs[key].append(np.mean(diff[c, loc_slice]))
                 diffAUCs[key].append(diffAUC)
 
         # convert lists to arrays
@@ -724,13 +727,10 @@ class TwoOdorDecoder(BC):
             maxDiffs_loc,
             minDiffs_loc,
             diffAUCs,
+            meanDiffs,
         ]:
             for key in loc_keys:
                 x[key] = np.array(x[key])
-
-        maxDiffs_loc = {key: np.array(maxDiffs_loc[key]) for key in loc_keys}
-        minDiffs_loc = {key: np.array(minDiffs_loc[key]) for key in loc_keys}
-        diffAUCs = {key: np.array(diffAUCs[key]) for key in loc_keys}
 
         self.print_done_small_proc()
 
@@ -799,6 +799,7 @@ class TwoOdorDecoder(BC):
             "MINDIFF_LOC": minDiffs_loc,
             "MINMAXDIFF": minmaxDiffs,
             "DIFFAUC": diffAUCs,
+            "MEANDIFF": meanDiffs,
         }
         self.loc_keys = loc_keys
 
@@ -991,8 +992,9 @@ class TwoOdorDecoder(BC):
             max4fv = self.BCSW_comparison["MAXDIFF_LOC"][key]
             min4fv = self.BCSW_comparison["MINDIFF_LOC"][key]
             minmax4fv = self.BCSW_comparison["MINMAXDIFF"][key]
+            mean4fv = self.BCSW_comparison["MEANDIFF"][key]
             diffAUC4fv = self.BCSW_comparison["DIFFAUC"][key]
-            fv = np.column_stack([max4fv, min4fv, minmax4fv, diffAUC4fv])
+            fv = np.column_stack([max4fv, min4fv, minmax4fv, mean4fv, diffAUC4fv])
             if self.fv4BCSW is None:
                 self.fv4BCSW = fv
             else:
@@ -1074,7 +1076,7 @@ class TwoOdorDecoder(BC):
         self._plot_histograms4DistanceMaps()
 
         # plot minmax diff
-        self._plot_minmax_diff()
+        self._plot_diff_by_location()
 
         # plot tuning similarity by cell type
         self.analyzing_BCSwitchTuning()
@@ -1857,7 +1859,7 @@ class TwoOdorDecoder(BC):
             fig, "Distance_Maps_BCSW", figure_save_path=self.FigPath
         )
 
-    def _plot_minmax_diff(self) -> None:
+    def _plot_diff_by_location(self) -> None:
         """
         Plots the min-max difference between L1 and L2 for each cell type.
         """
@@ -1868,16 +1870,20 @@ class TwoOdorDecoder(BC):
             for idx in range(len(labels_to_use))
         ]
 
-        barTypes = [("MINMAXDIFF", "Min-Max Difference")]
+        barTypes = [
+            ("MINMAXDIFF", "Min-Max Difference"),
+            ("MEANDIFF", "Mean Difference"),
+            ("DIFFAUC", "Diff AUC"),
+        ]
         fig, ax = self.fig_tools.create_plt_subplots(nrows=len(barTypes))
-        bar2_ax = ax
 
         for idx, (diff_type, diff_name) in enumerate(barTypes):
-            bar2_ax.set_title(diff_name)
-            bar2_ax.set_xlabel("Cell Type")
-            bar2_ax.set_ylabel(diff_name)
-            bar2_ax.set_xticks(np.arange(len(labels_to_use)))
-            bar2_ax.set_xticklabels(labels_to_use)
+            bar_ax = ax[idx]
+            bar_ax.set_title(diff_name)
+            bar_ax.set_xlabel("Cell Type")
+            bar_ax.set_ylabel(diff_name)
+            bar_ax.set_xticks(np.arange(len(labels_to_use)))
+            bar_ax.set_xticklabels(labels_to_use)
 
             for cidx, ctype in enumerate(self.cellTypes):
                 data2use = [
@@ -1897,7 +1903,7 @@ class TwoOdorDecoder(BC):
                     elif iidx == 1:
                         off = 1
                     self.fig_tools.bar_plot(
-                        ax=bar2_ax,
+                        ax=bar_ax,
                         X=cidx + off * self.plot_params["bar"]["offset"],
                         Y=mean,
                         yerr=sterr,
@@ -1906,14 +1912,14 @@ class TwoOdorDecoder(BC):
                         alpha=self.plot_params["bar"]["alpha"],
                     )
                     self.fig_tools.scatter_plot(
-                        ax=bar2_ax,
+                        ax=bar_ax,
                         X=cidx + off * self.plot_params["bar"]["offset"],
                         Y=d2plot,
                         color=colors[cidx],
                         s=self.plot_params["scatter"]["s_small"],
-                        jitter=0.01,
+                        # jitter=0.01,
                     )
-                # bar2_ax.plot(
+                # bar_ax.plot(
                 #     [
                 #         cidx - self.plot_params["bar"]["offset"],
                 #         cidx + self.plot_params["bar"]["offset"],
@@ -1921,10 +1927,10 @@ class TwoOdorDecoder(BC):
                 #     [data2use[0], data2use[1]],
                 #     color=colors[cidx],
                 # )
-                # bar2_ax.set_ylim(-1.1, 1.1)  # Adjust limits to make space
+                # bar_ax.set_ylim(-1.1, 1.1)  # Adjust limits to make space
 
                 # Annotation for L1 dominance (top)
-                bar2_ax.annotate(
+                bar_ax.annotate(
                     "More BC active",
                     xy=(1.02, 0.9),
                     xycoords="axes fraction",
@@ -1936,7 +1942,7 @@ class TwoOdorDecoder(BC):
                 )
 
                 # Annotation for L2 dominance (bottom)
-                bar2_ax.annotate(
+                bar_ax.annotate(
                     "More SWITCH active",
                     xy=(1.02, 0.1),
                     xycoords="axes fraction",
@@ -1948,7 +1954,7 @@ class TwoOdorDecoder(BC):
                 )
 
         self.fig_tools.save_figure(
-            fig, "minmaxDiff_BCSW_ByLocation", figure_save_path=self.FigPath
+            fig, "Diff_BCSW_ByLocation", figure_save_path=self.FigPath
         )
 
         # fig, ax = self.fig_tools.create_plt_subplots(ncols=3, flatten=True)
