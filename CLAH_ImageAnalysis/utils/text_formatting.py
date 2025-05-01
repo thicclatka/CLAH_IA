@@ -54,15 +54,15 @@ def color_dict() -> dict:
     return color_dict
 
 
-def color_dict_4cueTrigSigplots() -> dict:
+def color_dict_4cues() -> dict:
     """
-    Returns a dictionary mapping cue names to color codes for 4-cue triggered signal plots.
+    Returns a dictionary mapping cue names to color codes for plotting.
 
     Returns:
         dict: A dictionary mapping cue names to color codes.
     """
     colors = color_dict()
-    color_dict_4cueTrigSigplots = {
+    color_dict_4cues = {
         "CUE1": colors["green"],
         "OMITCUE1": colors["orange"],
         "CUE2": colors["red"],
@@ -77,8 +77,11 @@ def color_dict_4cueTrigSigplots() -> dict:
         "OMITBOTH": colors["darkred"],
         "OPTO": colors["darkorange"],
         "CUEWOPTO": colors["darkyellow"],
+        "BOTHCUES": colors["darkblue"],
+        "NON": colors["darkgray"],
+        "PLACE": colors["darkviolet"],
     }
-    return color_dict_4cueTrigSigplots
+    return color_dict_4cues
 
 
 def color_bool(value: str) -> str:

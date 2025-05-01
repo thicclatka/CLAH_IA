@@ -17,9 +17,7 @@ class CRwROI_plots(BC):
             self.color_dict["green_base_rgb"],
         ]
 
-        # self.cmap4celltypes = self.fig_tools.create_cmap4categories(
-        #     num_categories=10, cmap_name="tab20"
-        # )
+        self.colors = self.utils.color_dict_4cues()
 
         self.sim_rel_size = (20, 7)
         self.FOV_cluster_size = (20, 15)
@@ -317,7 +315,7 @@ class CRwROI_plots(BC):
         ctkeys2use = [
             key
             for key in isCell2plot.keys()
-            if key in ["CUE1", "CUE2", "BOTH", "PLACE"]
+            if key in ["CUE1", "CUE2", "BOTHCUES", "PLACE"]
         ]
 
         ctkeysall = ctkeys2use + ["NON"]
@@ -327,13 +325,13 @@ class CRwROI_plots(BC):
             # total_cells = len(isCell2plot["CUE1"][QC2use][sess])
             cue1 = isCell2plot["CUE1"][QC2use][sess].sum()
             cue2 = isCell2plot["CUE2"][QC2use][sess].sum()
-            both = isCell2plot["BOTH"][QC2use][sess].sum()
+            both = isCell2plot["BOTHCUES"][QC2use][sess].sum()
             place = isCell2plot["PLACE"][QC2use][sess].sum()
             non = isCell2plot["NON"][QC2use][sess].sum()
             total_dict = {
                 "CUE1": cue1,
                 "CUE2": cue2,
-                "BOTH": both,
+                "BOTHCUES": both,
                 "PLACE": place,
                 "NON": non,
                 "TOTAL": cue1 + cue2 + both + place + non,
@@ -374,7 +372,6 @@ class CRwROI_plots(BC):
         cmap4ct = self.fig_tools.create_cmap4categories(
             num_categories=len(ctkeysall), cmap_name="tab20"
         )
-        colors = {ctkey: cmap4ct(i) for i, ctkey in enumerate(ctkeysall)}
 
         if rectangular:
             for cidx, cellType in enumerate(ctkeys2use):
@@ -383,7 +380,7 @@ class CRwROI_plots(BC):
                     self.fig_tools.plot_bounding_box(
                         axis=axes[0, idx],
                         bounding_box=bounding_box,
-                        edgecolor=colors[cellType],
+                        edgecolor=self.colors[cellType],
                     )
         elif circular:
             for cidx, cellType in enumerate(ctkeys2use):
@@ -395,7 +392,7 @@ class CRwROI_plots(BC):
                             axes[0, idx],
                             cent,
                             rad,
-                            edgecolor=colors[cellType],
+                            edgecolor=self.colors[cellType],
                         )
         elif contour:
             for cidx, cellType in enumerate(ctkeys2use):
@@ -406,7 +403,7 @@ class CRwROI_plots(BC):
                             self.fig_tools.plot_contour(
                                 axes[0, idx],
                                 ctrs,
-                                edgecolor=colors[cellType],
+                                edgecolor=self.colors[cellType],
                             )
 
         for i, ctotal in enumerate(cell_totals):
@@ -419,7 +416,7 @@ class CRwROI_plots(BC):
                 labels4plot.append(f"{ctkey}: {ctotal[ctkey]}")
                 labels.append(ctkey)
                 props.append(ctotal[ctkey] / ctotal["TOTAL"])
-            colors4plot = [colors[ctkey] for ctkey in labels]
+            colors4plot = [self.colors[ctkey] for ctkey in labels]
 
             # Create pie chart
             wedges, _, _ = axes[1, i].pie(

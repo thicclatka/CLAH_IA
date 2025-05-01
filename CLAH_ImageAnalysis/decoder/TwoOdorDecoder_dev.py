@@ -176,12 +176,16 @@ class TwoOdorDecoder(BC):
                 "odors": self.fig_tools.create_cmap4categories(
                     num_categories=4, cmap_name="Accent"
                 ),
-                "cellTypes": self.fig_tools.create_cmap4categories(
-                    num_categories=len(self.cellTypes), cmap_name="tab20"
+                "cellTypes": self.utils.color_dict_4cues(),
+                "lapType": self.fig_tools.create_cmap4categories(
+                    num_categories=10, cmap_name="tab20"
                 ),
-                "cellTypes_wNon": self.fig_tools.create_cmap4categories(
-                    num_categories=len(self.cellTypes_wNon), cmap_name="tab20"
-                ),
+                # "cellTypes": self.fig_tools.create_cmap4categories(
+                #     num_categories=len(self.cellTypes), cmap_name="tab20"
+                # ),
+                # "cellTypes_wNon": self.fig_tools.create_cmap4categories(
+                #     num_categories=len(self.cellTypes_wNon), cmap_name="tab20"
+                # ),
             },
             "locator": {
                 "size": "3%",
@@ -1409,9 +1413,11 @@ class TwoOdorDecoder(BC):
             self.fv4BCSW,
             metric="euclidean",
         )
-        cmap4labels = self.plot_params["cmap"]["cellTypes_wNon"]
+        cmap4labels = self.plot_params["cmap"]["cellTypes"]
         unique_labels = [int(lab) for lab in np.unique(self.true_cellTypeLabel)]
-        colors = [cmap4labels(int(lab)) for lab in unique_labels]
+
+        true_cellTypeName = [self.cellTypes_wNon[cid] for cid in unique_labels]
+        colors = [cmap4labels[ctype] for ctype in true_cellTypeName]
 
         for label in unique_labels:
             if label == 4:
@@ -1563,9 +1569,7 @@ class TwoOdorDecoder(BC):
 
         colors = [cmap4lapType(int(idx)) for idx in range(len(self.lapTypeName))]
 
-        colors4cellTypes = [
-            cmap4cellTypes(int(idx)) for idx in range(len(self.cellTypes))
-        ]
+        colors4cellTypes = [cmap4cellTypes[ctype] for ctype in self.cellTypes]
 
         for idx, embedding in enumerate(embeddings):
             for ctype in self.cellTypes:
@@ -1757,8 +1761,7 @@ class TwoOdorDecoder(BC):
 
         labels_to_use = self.cellTypes
         colors = [
-            self.plot_params["cmap"]["cellTypes"](int(idx))
-            for idx in range(len(labels_to_use))
+            self.plot_params["cmap"]["cellTypes"][label] for label in labels_to_use
         ]
 
         histo_axes = axes[0, :]
@@ -1866,8 +1869,7 @@ class TwoOdorDecoder(BC):
         self.print_wFrm("Plotting min-max difference")
         labels_to_use = self.cellTypes
         colors = [
-            self.plot_params["cmap"]["cellTypes"](int(idx))
-            for idx in range(len(labels_to_use))
+            self.plot_params["cmap"]["cellTypes"][label] for label in labels_to_use
         ]
 
         barTypes = [

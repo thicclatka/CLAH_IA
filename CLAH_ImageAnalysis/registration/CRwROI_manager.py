@@ -332,7 +332,7 @@ class CRwROI_manager(BC, Data_roicat):
 
         keys2check4both = [key for key in self.isCell if "CUE" in key and len(key) > 3]
         if len(keys2check4both) > 1:
-            self.isCell["BOTH"] = []
+            self.isCell["BOTHCUES"] = []
             for sess in range(self.numSess):
                 cue1 = self.isCell["CUE1"][sess]
                 cue2 = self.isCell["CUE2"][sess]
@@ -345,7 +345,7 @@ class CRwROI_manager(BC, Data_roicat):
                 )
                 self.isCell["CUE1"][sess] = newcue1
                 self.isCell["CUE2"][sess] = newcue2
-                self.isCell["BOTH"].append(both)
+                self.isCell["BOTHCUES"].append(both)
 
     ######################################################
     #  ROICaT funcs

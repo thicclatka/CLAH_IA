@@ -47,7 +47,7 @@ class CCF_Plotter(BC):
         self.lapTypeNameArr = lapTypeNameArr
         self.fig_save_path = self.text_lib["FIGSAVE"]["DEFAULT"]
         self.figsize = (15, 15)
-        self.colors = self.utils.color_dict_4cueTrigSigplots()
+        self.colors = self.utils.color_dict_4cues()
         self.cueType_abbrev = self.text_lib["cueType_abbrev"]
         self.CCFPtxt = self.enum2dict(UA_enum.CCF_PLOT)
         self.desired_order = self.CCFPtxt["ORDER"]
