@@ -318,9 +318,9 @@ class wrapMultSessStruc(BC):
         self.rprint("segDict:")
         self._fill_mSSD_segDict(numSess)
 
-        if self.findLatest([self.file_tag["SD"], "prevName", self.file_tag["MAT"]]):
-            self.rprint("segDict_prevNameVar:")
-            self._fill_mSSD_segDict(numSess, prevNameVar=True)
+        # if self.findLatest([self.file_tag["SD"], "prevName", self.file_tag["MAT"]]):
+        #     self.rprint("segDict_prevNameVar:")
+        #     self._fill_mSSD_segDict(numSess, prevNameVar=True)
 
         # CueCellFinder Struct
         self.rprint("CCFStruct:")
@@ -369,7 +369,7 @@ class wrapMultSessStruc(BC):
             self.rprint(f"Problem with loading {ftag}: {e}")
         return loaded_pkl
 
-    def _fill_mSSD_segDict(self, numSess: str, prevNameVar: bool = False) -> None:
+    def _fill_mSSD_segDict(self, numSess: str) -> None:
         """
         Fills the multiple session segmentation structure with the segDict.
 
@@ -377,10 +377,7 @@ class wrapMultSessStruc(BC):
             numSess (str): The session number.
             prevNameVar (bool, optional): Whether to use the previous name variable (C instead of C_Temporal). Defaults to False.
         """
-        if prevNameVar:
-            fileTags2Find = [self.file_tag["SD"], "prevName", self.file_tag["MAT"]]
-        else:
-            fileTags2Find = [self.file_tag["SD"], self.file_tag["PKL"]]
+        fileTags2Find = [self.file_tag["SD"], self.file_tag["PKL"]]
 
         try:
             latest_file = self.findLatest(fileTags2Find)
@@ -394,30 +391,19 @@ class wrapMultSessStruc(BC):
         try:
             C_Temporal, A_Spatial, dx, dy = self.saveNloadUtils.load_segDict(
                 latest_file,
-                keep_A_sparse=True,
-                C_Temporal=True,
-                A_Spatial=True,
-                dx=True,
-                dy=True,
-                prevNameVar=prevNameVar,
+                C=True,
+                A=True,
+                d1=True,
+                d2=True,
             )
         except Exception as e:
             print(f"Problem with loading segDict: {e}")
 
-        if not prevNameVar:
-            self.multSessSegStruc[numSess][f"{self.dict_name['SD']}Name"] = latest_file
-            self.multSessSegStruc[numSess][self.SDkey["C_TEMPORAL"]] = C_Temporal
-            self.multSessSegStruc[numSess][self.SDkey["A_SPATIAL"]] = A_Spatial
-            self.multSessSegStruc[numSess][self.SDkey["DX"]] = dx
-            self.multSessSegStruc[numSess][self.SDkey["DY"]] = dy
-        else:
-            self.multSessSegStruc[numSess][
-                f"{self.dict_name['SD']}Name_prevNameVar"
-            ] = latest_file
-            self.multSessSegStruc[numSess]["C"] = C_Temporal
-            self.multSessSegStruc[numSess]["A"] = A_Spatial
-            self.multSessSegStruc[numSess]["d1"] = dx
-            self.multSessSegStruc[numSess]["d2"] = dy
+        self.multSessSegStruc[numSess][f"{self.dict_name['SD']}Name"] = latest_file
+        self.multSessSegStruc[numSess][self.SDkey["C_TEMPORAL"]] = C_Temporal
+        self.multSessSegStruc[numSess][self.SDkey["A_SPATIAL"]] = A_Spatial
+        self.multSessSegStruc[numSess][self.SDkey["DX"]] = dx
+        self.multSessSegStruc[numSess][self.SDkey["DY"]] = dy
 
     # !THIS ISNT BEING USED FOR NOW, KEEP JUST IN CASE
     def _fill_mSSD_H5_metadata(self, numSess: str, tolerance: float = 1e-9) -> None:
