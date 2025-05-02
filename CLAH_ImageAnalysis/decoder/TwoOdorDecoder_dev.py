@@ -995,10 +995,10 @@ class TwoOdorDecoder(BC):
         for key in self.loc_keys:
             max4fv = self.BCSW_comparison["MAXDIFF_LOC"][key]
             min4fv = self.BCSW_comparison["MINDIFF_LOC"][key]
-            minmax4fv = self.BCSW_comparison["MINMAXDIFF"][key]
+            # minmax4fv = self.BCSW_comparison["MINMAXDIFF"][key]
             mean4fv = self.BCSW_comparison["MEANDIFF"][key]
             diffAUC4fv = self.BCSW_comparison["DIFFAUC"][key]
-            fv = np.column_stack([max4fv, min4fv, minmax4fv, mean4fv, diffAUC4fv])
+            fv = np.column_stack([max4fv, min4fv, mean4fv, diffAUC4fv])
             if self.fv4BCSW is None:
                 self.fv4BCSW = fv
             else:

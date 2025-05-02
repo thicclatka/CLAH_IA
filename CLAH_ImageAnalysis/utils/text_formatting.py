@@ -74,7 +74,7 @@ def color_dict_4cues() -> dict:
         "OMITTONE": colors["darkturquoise"],
         "LED": colors["darkblue"],
         "OMITLED": colors["darkgreen"],
-        "OMITBOTH": colors["darkred"],
+        "OMITBOTH": colors["gray"],
         "OPTO": colors["darkorange"],
         "CUEWOPTO": colors["darkyellow"],
         "BOTHCUES": colors["darkblue"],
