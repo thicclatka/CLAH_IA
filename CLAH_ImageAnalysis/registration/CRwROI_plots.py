@@ -297,8 +297,10 @@ class CRwROI_plots(BC):
         """
         if not preQC:
             QC2use = "POST_QC"
+            clusterkey2use = self.CRkey["ACLUSTERS_QC"]
         else:
             QC2use = "PRE_QC"
+            clusterkey2use = self.CRkey["ACLUSTERS"]
 
         # init total_sess var for legibility
         total_sess = self.numSess
@@ -306,10 +308,6 @@ class CRwROI_plots(BC):
         # plot the FOV clusters
         fig, axes = self.fig_tools.create_plt_subplots(
             ncols=total_sess, nrows=2, figsize=self.FOV_cluster_size
-        )
-
-        clusterkey2use = (
-            self.CRkey["ACLUSTERS_QC"] if not preQC else self.CRkey["ACLUSTERS"]
         )
 
         ctkeys2use = [
@@ -323,18 +321,19 @@ class CRwROI_plots(BC):
         cell_totals = []
         for sess in range(total_sess):
             # total_cells = len(isCell2plot["CUE1"][QC2use][sess])
+            total = cluster_info[clusterkey2use]
             cue1 = isCell2plot["CUE1"][QC2use][sess].sum()
             cue2 = isCell2plot["CUE2"][QC2use][sess].sum()
             both = isCell2plot["BOTHCUES"][QC2use][sess].sum()
             place = isCell2plot["PLACE"][QC2use][sess].sum()
-            non = isCell2plot["NON"][QC2use][sess].sum()
+            non = total - (cue1 + cue2 + both + place)
             total_dict = {
                 "CUE1": cue1,
                 "CUE2": cue2,
                 "BOTHCUES": both,
                 "PLACE": place,
                 "NON": non,
-                "TOTAL": cue1 + cue2 + both + place + non,
+                "TOTAL": total,
             }
             cell_totals.append(total_dict)
 
@@ -367,10 +366,6 @@ class CRwROI_plots(BC):
             title=titles,
             xticks=ticks,
             yticks=ticks,
-        )
-
-        cmap4ct = self.fig_tools.create_cmap4categories(
-            num_categories=len(ctkeysall), cmap_name="tab20"
         )
 
         if rectangular:
