@@ -236,6 +236,11 @@ def get_segDict(selected_session: str):
         )
         return CTempnew, ASpatnew, SDeconvnew, accepted_labels
 
+    def refresh_accepted_rejected(accepted: set, rejected: set, undecided: set):
+        st.session_state.accepted = accepted
+        st.session_state.rejected = rejected
+        st.session_state.undecided = undecided
+
     ss2print = "/".join(selected_session.split("/")[-2:])
     st.subheader(ss2print)
     file_tag = text_dict()["file_tag"]
@@ -421,13 +426,14 @@ def get_segDict(selected_session: str):
             st.session_state.use_AL_SDISX_checkbox_result = False
             st.session_state.use_NNCE_checkbox_result = False
             st.session_state.use_PREV_JSON_checkbox_result = False
+
     with col2:
         adjust_labels_checkbox = st.checkbox(
-            "Adjust CNMF, ISX, or NNCE accepted/rejected components",
+            "Adjust accepted/rejected components",
             disabled=not imported_accepted_mainBool,
             value=st.session_state.adjust_labels_bool,
             key="adjust_labels_checkbox",
-            help="If you have already done accepted/rejected components but want to adjust them, check this box. Otherwise, if left unchecked, any changes made will not be registered.",
+            help="If you wish to adjust the accepted/rejected components, check this box. Otherwise, if left unchecked, any changes made will not be registered.",
         )
         st.session_state.adjust_labels_bool = adjust_labels_checkbox
 
@@ -446,43 +452,43 @@ def get_segDict(selected_session: str):
         #     f"- Rejected by NNCE, but not by ISX: {sorted(list(st.session_state.NNCE_rejected - st.session_state.AL_SDISX_rejected))}"
         # )
 
-    if (
-        st.session_state.use_CNMF_CE_checkbox_result
-        and not st.session_state.adjust_labels_bool
-    ):
-        st.session_state.accepted = set(st.session_state.CNMF_accepted.astype(int))
-        st.session_state.rejected = set(st.session_state.CNMF_rejected.astype(int))
-        st.session_state.undecided = set()
-    if (
-        st.session_state.use_AL_SDISX_checkbox_result
-        and not st.session_state.adjust_labels_bool
-    ):
-        st.session_state.accepted = st.session_state.AL_SDISX_accepted
-        st.session_state.rejected = st.session_state.AL_SDISX_rejected
-        st.session_state.undecided = st.session_state.AL_SDISX_undecided
-    if (
-        st.session_state.use_NNCE_checkbox_result
-        and not st.session_state.adjust_labels_bool
-    ):
-        st.session_state.accepted = set(st.session_state.NNCE_accepted)
-        st.session_state.rejected = set(st.session_state.NNCE_rejected)
-        st.session_state.undecided = set()
-    if (
-        st.session_state.use_PREV_JSON_checkbox_result
-        and not st.session_state.adjust_labels_bool
-    ):
-        st.session_state.accepted = st.session_state.PREV_JSON_accepted
-        st.session_state.rejected = st.session_state.PREV_JSON_rejected
-        st.session_state.undecided = st.session_state.PREV_JSON_undecided
-    if (
-        not st.session_state.use_CNMF_CE_checkbox_result
-        and not st.session_state.use_AL_SDISX_checkbox_result
-        and not st.session_state.use_NNCE_checkbox_result
-        and not st.session_state.use_PREV_JSON_checkbox_result
-    ):
-        st.session_state.accepted = set()
-        st.session_state.rejected = set()
-        st.session_state.undecided = set(list(range(st.session_state.CTemp.shape[0])))
+    if not st.session_state.adjust_labels_bool:
+        if st.session_state.use_CNMF_CE_checkbox_result:
+            refresh_accepted_rejected(
+                accepted=set(st.session_state.CNMF_accepted.astype(int)),
+                rejected=set(st.session_state.CNMF_rejected.astype(int)),
+                undecided=set(),
+            )
+        if st.session_state.use_AL_SDISX_checkbox_result:
+            refresh_accepted_rejected(
+                accepted=set(st.session_state.AL_SDISX_accepted),
+                rejected=set(st.session_state.AL_SDISX_rejected),
+                undecided=set(),
+            )
+        if st.session_state.use_NNCE_checkbox_result:
+            refresh_accepted_rejected(
+                accepted=set(st.session_state.NNCE_accepted),
+                rejected=set(st.session_state.NNCE_rejected),
+                undecided=set(),
+            )
+        if st.session_state.use_PREV_JSON_checkbox_result:
+            refresh_accepted_rejected(
+                accepted=set(st.session_state.PREV_JSON_accepted),
+                rejected=set(st.session_state.PREV_JSON_rejected),
+                undecided=set(),
+            )
+        if (
+            not st.session_state.use_CNMF_CE_checkbox_result
+            and not st.session_state.use_AL_SDISX_checkbox_result
+            and not st.session_state.use_NNCE_checkbox_result
+            and not st.session_state.use_PREV_JSON_checkbox_result
+            and selected_option == "None"
+        ):
+            refresh_accepted_rejected(
+                accepted=set(),
+                rejected=set(),
+                undecided=set(list(range(st.session_state.CTemp.shape[0]))),
+            )
 
     print(
         f"Adjust labels checkbox clicked -- State: {st.session_state.adjust_labels_bool}"
@@ -1126,8 +1132,8 @@ def plot_ASpat_wDSimage():
             aspect="auto",
         )
 
-    accepted_cmap_images = create_accepted_cmap_image()
     if accepted_bool:
+        accepted_cmap_images = create_accepted_cmap_image()
         print("Plotting accepted components...")
         print(f"Accepted cmap images shape: {accepted_cmap_images.shape}")
         ax.imshow(
@@ -1161,6 +1167,8 @@ def create_allcmap_images(ASpat: np.ndarray, DSimage_fname: str | None):
 
 @st.cache_data
 def create_accepted_cmap_image():
+    print(f"Accepted: {st.session_state.accepted}")
+    print(f"ASpat: {st.session_state.ASpat}")
     accepted_cmap_images = []
     for cell in list(st.session_state.accepted):
         data = st.session_state.ASpat[:, cell]
