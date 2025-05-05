@@ -272,8 +272,8 @@ class CRwROI_plots(BC):
         subj_id: str,
         FOV_clusters: list,
         cluster_info: dict,
-        isCell2plot: list,
-        PC_dict: dict,
+        isCell2plot: dict | None = None,
+        PC_dict: dict | None = None,
         rectangular: bool = False,
         circular: bool = False,
         contour=False,
@@ -286,8 +286,8 @@ class CRwROI_plots(BC):
             subj_id (str): Subject ID.
             FOV_clusters (list): List of FOV clusters.
             cluster_info (dict): Cluster information.
-            isCell2plot (list): List of boolean values indicating whether a cell is a PC or not.
-            PC_dict (dict): Dictionary containing PC information.
+            isCell2plot (dict | None): Dictionary containing boolean values indicating whether a cell is a specific cell type (which is defined by the keys) or not.
+            PC_dict (dict | None): Dictionary containing cell type specific information necessary to plot the bounding boxes to highlight specific cell types.
             rectangular (bool, optional): Whether to plot rectangular bounding boxes. Defaults to False.
             circular (bool, optional): Whether to plot circular patches. Defaults to False.
             contour (bool, optional): Whether to plot contours. Defaults to False.
@@ -305,36 +305,41 @@ class CRwROI_plots(BC):
         # init total_sess var for legibility
         total_sess = self.numSess
 
+        if isCell2plot is None:
+            nrows2use = 1
+            ctkeys2use = None
+            ctkeysall = None
+        else:
+            nrows2use = 2
+            ctkeys2use = [
+                key
+                for key in isCell2plot.keys()
+                if key in ["CUE1", "CUE2", "BOTHCUES", "PLACE"]
+            ]
+            ctkeysall = ctkeys2use + ["NON"]
+
         # plot the FOV clusters
         fig, axes = self.fig_tools.create_plt_subplots(
-            ncols=total_sess, nrows=2, figsize=self.FOV_cluster_size
+            ncols=total_sess, nrows=nrows2use, figsize=self.FOV_cluster_size
         )
-
-        ctkeys2use = [
-            key
-            for key in isCell2plot.keys()
-            if key in ["CUE1", "CUE2", "BOTHCUES", "PLACE"]
-        ]
-
-        ctkeysall = ctkeys2use + ["NON"]
 
         cell_totals = []
         for sess in range(total_sess):
-            # total_cells = len(isCell2plot["CUE1"][QC2use][sess])
             total = cluster_info[clusterkey2use]
-            cue1 = isCell2plot["CUE1"][QC2use][sess].sum()
-            cue2 = isCell2plot["CUE2"][QC2use][sess].sum()
-            both = isCell2plot["BOTHCUES"][QC2use][sess].sum()
-            place = isCell2plot["PLACE"][QC2use][sess].sum()
-            non = total - (cue1 + cue2 + both + place)
-            total_dict = {
-                "CUE1": cue1,
-                "CUE2": cue2,
-                "BOTHCUES": both,
-                "PLACE": place,
-                "NON": non,
-                "TOTAL": total,
-            }
+            total_dict = {}
+            sum_of_specific_types = 0
+
+            if ctkeys2use is not None:
+                for cellType in ctkeys2use:
+                    count = isCell2plot[cellType][QC2use][sess].sum()
+                    total_dict[cellType] = count
+                    sum_of_specific_types += count
+
+            # Calculate 'NON' count
+            non = total - sum_of_specific_types
+            total_dict["NON"] = non
+            total_dict["TOTAL"] = total
+
             cell_totals.append(total_dict)
 
         # set up titles for each subplot to be the session number
@@ -357,10 +362,15 @@ class CRwROI_plots(BC):
             ]
 
         # create empty ticks for the x and y axes
+        if ctkeys2use is not None:
+            ax2use = axes[0, :total_sess]
+        else:
+            ax2use = axes[:total_sess]
+
         ticks = self.fig_tools.empty_tick_maker(total_sess)
         self.fig_tools.plot_imshow(
             fig,
-            axes[0, :total_sess],
+            ax2use,
             FOV_clusters,
             suptitle=suptitle,
             title=titles,
@@ -368,61 +378,65 @@ class CRwROI_plots(BC):
             yticks=ticks,
         )
 
-        if rectangular:
-            for cidx, cellType in enumerate(ctkeys2use):
-                PC_bounds = PC_dict[cellType][self.CRkey["BOUND"]]
-                for idx, bounding_box in enumerate(PC_bounds):
-                    self.fig_tools.plot_bounding_box(
-                        axis=axes[0, idx],
-                        bounding_box=bounding_box,
-                        edgecolor=self.colors[cellType],
-                    )
-        elif circular:
-            for cidx, cellType in enumerate(ctkeys2use):
-                PC_centroids = PC_dict[cellType][self.CRkey["CENT"]]
-                PC_radii = PC_dict[cellType][self.CRkey["MIN_D"]]
-                for idx, (centroids, radii) in enumerate(zip(PC_centroids, PC_radii)):
-                    for cent, rad in zip(centroids, radii):
-                        self.fig_tools.plot_circle_patch(
-                            axes[0, idx],
-                            cent,
-                            rad,
+        if ctkeys2use is not None:
+            if rectangular:
+                for cidx, cellType in enumerate(ctkeys2use):
+                    PC_bounds = PC_dict[cellType][self.CRkey["BOUND"]]
+                    for idx, bounding_box in enumerate(PC_bounds):
+                        self.fig_tools.plot_bounding_box(
+                            axis=ax2use[idx],
+                            bounding_box=bounding_box,
                             edgecolor=self.colors[cellType],
                         )
-        elif contour:
-            for cidx, cellType in enumerate(ctkeys2use):
-                PC_contours = PC_dict[cellType][self.CRkey["CONTOUR"]]
-                for idx, sess_ctrs in enumerate(PC_contours):
-                    for cell_ctrs in sess_ctrs:
-                        for ctrs in cell_ctrs:
-                            self.fig_tools.plot_contour(
-                                axes[0, idx],
-                                ctrs,
+            elif circular:
+                for cidx, cellType in enumerate(ctkeys2use):
+                    PC_centroids = PC_dict[cellType][self.CRkey["CENT"]]
+                    PC_radii = PC_dict[cellType][self.CRkey["MIN_D"]]
+                    for idx, (centroids, radii) in enumerate(
+                        zip(PC_centroids, PC_radii)
+                    ):
+                        for cent, rad in zip(centroids, radii):
+                            self.fig_tools.plot_circle_patch(
+                                ax2use[idx],
+                                cent,
+                                rad,
                                 edgecolor=self.colors[cellType],
                             )
+            elif contour:
+                for cidx, cellType in enumerate(ctkeys2use):
+                    PC_contours = PC_dict[cellType][self.CRkey["CONTOUR"]]
+                    for idx, sess_ctrs in enumerate(PC_contours):
+                        for cell_ctrs in sess_ctrs:
+                            for ctrs in cell_ctrs:
+                                self.fig_tools.plot_contour(
+                                    ax2use[idx],
+                                    ctrs,
+                                    edgecolor=self.colors[cellType],
+                                )
 
-        for i, ctotal in enumerate(cell_totals):
-            props = []
-            labels = []
-            labels4plot = []
-            for ctkey in ctotal.keys():
-                if ctkey == "TOTAL":
-                    continue
-                labels4plot.append(f"{ctkey}: {ctotal[ctkey]}")
-                labels.append(ctkey)
-                props.append(ctotal[ctkey] / ctotal["TOTAL"])
-            colors4plot = [self.colors[ctkey] for ctkey in labels]
+        if ctkeys2use is not None:
+            for i, ctotal in enumerate(cell_totals):
+                props = []
+                labels = []
+                labels4plot = []
+                for ctkey in ctotal.keys():
+                    if ctkey == "TOTAL":
+                        continue
+                    labels4plot.append(f"{ctkey}: {ctotal[ctkey]}")
+                    labels.append(ctkey)
+                    props.append(ctotal[ctkey] / ctotal["TOTAL"])
+                colors4plot = [self.colors[ctkey] for ctkey in labels]
 
-            # Create pie chart
-            wedges, _, _ = axes[1, i].pie(
-                props,
-                labels=labels4plot,
-                colors=colors4plot,
-                autopct="%1.1f%%",
-                startangle=140,
-                wedgeprops={"alpha": 0.8},
-            )
-            axes[1, i].set_aspect("equal")
+                # Create pie chart
+                wedges, _, _ = axes[1, i].pie(
+                    props,
+                    labels=labels4plot,
+                    colors=colors4plot,
+                    autopct="%1.1f%%",
+                    startangle=140,
+                    wedgeprops={"alpha": 0.8},
+                )
+                axes[1, i].set_aspect("equal")
 
         # if total_sess < 4:
         #     axes[1, -1].legend(

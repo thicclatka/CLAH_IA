@@ -1,62 +1,95 @@
 """
-This script defines the `wrapMultSessStruc` class, which manages the creation of a multiple session segmentation structure by extending the BaseClass (BC). It processes multiple sessions, loads various data structures, and saves the combined results.
+This script defines the `wrapMultSessStruc` class, which manages the creation of a
+multiple session segmentation structure (MSSS) by extending the BaseClass (BC).
+It processes multiple sessions for specified subjects, loads various data structures
+(like `segDict`, `cueShiftStruc`, `treadBehDict`, `CCFStruct`, and downsampled images),
+combines them into the MSSS, and saves the results in a structured output folder.
 
 Functions:
-    alt_run(): Executes an alternative run of the method, ensuring the parser works correctly.
-    static_class_var_init(path, sess2process, output_folder): Initializes the static class variables for the class.
-    loop_byID_bySession(): Loops through the sessions and fills the multiple session segmentation structure.
-    sBYs_perID_processing(s2p_perID, ID): Processes the sessions by IDs for a specific ID.
-    _fill_multSessSegStruc_overall(ID, sess_idx): Fills the multiple session segmentation structure for a specific subject ID and session index.
-    _fill_DSImage(): Fills the multiple session segmentation structure with the downsampled image.
-    _fill_mSSD_other(ftag): Fills the multiple session segmentation structure with other major dictionaries.
-    _fill_mSSD_segDict(numSess): Fills the multiple session segmentation structure with the segmentation dictionary.
-    _fill_mSSD_H5_metadata(numSess, tolerance=1e-9): Fills the metadata for the multi-session segmentation structure from an H5 file.
-    print_headers(folder_anlz_str, compl_msg_fLoop, sess_num): Prints the headers for folder analysis and completion message.
+    alt_run(): Executes the main processing loop (`loop_byID_bySession`).
+    static_class_var_init(path, sess2process, output_folder): Initializes static
+        class variables, determines subject IDs and sessions, sets up file keys,
+        and configures the output folder path (prompting for experiment name and
+        brain region if necessary using helper functions `_setExpName` and
+        `_choose_brain_region`).
+    loop_byID_bySession(): Loops through each unique subject ID, processes their
+        sessions using `sBYs_perID_processing`, and saves the resulting
+        `multSessSegStruc` to a subject-specific folder within the combined
+        output directory.
+    sBYs_perID_processing(s2p_perID, ID): Processes the sessions for a specific
+        subject ID by iterating through each session number and calling
+        `_fill_multSessSegStruc_overall` within a context manager (`print_headers`)
+        for logging.
+    _fill_multSessSegStruc_overall(ID, sess_idx): Fills the `multSessSegStruc`
+        dictionary for a specific subject ID and session index with basic metadata
+        (path, day name, session name) and calls helper functions to load and add
+        data like the downsampled image (`_fill_DSImage`), other dictionaries
+        (`_fill_mSSD_other`), and the segmentation dictionary (`_fill_mSSD_segDict`).
+    _fill_DSImage(): Finds the latest downsampled, averaged, temporally filtered
+        image file, reads it, normalizes it, and returns the image array.
+    _fill_mSSD_other(ftag): Finds the latest .pkl file corresponding to the given
+        file tag (`CSS`, `TBD`, `CCF`), loads it, and returns the dictionary.
+    _fill_mSSD_segDict(numSess): Finds the latest `segDict` (.pkl or .h5 fallback),
+        loads essential components (`C_Temporal`, `A_Spatial`, `dx`, `dy`), and adds
+        them to the `multSessSegStruc` along with the `segDict` filename.
+    _fill_mSSD_H5_metadata(numSess, tolerance=1e-9): (Currently unused) Reads metadata
+        (pixel size) from an H5 file and adds it to the `multSessSegStruc`.
+    print_headers(folder_anlz_str, compl_msg_fLoop, sess_num): Context manager that
+        sets the current session's folder path, prints start/end messages for logging.
 
 Classes:
-    wrapMultSessStruc: Manages the creation of a multiple session segmentation structure by extending the BaseClass (BC).
+    wrapMultSessStruc: Manages the creation of a multiple session segmentation structure
+        by extending the BaseClass (BC). Inherits file/folder utilities, logging,
+        and parameter handling.
 
 Main Execution:
-    If the script is run directly, it will execute the `run_CLAH_script` function to create an instance of `wrapMultSessStruc`, run the parser, and execute the script.
+    If the script is run directly, it executes the `run_CLAH_script` function to:
+        1. Create an instance of `wrapMultSessStruc`.
+        2. Parse command-line arguments defined in `UA_enum.Parser4WMSS`.
+        3. Execute the script's `alt_run` method to start the processing.
 
 Dependencies:
-    - numpy: For numerical operations on arrays.
-    - contextlib: For context management.
+    - numpy: For numerical operations.
+    - contextlib: For the `print_headers` context manager.
     - typing: For type hints.
-    - inquirer: For prompting user input.
-    - CLAH_ImageAnalysis.core: Base class and script running utilities.
-    - CLAH_ImageAnalysis.tifStackFunc: Utilities for handling TIFF stack functions.
-    - CLAH_ImageAnalysis.unitAnalysis: Enums for unit analysis.
+    - inquirer: For prompting user input (`_choose_brain_region`).
+    - sys: For exiting the script on critical errors.
+    - CLAH_ImageAnalysis.core.BaseClass: Base class providing core functionalities.
+    - CLAH_ImageAnalysis.core.run_CLAH_script: Utility to run scripts with argument parsing.
+    - CLAH_ImageAnalysis.tifStackFunc.H5_Utils: Utilities for reading H5 files.
+    - CLAH_ImageAnalysis.tifStackFunc.TSF_enum: Enums for segmentation dictionary keys.
+    - CLAH_ImageAnalysis.unitAnalysis.UA_enum: Enums defining parser arguments.
 
 Usage:
-    This script is designed to be executed directly or imported as a module. When run directly, it uses the `run_CLAH_script` function to handle argument parsing and execution flow.
+    This script is designed to be executed directly from the command line or imported
+    as a module.
 
 Example:
     To run the script directly:
     ```bash
-    python wrapMultSessStruc.py --path /path/to/data --sess2process '1,2,3' --output_folder /path/to/output
+    python CLAH_ImageAnalysis/unitAnalysis/wrapMultSessStruc.py --path /path/to/data --sess2process '1,2,3' --output_folder /path/to/output/_MS_MyExperiment_CA3
     ```
 
     To import and use within another script:
     ```python
-    from CLAH_ImageAnalysis.core import wrapMultSessStruc
+    from CLAH_ImageAnalysis.unitAnalysis import wrapMultSessStruc
 
-    wmss = wrapMultSessStruc(path='/path/to/data', sess2process=[1, 2, 3], output_folder='/path/to/output')
-    wmss.loop_byID_bySession()
+    wmss = wrapMultSessStruc(path='/path/to/data', sess2process='1,2,3', output_folder='/path/to/output/_MS_MyExperiment_CA3')
+    wmss.alt_run()
     ```
 
 Parser Arguments:
     The script uses the following parser arguments defined in `UA_enum.Parser4WMSS`:
-        --path, -p: Path to the data folder (default: []).
-        --sess2process, -s2p: Sessions to process (default: []), can be a list of session numbers.
-        --output_folder, -out: Output folder path (default: None).
+        --path, -p: Path to the parent data folder containing subject/session subfolders. Default is `[]`, which will prompt the user to select the path.
+        --sess2process, -s2p: Sessions to process (e.g., '1,2,3' or 'all'). Default is `[]`, which will prompt the user to enter the sessions to process.
+        --output_folder, -out: Base output folder path. If not provided, user will be prompted.
 """
 
 from contextlib import contextmanager
 import inquirer
 import numpy as np
 from typing import Any
-
+import sys
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
 from CLAH_ImageAnalysis.tifStackFunc import H5_Utils
@@ -299,34 +332,58 @@ class wrapMultSessStruc(BC):
             sess_idx
         ]
 
-        # loading & filling multSessSegStruc w/image
-        self.multSessSegStruc[numSess]["IMG"] = self._fill_DSImage()
+        try:
+            # loading & filling multSessSegStruc w/image
+            self.multSessSegStruc[numSess]["IMG"] = self._fill_DSImage()
+        except Exception as e:
+            self.rprint(f"Problem with loading image into wrapMultSessStruc: {e}")
+            self.rprint("Skipping image, continuing...")
 
         # loading & filling multSessSegStruc w/major dicts created from previous scripts
         # cueShiftStruc
-        self.rprint("cueShiftStruc:")
-        self.multSessSegStruc[numSess][self.dict_name["CSS"]] = self._fill_mSSD_other(
-            "CSS"
-        )
+        try:
+            self.rprint("cueShiftStruc:")
+            self.multSessSegStruc[numSess][self.dict_name["CSS"]] = (
+                self._fill_mSSD_other("CSS")
+            )
+        except Exception as e:
+            self.rprint(
+                f"Problem with loading cueShiftStruc into wrapMultSessStruc: {e}"
+            )
+            self.rprint("Skipping cueShiftStruc, continuing...")
+
         # treadBehDict
-        self.rprint("treadBehDict:")
-        self.multSessSegStruc[numSess][self.dict_name["TREADBEHDICT"]] = (
-            self._fill_mSSD_other("TBD")
-        )
+        try:
+            self.rprint("treadBehDict:")
+            self.multSessSegStruc[numSess][self.dict_name["TREADBEHDICT"]] = (
+                self._fill_mSSD_other("TBD")
+            )
+        except Exception as e:
+            self.rprint(
+                f"Problem with loading treadBehDict into wrapMultSessStruc: {e}"
+            )
+            self.rprint("Skipping treadBehDict, continuing...")
         # segDict
         # load in segDict differently from other mats
-        self.rprint("segDict:")
-        self._fill_mSSD_segDict(numSess)
-
-        # if self.findLatest([self.file_tag["SD"], "prevName", self.file_tag["MAT"]]):
-        #     self.rprint("segDict_prevNameVar:")
-        #     self._fill_mSSD_segDict(numSess, prevNameVar=True)
+        try:
+            self.rprint("segDict:")
+            self._fill_mSSD_segDict(numSess)
+        except Exception as e:
+            self.rprint(f"Problem with loading segDict into wrapMultSessStruc: {e}")
+            self.rprint(
+                "Cannot skip segDict... please check the code and address any issues. Exiting..."
+            )
+            sys.exit(1)
 
         # CueCellFinder Struct
-        self.rprint("CCFStruct:")
-        self.multSessSegStruc[numSess][self.dict_name["CCF"]] = self._fill_mSSD_other(
-            "CCF"
-        )
+        try:
+            self.rprint("CCFStruct:")
+            self.multSessSegStruc[numSess][self.dict_name["CCF"]] = (
+                self._fill_mSSD_other("CCF")
+            )
+        except Exception as e:
+            self.rprint(f"Problem with loading CCFStruct into wrapMultSessStruc: {e}")
+            self.rprint("Skipping CCFStruct, continuing...")
 
     def _fill_DSImage(self) -> np.ndarray:
         """

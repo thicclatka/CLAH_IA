@@ -309,43 +309,18 @@ class CRwROI_manager(BC, Data_roicat):
             )
 
         # extract isTC array per session
-
-        self.CueCellTable = []
-        for sess in self.subj_sessions:
-            CCT = self.multSessSegStruc[sess]["CueCellFinderDict"]["CueCellTable"]
+        try:
+            self.CueCellTable = []
+            for sess in self.subj_sessions:
+                CCT = self.multSessSegStruc[sess]["CueCellFinderDict"]["CueCellTable"]
             self.CueCellTable.append(CCT)
+            self.isCell = self.CRTOOLS.organize_cellTypes_fromCCT(self.CueCellTable)
 
-        keys2check = self.CueCellTable[0].keys()
-        keys2check = [key for key in keys2check if "_IDX" in key]
-        keys2check = [key for key in keys2check if "NOT" not in key]
-
-        self.isCell = {key.split("_")[0]: [] for key in keys2check}
-
-        for sess in range(self.numSess):
-            total_cells = self.CueCellTable[sess]["TOTAL"]
-            for key in keys2check:
-                key4isCell = key.split("_")[0]
-                cellidx = np.array(self.CueCellTable[sess][key], dtype=int)
-                isCell = np.zeros(total_cells, dtype=int)
-                isCell[cellidx] = 1
-                self.isCell[key4isCell].append(isCell)
-
-        keys2check4both = [key for key in self.isCell if "CUE" in key and len(key) > 3]
-        if len(keys2check4both) > 1:
-            self.isCell["BOTHCUES"] = []
-            for sess in range(self.numSess):
-                cue1 = self.isCell["CUE1"][sess]
-                cue2 = self.isCell["CUE2"][sess]
-                both = np.logical_and(cue1, cue2)
-                newcue1 = np.array(
-                    [1 if c1 and not both[i] else 0 for i, c1 in enumerate(cue1)]
-                )
-                newcue2 = np.array(
-                    [1 if c2 and not both[i] else 0 for i, c2 in enumerate(cue2)]
-                )
-                self.isCell["CUE1"][sess] = newcue1
-                self.isCell["CUE2"][sess] = newcue2
-                self.isCell["BOTHCUES"].append(both)
+        except Exception as e:
+            self.rprint(f"Problem with importing cell type info: {e}")
+            self.rprint("Skipping cell type info, continuing...")
+            self.CueCellTable = None
+            self.isCell = None
 
     ######################################################
     #  ROICaT funcs
@@ -1029,7 +1004,8 @@ class CRwROI_manager(BC, Data_roicat):
         #     labelBySess=self.results[self.CRkey["CLUSTERS"]]["labels_bySession"],
         # )
 
-        # create isTC post cluster post QC
+        # create isCell boolean arrays for both post and pre QC
+        # returns None if no cell types are found
         isCell_post_cluster = self.CRTOOLS.isTC_incQC_counter(
             results=self.results,
             isCell=self.isCell,
@@ -1055,13 +1031,16 @@ class CRwROI_manager(BC, Data_roicat):
         # create colored FOV clusters
         footprints4coloredclusters = [r.power(sp_fp_exp) for r in aligned_ROIs]
 
-        self.PC_dict = {}
-        for cellType in isCell_post_cluster.keys():
-            if cellType == "NON":
-                continue
-            self.PC_dict[cellType] = self._create_ROI_PC_box(
-                footprints4coloredclusters, isCell_post_cluster[cellType]["POST_QC"]
-            )
+        if isCell_post_cluster is not None:
+            self.PC_dict = {}
+            for cellType in isCell_post_cluster.keys():
+                if cellType == "NON":
+                    continue
+                self.PC_dict[cellType] = self._create_ROI_PC_box(
+                    footprints4coloredclusters, isCell_post_cluster[cellType]["POST_QC"]
+                )
+        else:
+            self.PC_dict = None
 
         # get FOVs post QC
         self.FOV_clusters = roicat.visualization.compute_colored_FOV(
@@ -1093,13 +1072,17 @@ class CRwROI_manager(BC, Data_roicat):
             self.cluster_info[self.CRkey["DISCARD"]]
             < self.cluster_info[self.CRkey["DISCARD_QC"]]
         ):
-            self.PC_dict_preQC = {}
-            for cellType in isCell_post_cluster.keys():
-                if cellType == "NON":
-                    continue
-                self.PC_dict_preQC[cellType] = self._create_ROI_PC_box(
-                    footprints4coloredclusters, isCell_post_cluster[cellType]["PRE_QC"]
-                )
+            if isCell_post_cluster is not None:
+                self.PC_dict_preQC = {}
+                for cellType in isCell_post_cluster.keys():
+                    if cellType == "NON":
+                        continue
+                    self.PC_dict_preQC[cellType] = self._create_ROI_PC_box(
+                        footprints4coloredclusters,
+                        isCell_post_cluster[cellType]["PRE_QC"],
+                    )
+            else:
+                self.PC_dict_preQC = None
 
             self.FOV_clusters_preQC = roicat.visualization.compute_colored_FOV(
                 spatialFootprints=footprints4coloredclusters,
