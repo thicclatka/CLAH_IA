@@ -300,16 +300,17 @@ class CRwROI_manager(BC, Data_roicat):
         self.CRTOOLS.print_loaded_mSSS_results(ID=self.ID)
 
         # find refLapType per session
-        self.refLapType = []
-        for sess in self.subj_sessions:
-            self.refLapType.append(
-                self.multSessSegStruc[sess]["cueShiftStruc"]["lapCue"]["lap"][
-                    "refLapType"
-                ]
-            )
 
-        # extract isTC array per session
         try:
+            self.refLapType = []
+            for sess in self.subj_sessions:
+                self.refLapType.append(
+                    self.multSessSegStruc[sess]["cueShiftStruc"]["lapCue"]["lap"][
+                        "refLapType"
+                    ]
+                )
+
+            # extract isTC array per session
             self.CueCellTable = []
             for sess in self.subj_sessions:
                 CCT = self.multSessSegStruc[sess]["CueCellFinderDict"]["CueCellTable"]
@@ -320,6 +321,7 @@ class CRwROI_manager(BC, Data_roicat):
             self.rprint(f"Problem with importing cell type info: {e}")
             self.rprint("Skipping cell type info, continuing...")
             self.CueCellTable = None
+            self.refLapType = None
             self.isCell = None
 
     ######################################################
@@ -1132,9 +1134,13 @@ class CRwROI_manager(BC, Data_roicat):
             for roi_sparse in sparse_ROIS:
                 # Calculate centroid and bounds without converting to dense
                 centroid, bounds, min_dist = (
-                    self.CRTOOLS.find_centroidNbounds_fromROIsparse(roi_sparse)
+                    self.CRTOOLS.find_centroidNbounds_fromROIsparse(
+                        roi_sparse, self.FOV_height_width
+                    )
                 )
-                contours = self.CRTOOLS.find_contours_of_nonzero(roi_sparse)
+                contours = self.CRTOOLS.find_contours_of_nonzero(
+                    roi_sparse, self.FOV_height_width
+                )
                 # append to appropriate list
                 centroids4sess.append(centroid)
                 bounds4sess.append(bounds)

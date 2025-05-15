@@ -189,7 +189,7 @@ class wrapMultSessStruc(BC):
         BC.static_class_var_init(
             self,
             folder_path=path,
-            file_of_interest=self.text_lib["selector"]["tags"]["CSS"],
+            file_of_interest=self.text_lib["selector"]["tags"]["SD"],
             selection_made=sess2process,
             select_by_ID=True,
         )
@@ -419,12 +419,7 @@ class wrapMultSessStruc(BC):
         """
 
         latest_file = self.findLatest([self.file_tag[ftag], self.file_tag["PKL"]])
-        try:
-            loaded_pkl = self.saveNloadUtils.load_file(latest_file, previous=True)
-            # loaded_pkl = convert_lists_to_arrays(loaded_pkl)
-        except Exception as e:
-            self.rprint(f"Problem with loading {ftag}: {e}")
-        return loaded_pkl
+        return self.saveNloadUtils.load_file(latest_file, previous=True)
 
     def _fill_mSSD_segDict(self, numSess: str) -> None:
         """
@@ -446,10 +441,11 @@ class wrapMultSessStruc(BC):
                 self.utils.debug_utils.raiseVE_SysExit1("No usable segDict or h5 found")
 
         try:
-            C_Temporal, A_Spatial, dx, dy = self.saveNloadUtils.load_segDict(
+            C_Temporal, A_Spatial, S_Deconv, dx, dy = self.saveNloadUtils.load_segDict(
                 latest_file,
                 C=True,
                 A=True,
+                S=True,
                 d1=True,
                 d2=True,
             )
@@ -459,6 +455,7 @@ class wrapMultSessStruc(BC):
         self.multSessSegStruc[numSess][f"{self.dict_name['SD']}Name"] = latest_file
         self.multSessSegStruc[numSess][self.SDkey["C_TEMPORAL"]] = C_Temporal
         self.multSessSegStruc[numSess][self.SDkey["A_SPATIAL"]] = A_Spatial
+        self.multSessSegStruc[numSess][self.SDkey["S_DECONV"]] = S_Deconv
         self.multSessSegStruc[numSess][self.SDkey["DX"]] = dx
         self.multSessSegStruc[numSess][self.SDkey["DY"]] = dy
 

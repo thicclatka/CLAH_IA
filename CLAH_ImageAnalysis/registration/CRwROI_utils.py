@@ -27,7 +27,7 @@ class CRwROI_utils(BC):
         self.gm_tls = self.dep.geometric_tools
 
     def find_centroidNbounds_fromROIsparse(
-        self, ROIsparse: np.ndarray, min_dist_adjustor: float = 0.7
+        self, ROIsparse: np.ndarray, sparse_dims: tuple, min_dist_adjustor: float = 0.7
     ) -> tuple:
         """
         Finds the centroid and bounds from a sparse ROI.
@@ -40,8 +40,8 @@ class CRwROI_utils(BC):
             tuple: A tuple containing the centroid, bounds, and minimum distance.
 
         """
-        pxl_num = int(np.sqrt(ROIsparse.shape[-1]))
-        ROIsparse = ROIsparse.reshape(pxl_num, pxl_num)
+        ROIsparse = ROIsparse.reshape(sparse_dims[0], sparse_dims[1])
+        maxVal = np.max(sparse_dims)
 
         # Find non-zero elements
         rows, cols = ROIsparse.nonzero()
@@ -70,13 +70,16 @@ class CRwROI_utils(BC):
 
             # Adjust bounds based on minimum distance
             bounds = self.gm_tls.adjust_bounds_fromCOM_w_min_dist(
-                COM=centroid, min_dist=min_dist, max_val_allowed=pxl_num
+                COM=centroid, min_dist=min_dist, max_val_allowed=maxVal
             )
 
         return centroid, bounds, min_dist
 
     def find_contours_of_nonzero(
-        self, ROI_sparse: scipy.sparse.coo_matrix, contour_level: float = 0.45
+        self,
+        ROI_sparse: scipy.sparse.coo_matrix,
+        sparse_dims: tuple,
+        contour_level: float = 0.45,
     ) -> list:
         """
         Find contours of non-zero elements in a sparse ROI.
@@ -88,8 +91,7 @@ class CRwROI_utils(BC):
         Returns:
             list: List of contours found in the ROI.
         """
-        pxl_num = int(np.sqrt(ROI_sparse.shape[-1]))
-        ROI_dense = ROI_sparse.toarray().reshape(pxl_num, pxl_num)
+        ROI_dense = ROI_sparse.toarray().reshape(sparse_dims[0], sparse_dims[1])
 
         # find contours, by default, arr is normalized before contour detection
         contours = self.gm_tls.find_contours(ROI_dense, contour_level=contour_level)

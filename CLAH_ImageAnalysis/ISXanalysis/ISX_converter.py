@@ -419,6 +419,11 @@ class ISX_csv_converter:
 
         accepted_idx = np.where(np.in1d(accepted_labels, self.accepted2use))[0]
 
+        cell_map_image_fname = utils.findLatest([self.file_tag["PNG"], "cells-map"])
+        cell_map_image = utils.image_utils.read_image(cell_map_image_fname)
+        d1 = cell_map_image.shape[0]
+        d2 = cell_map_image.shape[1]
+
         segDict = {
             "C": CTemp[accepted_idx, :],
             "S": SDeconv[accepted_idx, :],
@@ -428,6 +433,8 @@ class ISX_csv_converter:
             "A_all": ASpat,
             "accepted_labels": accepted_labels,
             "CFrameTimes": CFrameTimes,
+            "d1": d1,
+            "d2": d2,
         }
 
         if self.AvB_Check:
