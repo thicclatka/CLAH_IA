@@ -524,35 +524,40 @@ class CNMF_Utils(BC):
         Parameters:
             Yr (np.ndarray): The raw fluorescence data.
         """
-        with self.StatusPrinter.output_btw_dots(
-            pre_msg="Extracting df/f values",
-            done_msg=True,
-            timekeep=True,
-            timekeep_msg="df/f extraction",
-        ):
-            import caiman.source_extraction.cnmf.utilities as cnmf_tools
+        try:
+            with self.StatusPrinter.output_btw_dots(
+                pre_msg="Extracting df/f values",
+                done_msg=True,
+                timekeep=True,
+                timekeep_msg="df/f extraction",
+            ):
+                import caiman.source_extraction.cnmf.utilities as cnmf_tools
 
-            if self.extract_OR_detrend == "extract":
-                self.F_dff = cnmf_tools.extract_DF_F(
-                    Yr=Yr,
-                    A=self.NonNegMatrix_post_refining.estimates.A,
-                    C=self.NonNegMatrix_post_refining.estimates.C,
-                    bl=self.NonNegMatrix_post_refining.estimates.bl,
-                    quantileMin=self.quantileMin,
-                    frames_window=self.frames_window,
-                    dview=self.dview,
-                )
+                if self.extract_OR_detrend == "extract":
+                    self.F_dff = cnmf_tools.extract_DF_F(
+                        Yr=Yr,
+                        A=self.NonNegMatrix_post_refining.estimates.A,
+                        C=self.NonNegMatrix_post_refining.estimates.C,
+                        bl=self.NonNegMatrix_post_refining.estimates.bl,
+                        quantileMin=self.quantileMin,
+                        frames_window=self.frames_window,
+                        dview=self.dview,
+                    )
 
-            elif self.extract_OR_detrend == "detrend":
-                self.F_dff = cnmf_tools.detrend_df_f(
-                    self.NonNegMatrix_post_refining.estimates.A,
-                    self.NonNegMatrix_post_refining.estimates.b,
-                    self.NonNegMatrix_post_refining.estimates.C,
-                    self.NonNegMatrix_post_refining.estimates.f,
-                    YrA=self.NonNegMatrix_post_refining.estimates.YrA,
-                    quantileMin=self.quantileMin,
-                    frames_window=self.frames_window,
-                )
+                elif self.extract_OR_detrend == "detrend":
+                    self.F_dff = cnmf_tools.detrend_df_f(
+                        self.NonNegMatrix_post_refining.estimates.A,
+                        self.NonNegMatrix_post_refining.estimates.b,
+                        self.NonNegMatrix_post_refining.estimates.C,
+                        self.NonNegMatrix_post_refining.estimates.f,
+                        YrA=self.NonNegMatrix_post_refining.estimates.YrA,
+                        quantileMin=self.quantileMin,
+                        frames_window=self.frames_window,
+                    )
+        except Exception as e:
+            print(f"Error in calc_F_dff: {e}")
+            print("Setting F_dff to None\n")
+            self.F_dff = None
 
     def createNexport_segDict(
         self,

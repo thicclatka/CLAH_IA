@@ -27,7 +27,7 @@ class CRwROI_utils(BC):
         self.gm_tls = self.dep.geometric_tools
 
     def find_centroidNbounds_fromROIsparse(
-        self, ROIsparse: np.ndarray, min_dist_adjustor: float = 0.7
+        self, ROIsparse: np.ndarray, sparse_dims: tuple, min_dist_adjustor: float = 0.7
     ) -> tuple:
         """
         Finds the centroid and bounds from a sparse ROI.
@@ -40,8 +40,8 @@ class CRwROI_utils(BC):
             tuple: A tuple containing the centroid, bounds, and minimum distance.
 
         """
-        pxl_num = int(np.sqrt(ROIsparse.shape[-1]))
-        ROIsparse = ROIsparse.reshape(pxl_num, pxl_num)
+        ROIsparse = ROIsparse.reshape(sparse_dims[0], sparse_dims[1])
+        maxVal = np.max(sparse_dims)
 
         # Find non-zero elements
         rows, cols = ROIsparse.nonzero()
@@ -70,13 +70,16 @@ class CRwROI_utils(BC):
 
             # Adjust bounds based on minimum distance
             bounds = self.gm_tls.adjust_bounds_fromCOM_w_min_dist(
-                COM=centroid, min_dist=min_dist, max_val_allowed=pxl_num
+                COM=centroid, min_dist=min_dist, max_val_allowed=maxVal
             )
 
         return centroid, bounds, min_dist
 
     def find_contours_of_nonzero(
-        self, ROI_sparse: scipy.sparse.coo_matrix, contour_level: float = 0.45
+        self,
+        ROI_sparse: scipy.sparse.coo_matrix,
+        sparse_dims: tuple,
+        contour_level: float = 0.45,
     ) -> list:
         """
         Find contours of non-zero elements in a sparse ROI.
@@ -88,8 +91,7 @@ class CRwROI_utils(BC):
         Returns:
             list: List of contours found in the ROI.
         """
-        pxl_num = int(np.sqrt(ROI_sparse.shape[-1]))
-        ROI_dense = ROI_sparse.toarray().reshape(pxl_num, pxl_num)
+        ROI_dense = ROI_sparse.toarray().reshape(sparse_dims[0], sparse_dims[1])
 
         # find contours, by default, arr is normalized before contour detection
         contours = self.gm_tls.find_contours(ROI_dense, contour_level=contour_level)
@@ -115,6 +117,54 @@ class CRwROI_utils(BC):
             frame_num=1,
             new_line_after=1,
         )
+
+    def organize_cellTypes_fromCCT(self, List_CueCellTable: list) -> dict:
+        """
+        Handles the cell types from the CueCellTable. Results are a dictionary of lists of boolean arrays. 1 indicates the cell is of that type, 0 indicates it is not.
+
+        Parameters:
+            List_CueCellTable (list): The list of CueCellTable.
+
+        Returns:
+            dict: The cell types. Each entry is a list of lists of boolean arrays. 1 indicates the cell is of that type, 0 indicates it is not. First layer of lists is for each session, second layer of lists represents the cell types in a boolean manner for each cell for that session.
+        """
+        CCT = List_CueCellTable
+        numSess = len(CCT)
+
+        keys2check = CCT[0].keys()
+        keys2check = [key for key in keys2check if "_IDX" in key]
+        keys2check = [key for key in keys2check if "NOT" not in key]
+
+        isCell = {key.split("_")[0]: [] for key in keys2check}
+
+        for sess in range(numSess):
+            total_cells = CCT[sess]["TOTAL"]
+            for key in keys2check:
+                key4isCell = key.split("_")[0]
+                cellidx = np.array(CCT[sess][key], dtype=int)
+                isCell_curr = np.zeros(total_cells, dtype=int)
+                isCell_curr[cellidx] = 1
+                isCell[key4isCell].append(isCell_curr)
+
+        keys2check4both = [key for key in isCell if "CUE" in key and len(key) > 3]
+
+        if len(keys2check4both) > 1:
+            isCell["BOTHCUES"] = []
+            for sess in range(numSess):
+                cue1 = isCell["CUE1"][sess]
+                cue2 = isCell["CUE2"][sess]
+                both = np.logical_and(cue1, cue2)
+                newcue1 = np.array(
+                    [1 if c1 and not both[i] else 0 for i, c1 in enumerate(cue1)]
+                )
+                newcue2 = np.array(
+                    [1 if c2 and not both[i] else 0 for i, c2 in enumerate(cue2)]
+                )
+                isCell["CUE1"][sess] = newcue1
+                isCell["CUE2"][sess] = newcue2
+                isCell["BOTHCUES"].append(both)
+
+        return isCell
 
     @staticmethod
     def update_count_dict(
@@ -548,31 +598,35 @@ class CRwROI_utils(BC):
         cellTypes = isCell.keys()
         isCellCount_dict = {cT: {"PRE_QC": [], "POST_QC": []} for cT in cellTypes}
 
-        for ct in cellTypes:
-            for labels, counts in zip(
-                results[self.CRkey["CLUSTERS"]]["labels_bySession"], isCell[ct]
-            ):
-                isC_forSess = []
-                isC_forSess_QC = []
+        if cellTypes is not None:
+            for ct in cellTypes:
+                for labels, counts in zip(
+                    results[self.CRkey["CLUSTERS"]]["labels_bySession"], isCell[ct]
+                ):
+                    isC_forSess = []
+                    isC_forSess_QC = []
 
-                for cid, cellBool in zip(labels, counts):
-                    # each PC_cell is either True or False
-                    if cid == rejected_label:
-                        # if rejected label, append False
-                        isC_forSess.append(False)
-                        isC_forSess_QC.append(False)
-                        continue
-                    # set alpha label similarly to above
-                    # see note above for alpha_labels
-                    alpha_idx = cid + 1
-                    # check if PC cell post QC
-                    cellBool_QC = alpha_labels[alpha_idx] * cellBool
-                    # determine check & append True if check is 1
-                    CRwROI_utils.checkNcounter(cellBool, isC_forSess)
-                    CRwROI_utils.checkNcounter(cellBool_QC, isC_forSess_QC)
-                # append to isPC_dict accordingly
-                isCellCount_dict[ct]["PRE_QC"].append(np.array(isC_forSess))
-                isCellCount_dict[ct]["POST_QC"].append(np.array(isC_forSess_QC))
+                    for cid, cellBool in zip(labels, counts):
+                        # each PC_cell is either True or False
+                        if cid == rejected_label:
+                            # if rejected label, append False
+                            isC_forSess.append(False)
+                            isC_forSess_QC.append(False)
+                            continue
+                        # set alpha label similarly to above
+                        # see note above for alpha_labels
+                        alpha_idx = cid + 1
+                        # check if PC cell post QC
+                        cellBool_QC = alpha_labels[alpha_idx] * cellBool
+                        # determine check & append True if check is 1
+                        CRwROI_utils.checkNcounter(cellBool, isC_forSess)
+                        CRwROI_utils.checkNcounter(cellBool_QC, isC_forSess_QC)
+                    # append to isPC_dict accordingly
+                    isCellCount_dict[ct]["PRE_QC"].append(np.array(isC_forSess))
+                    isCellCount_dict[ct]["POST_QC"].append(np.array(isC_forSess_QC))
+        else:
+            isCellCount_dict = None
+
         return isCellCount_dict
 
     def create_resultsNrun_data(
@@ -737,43 +791,44 @@ class CRwROI_utils(BC):
             self.CRkey["DISCARD"]: discard,
             self.CRkey["DISCARD_QC"]: discard_qc,
         }
-        for key in isCell_post_cluster.keys():
-            cluster_info[f"UNTRACKED_{key}"] = 0
-            cluster_info[f"UNDERLYING_{key}"] = 0
-            cluster_info[f"TRACKED_{key}"] = 0
 
-        # iterate through each session to find PC cells and add to dict accordingly
-        for cellType in isCell_post_cluster.keys():
-            for i, (pre, post) in enumerate(
-                zip(
-                    isCell_post_cluster[cellType]["PRE_QC"],
-                    isCell_post_cluster[cellType]["POST_QC"],
-                )
-            ):
-                cluster_info[f"{cellType}_S{i + 1}"] = pre.sum()
-                cluster_info[f"{cellType}_S{i + 1}_QC"] = post.sum()
+        # iterate through each session to count cells that are tracked by cell type and add to dict accordingly
+        if isCell_post_cluster is not None:
+            for key in isCell_post_cluster.keys():
+                cluster_info[f"UNTRACKED_{key}"] = 0
+                cluster_info[f"UNDERLYING_{key}"] = 0
+                cluster_info[f"TRACKED_{key}"] = 0
+            for cellType in isCell_post_cluster.keys():
+                for i, (pre, post) in enumerate(
+                    zip(
+                        isCell_post_cluster[cellType]["PRE_QC"],
+                        isCell_post_cluster[cellType]["POST_QC"],
+                    )
+                ):
+                    cluster_info[f"{cellType}_S{i + 1}"] = pre.sum()
+                    cluster_info[f"{cellType}_S{i + 1}_QC"] = post.sum()
 
-        for cellType in isCell_post_cluster.keys():
-            tracked_cells = 0
-            for sess in range(self.numSess):
-                isCell2check = isCell_pre_cluster[cellType][sess]
-                isCell2check_clust = isCell_post_cluster[cellType]["PRE_QC"][sess]
-                trkd = cluster_info[f"{cellType}_S{sess + 1}"]
+            for cellType in isCell_post_cluster.keys():
+                tracked_cells = 0
+                for sess in range(self.numSess):
+                    isCell2check = isCell_pre_cluster[cellType][sess]
+                    isCell2check_clust = isCell_post_cluster[cellType]["PRE_QC"][sess]
+                    trkd = cluster_info[f"{cellType}_S{sess + 1}"]
 
-                # find cells not tracked between sessions
-                cluster_info[f"UNTRACKED_{cellType}"] += sum(
-                    [
-                        1 if pre == 1 and post == 0 else 0
-                        for pre, post in zip(isCell2check, isCell2check_clust)
-                    ]
-                )
-                # sum cells tracked between sessions
-                tracked_cells += trkd
+                    # find cells not tracked between sessions
+                    cluster_info[f"UNTRACKED_{cellType}"] += sum(
+                        [
+                            1 if pre == 1 and post == 0 else 0
+                            for pre, post in zip(isCell2check, isCell2check_clust)
+                        ]
+                    )
+                    # sum cells tracked between sessions
+                    tracked_cells += trkd
 
-            untracked_cells = cluster_info[f"UNTRACKED_{cellType}"]
-            underlying_cells = untracked_cells + tracked_cells
-            cluster_info[f"TRACKED_{cellType}"] = tracked_cells
-            cluster_info[f"UNDERLYING_{cellType}"] = underlying_cells
+                untracked_cells = cluster_info[f"UNTRACKED_{cellType}"]
+                underlying_cells = untracked_cells + tracked_cells
+                cluster_info[f"TRACKED_{cellType}"] = tracked_cells
+                cluster_info[f"UNDERLYING_{cellType}"] = underlying_cells
 
         total_cells = cluster_info[UCELL]
 

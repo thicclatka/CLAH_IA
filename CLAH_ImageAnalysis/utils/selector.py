@@ -152,9 +152,7 @@ class subj_selector_utils:
                 self.file_check[key][status].append(sess_num)
 
         self._fill_bool_dict()
-        self._create_IDDict() if FOI == self.sel_tag[
-            "CSS"
-        ] or self.select_by_ID else None
+        self._create_IDDict() if self.select_by_ID else None
 
     def _create_IDDict(self) -> None:
         """Organize session and multi-session dictionaries for CSS selection."""
@@ -171,14 +169,14 @@ class subj_selector_utils:
                 for key in ["DATE", "TYPE"]:
                     self.IDDict[id][key] = self.sess_dict[key][subj_idx]
                 self.IDDict[id]["IDX"] = subj_idx + 1
-                self.IDDict[id][f"ALL_{FOI}"] = all(
+                self.IDDict[id][f"ALL_{FOI.upper()}"] = all(
                     idx in self.bool_dict[f"Y_{FOI}"] for idx in subj_idx + 1
                 )
             else:
                 self.IDDict[id]["DATE"] = self.sess_dict["DATE"][subj_idx]
                 self.IDDict[id]["TYPE"] = self.sess_dict["TYPE"][subj_idx]
                 self.IDDict[id]["IDX"] = subj_idx + 1
-                self.IDDict[id][f"ALL_{FOI}"] = (
+                self.IDDict[id][f"ALL_{FOI.upper()}"] = (
                     subj_idx + 1 in self.bool_dict[f"Y_{FOI}"]
                 )
 
@@ -259,8 +257,11 @@ class subj_selector_utils:
             self.eligible_folders = self.bool_dict["Y_CI"]
         elif FOI == self.sel_tag["CSS"]:
             condkeys2use = ["Y_CSS", "N_CSS"]
+            self.eligible_folders = self.bool_dict["Y_CSS"]
+
+        if self.select_by_ID:
             # special case for CSS
-            self._eligibleFileSetup4CSS()
+            self._eligibleFileSetup4selectionByID(condkeys2use)
 
         # if FOI != self.sel_tag["CSS"]:
         #     self.processAll = self.eligible_folders
@@ -366,55 +367,107 @@ class subj_selector_utils:
 
         return condkeys2use
 
-    def _eligibleFileSetup4CSS(self) -> None:
+    def _eligibleFileSetup4selectionByID(self, condkeys2use: list) -> None:
         """Print information about eligible cueShiftStruc (CSS) files."""
-        if self.select_by_ID:
-            ID_key = self.IDDict.keys()
-            init_empty = [[] for _ in range(len(ID_key))]
-            self.CSS_ID = {"Y": [], "N": []}
-            self.bool_dict["Y_CSS_ALL"] = init_empty.copy()
-            self.bool_dict["N_CSS_ALL"] = init_empty.copy()
+        first_key = condkeys2use[0]
+        parts = first_key.split("_")
+        ft2use = parts[1]
 
-            for idx, id in enumerate(self.ID):
-                sess_arr = self.IDDict[id]["IDX"]
-                date_arr = self.IDDict[id]["DATE"]
-                str2fill = "["
-                for sess, date in zip(sess_arr, date_arr):
-                    str2fill += f" {sess:02} ({date}),"
-                str2fill = str2fill.rstrip(",") + "]"
-                if self.IDDict[id]["ALL_CSS"]:
-                    key2use = "Y"
-                else:
-                    key2use = "N"
-                self.CSS_ID[key2use].append(f"{id:<5} {str2fill}")
-                self.bool_dict[f"{key2use}_CSS_ALL"][idx] = sess_arr
+        if ft2use not in ["CSS", "SD"]:
+            raise ValueError(f"Invalid file type: {ft2use}")
 
-            yes_output = "none" if not self.CSS_ID["Y"] else str(self.CSS_ID["Y"])
-            no_output = "none" if not self.CSS_ID["N"] else str(self.CSS_ID["N"])
+        ID_key = self.IDDict.keys()
+        init_empty = [[] for _ in range(len(ID_key))]
+        self.FT_ID = {"Y": [], "N": []}
+        self.bool_dict[f"Y_{ft2use}_ALL"] = init_empty.copy()
+        self.bool_dict[f"N_{ft2use}_ALL"] = init_empty.copy()
 
-            output = [(yes_output, "yes", "Y"), (no_output, "no", "N")]
+        for idx, id in enumerate(self.ID):
+            sess_arr = self.IDDict[id]["IDX"]
+            date_arr = self.IDDict[id]["DATE"]
+            str2fill = "["
+            for sess, date in zip(sess_arr, date_arr):
+                str2fill += f" {sess:02} ({date}),"
+            str2fill = str2fill.rstrip(",") + "]"
+            if self.IDDict[id][f"ALL_{ft2use}"]:
+                key2use = "Y"
+            else:
+                key2use = "N"
+            self.FT_ID[key2use].append(f"{id:<5} {str2fill}")
+            self.bool_dict[f"{key2use}_{ft2use}_ALL"][idx] = sess_arr
 
-            for out, ssskey, csskey in output:
-                if out == "none":
-                    print(f"{self.subj_sel_str[f'subj_{ssskey}_CSS_all']} {out}")
-                else:
-                    print(self.subj_sel_str[f"subj_{ssskey}_CSS_all"])
-                    for idx, idNarr in enumerate(self.CSS_ID[csskey]):
-                        print_wFrame(f"{idNarr}")
+        yes_output = "none" if not self.FT_ID["Y"] else str(self.FT_ID["Y"])
+        no_output = "none" if not self.FT_ID["N"] else str(self.FT_ID["N"])
 
-            # raise error if no CSS files are found
-            if not self.CSS_ID["Y"] and not self.CSS_ID["N"]:
-                debug_utils.raiseVE_SysExit1(self.subj_sel_str["subj_need_multCSS"])
+        output = [(yes_output, "yes", "Y"), (no_output, "no", "N")]
 
-            # adjust eligible_folders for CSS to be list by session num vs group/ID num
-            self.eligible_folders = [
-                item
-                for sublist in self.bool_dict["Y_CSS_ALL"]
-                if isinstance(sublist, np.ndarray)
-                for item in sublist.tolist()
-            ]
-        else:
-            self.eligible_folders = self.bool_dict["Y_CSS"]
+        for out, ssskey, csskey in output:
+            if out == "none":
+                print(f"{self.subj_sel_str[f'subj_{ssskey}_{ft2use}_all']} {out}")
+            else:
+                print(self.subj_sel_str[f"subj_{ssskey}_{ft2use}_all"])
+                for idx, idNarr in enumerate(self.FT_ID[csskey]):
+                    print_wFrame(f"{idNarr}")
+
+        # raise error if no CSS files are found
+        if not self.FT_ID["Y"] and not self.FT_ID["N"]:
+            debug_utils.raiseVE_SysExit1(self.subj_sel_str[f"subj_need_mult{ft2use}"])
+
+        # adjust eligible_folders for CSS to be list by session num vs group/ID num
+        self.eligible_folders = [
+            item
+            for sublist in self.bool_dict[f"Y_{ft2use}_ALL"]
+            if isinstance(sublist, np.ndarray)
+            for item in sublist.tolist()
+        ]
+
+    # def _eligibleFileSetup4CSS(self) -> None:
+    #     """Print information about eligible cueShiftStruc (CSS) files."""
+    #     if self.select_by_ID:
+    #         ID_key = self.IDDict.keys()
+    #         init_empty = [[] for _ in range(len(ID_key))]
+    #         self.CSS_ID = {"Y": [], "N": []}
+    #         self.bool_dict["Y_CSS_ALL"] = init_empty.copy()
+    #         self.bool_dict["N_CSS_ALL"] = init_empty.copy()
+
+    #         for idx, id in enumerate(self.ID):
+    #             sess_arr = self.IDDict[id]["IDX"]
+    #             date_arr = self.IDDict[id]["DATE"]
+    #             str2fill = "["
+    #             for sess, date in zip(sess_arr, date_arr):
+    #                 str2fill += f" {sess:02} ({date}),"
+    #             str2fill = str2fill.rstrip(",") + "]"
+    #             if self.IDDict[id]["ALL_CSS"]:
+    #                 key2use = "Y"
+    #             else:
+    #                 key2use = "N"
+    #             self.CSS_ID[key2use].append(f"{id:<5} {str2fill}")
+    #             self.bool_dict[f"{key2use}_CSS_ALL"][idx] = sess_arr
+
+    #         yes_output = "none" if not self.CSS_ID["Y"] else str(self.CSS_ID["Y"])
+    #         no_output = "none" if not self.CSS_ID["N"] else str(self.CSS_ID["N"])
+
+    #         output = [(yes_output, "yes", "Y"), (no_output, "no", "N")]
+
+    #         for out, ssskey, csskey in output:
+    #             if out == "none":
+    #                 print(f"{self.subj_sel_str[f'subj_{ssskey}_CSS_all']} {out}")
+    #             else:
+    #                 print(self.subj_sel_str[f"subj_{ssskey}_CSS_all"])
+    #                 for idx, idNarr in enumerate(self.CSS_ID[csskey]):
+    #                     print_wFrame(f"{idNarr}")
+
+    #         # raise error if no CSS files are found
+    #         if not self.CSS_ID["Y"] and not self.CSS_ID["N"]:
+    #             debug_utils.raiseVE_SysExit1(self.subj_sel_str["subj_need_multCSS"])
+
+    #         # adjust eligible_folders for CSS to be list by session num vs group/ID num
+    #         self.eligible_folders = [
+    #             item
+    #             for sublist in self.bool_dict["Y_CSS_ALL"]
+    #             if isinstance(sublist, np.ndarray)
+    #             for item in sublist.tolist()
+    #         ]
 
     def MakeChoice_printSelectionResults(self) -> list:
         """
@@ -599,9 +652,9 @@ class subj_selector_utils:
         FOI = self.file_of_interest
         print(self.breaker_lean)
         print("Eligible subjects/sessions to select:")
-        if FOI == self.sel_tag["CSS"] and self.select_by_ID:
+        if self.select_by_ID:
             for id in self.ID:
-                if self.IDDict[id]["ALL_CSS"]:
+                if self.IDDict[id][f"ALL_{FOI}"]:
                     print(f"--{id}:")
                     for sess in self.IDDict[id]["IDX"]:
                         self._print_sessNum_fname(sess)
