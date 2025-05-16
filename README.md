@@ -17,7 +17,6 @@ CLAH Image Analysis provides tools for:
 - Motion correction and segmentation
 - Cell registration
 - Unit analysis
-- Calcium imaging processing
 
 ## Quick Navigation
 
