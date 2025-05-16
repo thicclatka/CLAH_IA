@@ -1,18 +1,20 @@
 import json
 import os
 import pickle
+
 import h5py
 import numpy as np
 from rich import print
-from scipy.io import loadmat
-from scipy.io import savemat
+from scipy.io import loadmat, savemat
 from scipy.sparse import isspmatrix
-from CLAH_ImageAnalysis.utils import basename_finder
-from CLAH_ImageAnalysis.utils import enum_utils
-from CLAH_ImageAnalysis.utils import get_current_date_string
-from CLAH_ImageAnalysis.utils import text_formatting
-from CLAH_ImageAnalysis.utils import debug_utils
 
+from CLAH_ImageAnalysis.utils import (
+    basename_finder,
+    debug_utils,
+    enum_utils,
+    get_current_date_string,
+    text_formatting,
+)
 
 # strings for file names & process
 # text_lib = text_dict()

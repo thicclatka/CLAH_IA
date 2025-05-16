@@ -1,7 +1,9 @@
 import gc
 from collections import namedtuple
+
 import h5py
 import numpy as np
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 

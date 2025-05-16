@@ -1,8 +1,10 @@
 import json
 
-from CLAH_ImageAnalysis.utils import debug_utils
-from CLAH_ImageAnalysis.utils import get_current_date_string
-from CLAH_ImageAnalysis.utils import text_formatting
+from CLAH_ImageAnalysis.utils import (
+    debug_utils,
+    get_current_date_string,
+    text_formatting,
+)
 
 # strings for file names & process
 file_tag = text_formatting.text_dict()["file_tag"]

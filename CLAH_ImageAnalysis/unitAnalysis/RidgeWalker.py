@@ -1,6 +1,7 @@
 import numpy as np
-from scipy.ndimage import maximum_filter
 import pywt
+from scipy.ndimage import maximum_filter
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 # from CLAH_ImageAnalysis.dependencies import runmean

@@ -1,12 +1,13 @@
-import os
-import shutil
-import easygui
-import pwd
 import grp
+import os
+import pwd
+import shutil
 import stat
 from typing import Literal
-from CLAH_ImageAnalysis.utils import text_dict
-from CLAH_ImageAnalysis.utils import print_wFrame
+
+import easygui
+
+from CLAH_ImageAnalysis.utils import print_wFrame, text_dict
 
 
 def move_back_dir(levels: int = 1) -> None:

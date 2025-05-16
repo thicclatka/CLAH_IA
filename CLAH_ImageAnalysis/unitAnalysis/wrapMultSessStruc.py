@@ -85,15 +85,16 @@ Parser Arguments:
         --output_folder, -out: Base output folder path. If not provided, user will be prompted.
 """
 
+import sys
 from contextlib import contextmanager
+from typing import Any
+
 import inquirer
 import numpy as np
-from typing import Any
-import sys
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
-from CLAH_ImageAnalysis.tifStackFunc import H5_Utils
-from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
+from CLAH_ImageAnalysis.tifStackFunc import H5_Utils, TSF_enum
 
 
 class wrapMultSessStruc(BC):

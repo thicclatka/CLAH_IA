@@ -38,8 +38,7 @@ Example:
 python MoCo2segDict.py --path /path/to/data --motion_correct yes --segment yes
 """
 
-from CLAH_ImageAnalysis.core import run_CLAH_script
-from CLAH_ImageAnalysis.core import extract_args_preParser
+from CLAH_ImageAnalysis.core import extract_args_preParser, run_CLAH_script
 from CLAH_ImageAnalysis.tifStackFunc import M2SD_manager as M2SDM
 
 
@@ -275,11 +274,13 @@ class MoCo2segDict(M2SDM):
 
 
 def main():
-    import os
     import getpass
+    import os
     from pathlib import Path
-    from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
+
     from sqljobscheduler import LockFileUtils
+
+    from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
 
     def run_script(clear_terminal: bool = True):
         run_CLAH_script(

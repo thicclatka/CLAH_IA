@@ -1,5 +1,6 @@
-from CLAH_ImageAnalysis.utils import print_wFrame, section_breaker
 from typing import Any
+
+from CLAH_ImageAnalysis.utils import print_wFrame, section_breaker
 
 
 class CUDA_utils:
@@ -86,8 +87,8 @@ class CUDA_utils:
             bool: True if CUDA is available, False otherwise.
         """
         try:
-            import pycuda.gpuarray as gpuarray
             import pycuda.driver as cudadrv
+            import pycuda.gpuarray as gpuarray
 
             return True
         except:

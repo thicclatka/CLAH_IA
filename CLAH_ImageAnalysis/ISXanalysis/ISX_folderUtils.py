@@ -1,8 +1,11 @@
-import os
-import shutil
 import argparse
+import os
+
+# import shutil
 from datetime import datetime
+
 from rich import print
+
 from CLAH_ImageAnalysis import utils
 
 

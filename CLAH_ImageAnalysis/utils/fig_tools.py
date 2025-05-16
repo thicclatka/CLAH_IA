@@ -1,31 +1,31 @@
 import os
 import re
 import warnings
-import numpy as np
-import seaborn as sns
-from typing import Optional
-from scipy.stats import sem
-import matplotlib.pyplot as plt
+from typing import Any, Optional
+
 import matplotlib.colors as mcolors
-import matplotlib.patches as patches
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from matplotlib.patches import Polygon
-from matplotlib.font_manager import FontProperties
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from matplotlib.colors import Normalize
-from typing import Any
 import matplotlib.gridspec as gridspec
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
+import seaborn as sns
+from matplotlib.colors import Normalize
+from matplotlib.font_manager import FontProperties
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch, Polygon
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from plotly.subplots import make_subplots
+from scipy.stats import sem
+
 # import plotly.tools as tls
 # import plotly.io as pio
-
-from CLAH_ImageAnalysis.utils import create_multiline_string
-from CLAH_ImageAnalysis.utils import text_dict
-from CLAH_ImageAnalysis.utils import color_dict
-from CLAH_ImageAnalysis.utils import saveNloadUtils
-
+from CLAH_ImageAnalysis.utils import (
+    color_dict,
+    create_multiline_string,
+    saveNloadUtils,
+    text_dict,
+)
 
 if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
     warnings.filterwarnings("ignore", message="This plugin does not support raise()")

@@ -1,4 +1,5 @@
 import numpy as np
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 

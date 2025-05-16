@@ -1,5 +1,6 @@
 import os
 from enum import Enum
+
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.dependencies import CUDA_utils
 

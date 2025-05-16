@@ -62,9 +62,7 @@ from rich import print as rprint
 
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
-from CLAH_ImageAnalysis.unitAnalysis import LapFinder4lapCueDict
-from CLAH_ImageAnalysis.unitAnalysis import UA_enum
-
+from CLAH_ImageAnalysis.unitAnalysis import LapFinder4lapCueDict, UA_enum
 
 ######################################################
 # main function
@@ -193,11 +191,11 @@ class posLapDictNpksByLTDict_funcs:
 
         # later posLapDict will be converted into array after being filled
         self.posLapDict = {
-            f"{self.PKSkey['LAP_TYPE']}{i+1}": [] for i in range(self.numLapTypes)
+            f"{self.PKSkey['LAP_TYPE']}{i + 1}": [] for i in range(self.numLapTypes)
         }
         # just create lists w/in entries for now
         for i in range(self.numLapTypes):
-            self.pksByLTDict[f"{self.PKSkey['LAP_TYPE']}{i+1}"] = {
+            self.pksByLTDict[f"{self.PKSkey['LAP_TYPE']}{i + 1}"] = {
                 key: [] for key in self.pksDict
             }
 

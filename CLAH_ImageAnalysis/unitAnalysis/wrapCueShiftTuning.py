@@ -34,12 +34,10 @@ Example:
 import numpy as np
 from rich import print
 
-from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis import behavior as beh
+from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import computePlaceCells
-from CLAH_ImageAnalysis.unitAnalysis import UA_enum
-from CLAH_ImageAnalysis.unitAnalysis import sepCueShiftLapSpkTimes
-
+from CLAH_ImageAnalysis.unitAnalysis import UA_enum, sepCueShiftLapSpkTimes
 
 # TODO: NEED TO EITHER REMOVE REW OMIT OR ADD ABILITY TO OMIT REWARDS
 

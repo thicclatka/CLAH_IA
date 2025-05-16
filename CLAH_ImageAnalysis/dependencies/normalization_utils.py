@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
-from skimage.util import img_as_uint
-from skimage.util import img_as_ubyte
-from sklearn.preprocessing import MinMaxScaler
 from rich import print as rprint
+from skimage.util import img_as_ubyte, img_as_uint
+from sklearn.preprocessing import MinMaxScaler
+
 from CLAH_ImageAnalysis.utils import color_dict
 
 

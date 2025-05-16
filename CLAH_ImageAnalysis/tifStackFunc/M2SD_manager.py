@@ -1,14 +1,18 @@
 import os
+
 import numpy as np
 from tqdm import tqdm
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
-from CLAH_ImageAnalysis.tifStackFunc import CNMF_Utils
-from CLAH_ImageAnalysis.tifStackFunc import H5_Utils
-from CLAH_ImageAnalysis.tifStackFunc import ImageStack_Utils
-from CLAH_ImageAnalysis.tifStackFunc import MoCoPreprocessing
+from CLAH_ImageAnalysis.tifStackFunc import (
+    CNMF_Utils,
+    H5_Utils,
+    ImageStack_Utils,
+    MoCoPreprocessing,
+    NoRMCorre,
+    TSF_enum,
+)
 from CLAH_ImageAnalysis.tifStackFunc import Movie_Utils as movie_utils
-from CLAH_ImageAnalysis.tifStackFunc import NoRMCorre
-from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
 
 
 class M2SD_manager(BC):

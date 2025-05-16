@@ -1,9 +1,8 @@
 import argparse
 import os
 from typing import Any
-from CLAH_ImageAnalysis.utils import print_header
-from CLAH_ImageAnalysis.utils import print_wFrame
-from CLAH_ImageAnalysis.utils import text_dict
+
+from CLAH_ImageAnalysis.utils import print_header, print_wFrame, text_dict
 
 
 def _valid_path(path: str, out: bool = False) -> str | list:

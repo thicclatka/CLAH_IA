@@ -1,13 +1,16 @@
 import os
 
 import numpy as np
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
-from CLAH_ImageAnalysis.unitAnalysis import CueCellFinder
-from CLAH_ImageAnalysis.unitAnalysis import pks_utils
-from CLAH_ImageAnalysis.unitAnalysis import QT_Plotters
-from CLAH_ImageAnalysis.unitAnalysis import UA_enum
-from CLAH_ImageAnalysis.unitAnalysis import wrapCueShiftTuning
+from CLAH_ImageAnalysis.unitAnalysis import (
+    CueCellFinder,
+    QT_Plotters,
+    UA_enum,
+    pks_utils,
+    wrapCueShiftTuning,
+)
 
 # from CLAH_ImageAnalysis.unitAnalysis import RidgeWalker
 

@@ -1,10 +1,11 @@
-import numpy as np
-import cv2
 import os
-from skimage.transform import resize
-from CLAH_ImageAnalysis.utils import fig_tools
-from CLAH_ImageAnalysis.utils import text_dict
+
+import cv2
+import numpy as np
 from scipy.interpolate import interp1d
+from skimage.transform import resize
+
+from CLAH_ImageAnalysis.utils import fig_tools, text_dict
 
 
 def read_image(path_to_image: str) -> np.ndarray:
@@ -17,9 +18,10 @@ def read_image(path_to_image: str) -> np.ndarray:
     Returns:
         np.ndarray: The image as a numpy array.
     """
+    import warnings
+
     import rasterio
     from rasterio.errors import NotGeoreferencedWarning
-    import warnings
 
     assert isinstance(path_to_image, str), "Path must be a string"
     assert path_to_image.strip(), "Path cannot be empty"

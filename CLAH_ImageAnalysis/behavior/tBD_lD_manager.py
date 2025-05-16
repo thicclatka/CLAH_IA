@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
+from CLAH_ImageAnalysis.behavior import (
+    GPIOfrTimes,
+    TDML2treadBehDict,
+    XML2frTimes2P,
+    behavior_utils,
+)
 from CLAH_ImageAnalysis.behavior import TDML2tBD_enum as TDMLE
-from CLAH_ImageAnalysis.behavior import XML2frTimes2P
-from CLAH_ImageAnalysis.behavior import TDML2treadBehDict
-from CLAH_ImageAnalysis.behavior import behavior_utils
-from CLAH_ImageAnalysis.behavior import GPIOfrTimes
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 # TODO: REMOVE THESE GLOBAL VARS AND MOVE TO CLASS & ADJUST IMPORT STATEMENTS

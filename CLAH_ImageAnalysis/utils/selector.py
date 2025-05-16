@@ -1,14 +1,18 @@
-from itertools import chain
-import numpy as np
-import inquirer
 import re
-from CLAH_ImageAnalysis.utils import create_multiline_string
-from CLAH_ImageAnalysis.utils import folder_tools
-from CLAH_ImageAnalysis.utils import ProcessStatusPrinter
-from CLAH_ImageAnalysis.utils import text_dict
-from CLAH_ImageAnalysis.utils import debug_utils
-from CLAH_ImageAnalysis.utils import print_wFrame
-from CLAH_ImageAnalysis.utils import file_finder
+from itertools import chain
+
+import inquirer
+import numpy as np
+
+from CLAH_ImageAnalysis.utils import (
+    ProcessStatusPrinter,
+    create_multiline_string,
+    debug_utils,
+    file_finder,
+    folder_tools,
+    print_wFrame,
+    text_dict,
+)
 
 ######################################################
 #  util class function

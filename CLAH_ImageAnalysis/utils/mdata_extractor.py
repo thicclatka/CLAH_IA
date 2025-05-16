@@ -1,13 +1,13 @@
-import os
-import easygui
 import glob
+import os
+
+import easygui
 from rich import print
+from rich.box import ROUNDED
 from rich.console import Console
 from rich.table import Table
-from rich.box import ROUNDED
-from CLAH_ImageAnalysis.utils import findLatest
-from CLAH_ImageAnalysis.utils import color_bool
-from CLAH_ImageAnalysis.utils import text_dict
+
+from CLAH_ImageAnalysis.utils import color_bool, findLatest, text_dict
 
 text_lib = text_dict()
 file_tag = text_lib["file_tag"]

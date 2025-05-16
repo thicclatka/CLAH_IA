@@ -1,11 +1,11 @@
 import copy
-from typing import List
+
+# from typing import List
 import numpy as np
 import scipy
-from scipy.sparse import csr_matrix
-from scipy.sparse import issparse
-# from collections import OrderedDict
+from scipy.sparse import csr_matrix, issparse
 
+# from collections import OrderedDict
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 

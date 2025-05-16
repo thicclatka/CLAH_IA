@@ -1,12 +1,11 @@
-import sqlite3
 import os
-from typing import Callable
-from typing import Literal
+import sqlite3
 from pathlib import Path
+from typing import Callable, Literal
+
 from tqdm import tqdm
-from CLAH_ImageAnalysis.utils import paths
-from CLAH_ImageAnalysis.utils import print_done_small_proc
-from CLAH_ImageAnalysis.utils import print_wFrame
+
+from CLAH_ImageAnalysis.utils import paths, print_done_small_proc, print_wFrame
 
 
 def create_db_path_with_name(db_name: str) -> Path:

@@ -1,9 +1,10 @@
 import numpy as np
+import pandas as pd
 from scipy.stats import sem
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
 from CLAH_ImageAnalysis.registration import CRwROI_enum
-import pandas as pd
 
 
 class CR_CI_collater(BC):

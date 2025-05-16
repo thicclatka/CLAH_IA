@@ -1,9 +1,10 @@
 import os
 import sys
+
 from rich import print
+
 from CLAH_ImageAnalysis.unitAnalysis import quickTuning
 from CLAH_ImageAnalysis.utils.text_formatting import text_dict
-
 
 os.system("clear")
 

@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import sem
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
 

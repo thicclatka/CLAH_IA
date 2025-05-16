@@ -1,9 +1,8 @@
 import json
 import os
 from pathlib import Path
-from CLAH_ImageAnalysis.utils import paths
-from CLAH_ImageAnalysis.utils import db_utils
-from CLAH_ImageAnalysis.utils import text_formatting
+
+from CLAH_ImageAnalysis.utils import db_utils, paths, text_formatting
 
 
 def load_template(systemd_services_dir: Path, template_name: str) -> str:

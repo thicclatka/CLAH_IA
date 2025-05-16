@@ -1,14 +1,15 @@
 import os
+
 import numpy as np
-from tqdm import tqdm
-from CLAH_ImageAnalysis.core import BaseClass as BC
-from CLAH_ImageAnalysis.core import run_CLAH_script
-from CLAH_ImageAnalysis.unitAnalysis import pks_utils
-from CLAH_ImageAnalysis.unitAnalysis import UA_enum
+import pandas as pd
+from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
-from scipy import stats
-import pandas as pd
+from tqdm import tqdm
+
+from CLAH_ImageAnalysis.core import BaseClass as BC
+from CLAH_ImageAnalysis.core import run_CLAH_script
+from CLAH_ImageAnalysis.unitAnalysis import UA_enum, pks_utils
 
 
 class ISX_analyzer(BC):

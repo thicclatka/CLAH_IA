@@ -1,11 +1,12 @@
 import os
 import shutil
+from enum import Enum
+
 import caiman as cm
 import matplotlib.pyplot as plt
 import numpy as np
-from caiman.source_extraction.cnmf import cnmf as cnmf
 from caiman.components_evaluation import estimate_components_quality_auto
-from enum import Enum
+from caiman.source_extraction.cnmf import cnmf as cnmf
 
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum

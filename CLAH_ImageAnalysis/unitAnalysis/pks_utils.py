@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from CLAH_ImageAnalysis.dependencies import local_minima
-from CLAH_ImageAnalysis.dependencies import runmean
+
+from CLAH_ImageAnalysis.dependencies import local_minima, runmean
 from CLAH_ImageAnalysis.unitAnalysis import QT_Plotters
 
 

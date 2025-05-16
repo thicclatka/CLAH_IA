@@ -12,7 +12,9 @@ Classes:
 """
 
 from enum import Enum
+
 from lxml import etree
+
 from CLAH_ImageAnalysis import utils
 
 
