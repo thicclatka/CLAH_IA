@@ -8,7 +8,6 @@ import {
   Typography,
   CircularProgress,
   IconButton,
-  Paper,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -46,18 +45,54 @@ const FileViewer: FC<FileViewerProps> = ({ filePath, cropCoords }) => {
     enabled: !!filePath,
   });
 
-  // Initialize crop box with existing coordinates if they exist
   useEffect(() => {
-    if (cropCoords && cropCoords.length === 2) {
-      const [start, end] = cropCoords;
+    if (
+      cropCoords &&
+      cropCoords.length === 2 &&
+      imageRef.current &&
+      imageRef.current.naturalWidth > 0 &&
+      imageRef.current.naturalHeight > 0
+    ) {
+      const [start, end] = cropCoords; // original image coordinates
+
+      const rect = imageRef.current.getBoundingClientRect(); // Displayed size
+      const naturalWidth = imageRef.current.naturalWidth;
+      const naturalHeight = imageRef.current.naturalHeight;
+
+      if (rect.width === 0 || rect.height === 0) {
+        return;
+      }
+
+      const scaleX = rect.width / naturalWidth; // display_width / original_width
+      const scaleY = rect.height / naturalHeight; // display_height / original_height
+
+      const display_x1 = start[0] * scaleX;
+      const display_y1 = start[1] * scaleY;
+      const display_x2 = end[0] * scaleX;
+      const display_y2 = end[1] * scaleY;
+
       setCropBox({
-        x: start[0],
-        y: start[1],
-        width: end[0] - start[0],
-        height: end[1] - start[1],
+        x: Math.min(display_x1, display_x2),
+        y: Math.min(display_y1, display_y2),
+        width: Math.abs(display_x2 - display_x1),
+        height: Math.abs(display_y2 - display_y1),
       });
+    } else if (!cropCoords) {
+      // If cropCoords are empty, clear the box
+      setCropBox(null);
     }
-  }, [cropCoords]);
+    // Adding dependencies on imageRef.current properties that affect scaling
+    // Note: directly depending on imageRef.current might not trigger re-renders if only its properties change.
+    // A common pattern is to use a state variable that updates on image load or resize.
+    // However, for initial load, naturalWidth/Height check often suffices if image is loaded before this effect runs.
+    // If the image resizes dynamically, a ResizeObserver on imageRef might be more robust for updating the display cropBox.
+  }, [
+    cropCoords,
+    imageRef.current?.naturalWidth,
+    imageRef.current?.naturalHeight,
+    imageRef.current?.width,
+    imageRef.current?.height,
+  ]);
 
   const handlePrevFrame = useCallback(() => {
     if (currentFrame > 0) {
@@ -146,12 +181,41 @@ const FileViewer: FC<FileViewerProps> = ({ filePath, cropCoords }) => {
   const handleExportCrop = async () => {
     if (!cropBox || !imageRef.current) return;
 
-    const rect = imageRef.current.getBoundingClientRect();
-    // Clamp the coordinates to the image boundaries before exporting
-    const x1 = Math.max(0, Math.min(cropBox.x, rect.width));
-    const y1 = Math.max(0, Math.min(cropBox.y, rect.height));
-    const x2 = Math.max(0, Math.min(cropBox.x + cropBox.width, rect.width));
-    const y2 = Math.max(0, Math.min(cropBox.y + cropBox.height, rect.height));
+    const rect = imageRef.current.getBoundingClientRect(); // Displayed size
+    const naturalWidth = imageRef.current.naturalWidth; // Original (natural) width of the image source
+    const naturalHeight = imageRef.current.naturalHeight; // Original (natural) height of the image source
+
+    // Prevent division by zero if image dimensions are not loaded yet
+    if (
+      rect.width === 0 ||
+      rect.height === 0 ||
+      naturalWidth === 0 ||
+      naturalHeight === 0
+    ) {
+      alert("Error: Image dimensions are not fully loaded. Please try again.");
+      return;
+    }
+
+    // Calculate scaling factors
+    const scaleX = naturalWidth / rect.width;
+    const scaleY = naturalHeight / rect.height;
+
+    // Scale the cropBox coordinates (which are relative to the displayed image)
+    // back to the original image's coordinate system.
+    const original_x1 = cropBox.x * scaleX;
+    const original_y1 = cropBox.y * scaleY;
+    const original_x2 = (cropBox.x + cropBox.width) * scaleX;
+    const original_y2 = (cropBox.y + cropBox.height) * scaleY;
+
+    // Prepare data to send to the backend
+    // Ensure x1,y1 is top-left and x2,y2 is bottom-right for consistency,
+    // though the backend's use of min/max for LRTB handles arbitrary corners.
+    const dataToSend = {
+      x1: Math.round(Math.min(original_x1, original_x2)),
+      y1: Math.round(Math.min(original_y1, original_y2)),
+      x2: Math.round(Math.max(original_x1, original_x2)),
+      y2: Math.round(Math.max(original_y1, original_y2)),
+    };
 
     try {
       const response = await fetch(
@@ -161,12 +225,7 @@ const FileViewer: FC<FileViewerProps> = ({ filePath, cropCoords }) => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            x1: Math.round(x1),
-            y1: Math.round(y1),
-            x2: Math.round(x2),
-            y2: Math.round(y2),
-          }),
+          body: JSON.stringify(dataToSend),
         }
       );
 
@@ -177,9 +236,11 @@ const FileViewer: FC<FileViewerProps> = ({ filePath, cropCoords }) => {
       }
 
       alert("Crop coordinates exported successfully!");
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error("Error exporting crop coordinates:", error);
-      alert("Failed to export crop coordinates:\n" + error.message);
+      alert("Failed to export crop coordinates:\n" + errorMessage);
     }
   };
 
