@@ -216,13 +216,26 @@ class CNMF_PARAMS(Enum):
 class segDict_Txt(Enum):
     """
     Constants for segmentation dictionary:
+    - ACCEPTED_LABELS: Key for the accepted labels of each component.
     - A_SPATIAL: Key for the spatial footprint of each component.
-    - C_TEMPORAL: Key for the temporal trace of each component.
+    - A_SPATIAL_ALL: Key for the spatial footprint of all components, if hand-selection was used.
     - B_BACK: Key for the background of each component.
+    - B_BACK_SPAT: Key for the background of all components.
+    - C_TEMPORAL: Key for the temporal trace of each component.
+    - C_TEMPORAL_ALL: Key for the temporal trace of all components, if hand-selection was used.
     - DFF: Key for the delta F/F of each component.
-    - DX: Key for the x-shifts for motion correction.
-    - DY: Key for the y-shifts for motion correction.
+    - DX: Key for the size of dx dimension
+    - DY: Key for the size of dy dimension
+    - F_BACK_TEMP: Key for the temporal background of each background component.
+    - IDX_BAD: Key for the indices of bad components.
+    - IDX_GODO: Key for the indices of good components.
+    - RSR: Key for the residual sum of squares of each component.
     - S_DECONV: Key for the deconvolved spike trains of each component.
+    - S_DECONV_ALL: Key for the deconvolved spike trains of all components, if hand-selection was used.
+    - YRA: Key for the YrA of each component.
+    - SNR_COMP: Key for the signal-to-noise ratio of each component.
+    - R_VALUES: Key for the correlation values of each component.
+    - CNN_PREDS: Key for the CNN predictions of each component.
     """
 
     ACCEPTED_LABELS = "accepted_labels"
@@ -295,11 +308,6 @@ class Parser4M2SD(Enum):
             "DEFAULT": False,
             "HELP": "Concatenate H5s into a single H5 before motion correction, but create 2 segDicts. ONLY USE THIS TO COMBINE THE RESULTS FOR THE SAME SUBJECT ID ACROSS 2 SESSIONS.",
         },
-        # ("prev_sd_varnames", "psv"): {
-        #     "TYPE": "bool",
-        #     "DEFAULT": False,
-        #     "HELP": "Use the old variable names for the segDict (i.e. A, C, S, etc). Default is False, in which names will be A_Spatial, C_Temporal, etc.",
-        # },
         ("mc_iter", "mci"): {
             "TYPE": "int",
             "DEFAULT": 1,
@@ -406,4 +414,3 @@ def generateNexport_user_set_params(
 
     # Save to JSON
     utils.enum_utils.create_json_from_enumDict(params, fname, indent=4)
-    return
