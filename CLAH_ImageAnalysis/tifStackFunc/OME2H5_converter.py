@@ -120,7 +120,7 @@ if __name__ == "__main__":
         "--path_to_ome",
         default=None,
         type=str,
-        help="Path to folder containing OME-TIFF files.",
+        help="Path to folder containing session directories with OME-TIFF files.",
     )
     args = parser.parse_args()
 
