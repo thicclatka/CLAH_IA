@@ -5,7 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![build for base install](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml/badge.svg)](https://github.com/thicclatka/CLAH_IA/actions/workflows/build.yml)
 
-A comprehensive suite of Python programs for 1- & 2-photon calcium imaging analysis. Best to use on a local server, with a GPU for faster processing and data stored on a drive(s) separate from the root mount.
+A comprehensive suite of Python programs for 1- & 2-photon calcium imaging analysis. Best to use on a local server, with a GPU for faster processing and data stored on drive(s) separate from the root mount.
 
 Documentation: [https://thicclatka.github.io/CLAH_IA](https://thicclatka.github.io/CLAH_IA)
 
@@ -28,7 +28,7 @@ CLAH Image Analysis provides tools for:
 
 ## TODO
 
-- [ ] Flesh out start up & set up scripts
+- [x] Flesh out start up & set up scripts
 - [ ] Add GUI/WA details to Documentation
 - [ ] Change segDict_WA to FastAPI + typescript from streamlit
 - [ ] Create docker file

@@ -83,4 +83,4 @@ This script will typically perform the following actions:
     - Start the services
     - Enable services to start on boot up
 
-Make sure to inspect the [SystemdServices directory in the repo](https://github.com/thicclatka/CLAH_IA/blob/main/SystemdServices) script if you want to understand the exact commands being run or if you need to customize the setup.
+Make sure to inspect the [SystemdServices directory in the repo](https://github.com/thicclatka/CLAH_IA/blob/main/SystemdServices) if you want to understand the exact commands being run or if you need to customize the setup.

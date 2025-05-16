@@ -2,12 +2,12 @@
 
 ## [Quick Tuning](https://github.com/thicclatka/CLAH_IA/blob/main/CLAH_ImageAnalysis/unitAnalysis/quickTuning.py)
 
-### Input
+### QT Input
 
 - segmented dictionary (segDict)
 - treadmill/behavior log/json file (.tdml)
 
-### Output
+### QT Output
 
 - treadmill behavior dictionary (treadBehDict)
 - lap info dictionary (lapDict)
@@ -15,7 +15,7 @@
 - cueShiftStruc
 - Figures (stored in /path/to/segDict/Figures)
 
-### CLI
+### QT CLI
 
 ```console
 usage: quickTuning.py   [-h] [-p PATH] [-s2p SESS2PROCESS] [-f FPS] [-sdt SDTHRESH]
@@ -58,15 +58,15 @@ options:
 
 ## [WrapMultSessStruc](https://github.com/thicclatka/CLAH_IA/blob/main/CLAH_ImageAnalysis/unitAnalysis/wrapMultSessStruc.py)
 
-### Input
+### WMSS Input
 
 - cueShiftStruc
 
-### Output
+### WMSS Output
 
 - multSessSegStruc (location is based on -output_folder parameter)
 
-### CLI
+### WMSS CLI
 
 ```console
 usage: wrapMultSessStruc.py [-h] [-p PATH] [-s2p SESS2PROCESS] [-out OUTPUT_FOLDER]
@@ -94,17 +94,17 @@ options:
 
 ## [Post Cell Registrar Cue Cell Finder (PostCR_CueCellFinder)](https://github.com/thicclatka/CLAH_IA/blob/main/CLAH_ImageAnalysis/unitAnalysis/PostCR_CueCellFinder.py)
 
-### Input
+### PCRCCF Input
 
 - multSessSegStruc
 
-### Output
+### PCRCCF Output
 
 - PCRTrigSigDict
-  - Figures per subject (/path/to/multSessSegStruc/Figures)
-  - Figures across subjects (/path/to/MultSess/dir/~GroupData)
+    - Figures per subject (/path/to/multSessSegStruc/Figures)
+    - Figures across subjects (/path/to/MultSess/dir/~GroupData)
 
-### CLI
+### PCRCFF CLI
 
 ```console
 usage: PostCR_CueCellFinder.py  [-h] [-p PATH] [-s2p SESS2PROCESS] [-ots OUTLIER_TS]
