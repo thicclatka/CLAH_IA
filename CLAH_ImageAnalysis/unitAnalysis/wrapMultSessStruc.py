@@ -192,6 +192,7 @@ class wrapMultSessStruc(BC):
             file_of_interest=self.text_lib["selector"]["tags"]["SD"],
             selection_made=sess2process,
             select_by_ID=True,
+            noTDML4SD=True,
         )
 
         # initiate keys for segDict
