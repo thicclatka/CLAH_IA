@@ -41,7 +41,7 @@ def file_check4dbCreation(filenames: list[str]) -> bool:
     """
     file_tag = text_dict()["file_tag"]
     h5check = any(
-        f.endswith(file_tag["H5"]) and file_tag["ELEMENT"] in f for f in filenames
+        f.endswith(file_tag["H5"]) and file_tag["CYCLE"] in f for f in filenames
     )
     isxdcheck = any(f.endswith(file_tag["ISXD"]) for f in filenames)
     return h5check or isxdcheck
@@ -59,7 +59,7 @@ def file_check4SessionDict(session: Path) -> bool:
     """
     file_tag = text_dict()["file_tag"]
     h5check = any(
-        p.is_file() and p.suffix == file_tag["H5"] and file_tag["ELEMENT"] in p.name
+        p.is_file() and p.suffix == file_tag["H5"] and file_tag["CODE"] in p.name
         for p in session.iterdir()
     )
     isxdcheck = any(

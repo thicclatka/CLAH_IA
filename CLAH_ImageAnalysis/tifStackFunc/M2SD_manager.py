@@ -329,7 +329,8 @@ class M2SD_manager(BC):
         def _findFiles(full_path: bool = False) -> tuple:
             eMC_file = self.findLatest(self.file_tag["COMP_EMCFNAME"])
             h5_file = self.findLatest(
-                [self.file_tag["H5"], self.file_tag["CYCLE"], self.file_tag["ELEMENT"]],
+                # [self.file_tag["H5"], self.file_tag["CYCLE"], self.file_tag["ELEMENT"]],
+                [self.file_tag["H5"], self.file_tag["CYCLE"]],
                 notInclude=[
                     self.file_tag["SQZ"],
                     self.file_tag["EMC"],
@@ -602,41 +603,42 @@ class M2SD_manager(BC):
             else:
                 self.print_wFrm("Using files:")
                 for h5 in self.latest_h5:
-                    self.create_quickLinks_folder(fpath=os.path.dirname(h5))
-                    self.create_symlink4QL(
-                        src=h5,
-                        link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
-                        fpath4link=self.folder_tools.get_dirname(h5),
-                    )
+                    # self.create_quickLinks_folder(fpath=os.path.dirname(h5))
+                    # self.create_symlink4QL(
+                    #     src=h5,
+                    #     link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
+                    #     fpath4link=self.folder_tools.get_dirname(h5),
+                    # )
                     self.print_wFrm(f"{h5}", frame_num=1)
+
                 concath5name = f"{self.basename}{self.file_tag['CYCLE']}{self.file_tag['CODE']}{self.file_tag['ELEMENT']}{self.file_tag['CODE']}"
                 self.fname_concat = os.path.join(self.output_pathByID, concath5name)
                 file2use = self.H5U.concatH5s(
                     H5s=self.latest_h5, fname_concat=self.fname_concat
                 )
-                self.create_symlink4QL(
-                    src=file2use,
-                    link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
-                    fpath4link=self.folder_tools.get_dirname(file2use),
-                )
+                # self.create_symlink4QL(
+                #     src=file2use,
+                #     link_name=self.text_lib["QL_LNAMES"]["RAW_H5"],
+                #     fpath4link=self.folder_tools.get_dirname(file2use),
+                # )
             self.print_done_small_proc()
         else:
-            self.create_quickLinks_folder()
+            # self.create_quickLinks_folder()
             if self.latest_isxd:
                 file2use = self.latest_isxd
-                qlName = self.text_lib["QL_LNAMES"]["RAW_ISXD"]
+                # qlName = self.text_lib["QL_LNAMES"]["RAW_ISXD"]
             elif self.latest_tiff:
                 file2use = self.latest_tiff
-                qlName = self.text_lib["QL_LNAMES"]["RAW_TIFF"]
+                # qlName = self.text_lib["QL_LNAMES"]["RAW_TIFF"]
             else:
                 file2use = self.latest_h5
-                qlName = self.text_lib["QL_LNAMES"]["RAW_H5"]
+                # qlName = self.text_lib["QL_LNAMES"]["RAW_H5"]
 
-            self.create_symlink4QL(
-                src=file2use,
-                link_name=qlName,
-                fpath4link=self.folder_tools.get_dirname(file2use),
-            )
+            # self.create_symlink4QL(
+            #     src=file2use,
+            #     link_name=qlName,
+            #     fpath4link=self.folder_tools.get_dirname(file2use),
+            # )
 
         if file2use.endswith(self.file_tag["ISXD"]) or file2use.endswith(
             self.file_tag["TIFF"]
@@ -696,25 +698,25 @@ class M2SD_manager(BC):
             )
             self.list_h5fn_pproc[idx] = h5fname
 
-            if idx == 0:
-                if not self.concatCheck:
-                    self.create_symlink4QL(
-                        src=os.path.join(self.folder_path, h5fname),
-                        link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_H5"],
-                        fpath4link=self.folder_tools.get_dirname(h5fname),
-                    )
+            # if idx == 0:
+            #     if not self.concatCheck:
+            #         self.create_symlink4QL(
+            #             src=os.path.join(self.folder_path, h5fname),
+            #             link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_H5"],
+            #             fpath4link=self.folder_tools.get_dirname(h5fname),
+            #         )
 
             print("Exporting image stack as colormapped AVI:")
             avi_fname = self.ISUtils.apply_colormap2stack_export2avi(
                 array_to_use=array,
                 fname_save=h5fname,
             )
-            if not self.concatCheck:
-                self.create_symlink4QL(
-                    src=os.path.join(self.folder_path, avi_fname),
-                    link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_AVI"],
-                    fpath4link=self.folder_tools.get_dirname(avi_fname),
-                )
+            # if not self.concatCheck:
+            #     self.create_symlink4QL(
+            #         src=os.path.join(self.folder_path, avi_fname),
+            #         link_name=self.text_lib["QL_LNAMES"]["NORM_TFDS_AVI"],
+            #         fpath4link=self.folder_tools.get_dirname(avi_fname),
+            #     )
             self.print_done_small_proc()
 
         # clear self.norm_uint_tempfilteredDS_arr for memory
@@ -727,9 +729,7 @@ class M2SD_manager(BC):
         """
         if not self.onePhotonCheck:
             print(f"Loading {self.h5filename}")
-            self.print_wFrm(
-                "squeezing array from 5 to 3 dimensions (for Motion Correction)"
-            )
+            self.print_wFrm("squeezing array to 3 dimensions (for Motion Correction)")
 
             twoChan = False
             if self.twoCh:
@@ -761,13 +761,13 @@ class M2SD_manager(BC):
                         self.h5fname_sqz_ch2 = h5fname_sqz
                     elif chan == 0:
                         self.h5fname_sqz_ch1 = h5fname_sqz
-                if self.oneCh or (self.twoCh and chan == 0):
-                    if not self.concatCheck:
-                        self.create_symlink4QL(
-                            src=h5fname_sqz,
-                            link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
-                            fpath4link=self.folder_tools.get_dirname(h5fname_sqz),
-                        )
+                # if self.oneCh or (self.twoCh and chan == 0):
+                #     if not self.concatCheck:
+                #         self.create_symlink4QL(
+                #             src=h5fname_sqz,
+                #             link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
+                #             fpath4link=self.folder_tools.get_dirname(h5fname_sqz),
+                #         )
         else:
             print(
                 f"Loading: {self.latest_isxd if self.latest_isxd else self.latest_tiff}"
@@ -805,24 +805,24 @@ class M2SD_manager(BC):
                 bandpass_applied=self.bandpass_applied,
                 crop_applied=self.crop_applied,
             )
-            if not self.concatCheck:
-                self.create_symlink4QL(
-                    src=os.path.join(self.folder_path, self.h5fname_sqz),
-                    link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
-                    fpath4link=self.folder_tools.get_dirname(self.h5fname_sqz),
-                )
-                self.create_symlink4QL(
-                    src=os.path.join(
-                        self.folder_path,
-                        self.findLatest(self.file_tag["ABBR_DS"]),
-                    ),
-                    link_name=self.text_lib["QL_LNAMES"]["SMP_SQZ_H5"],
-                    fpath4link=self.folder_tools.get_dirname(
-                        os.path.join(
-                            self.folder_path, self.findLatest(self.file_tag["ABBR_DS"])
-                        )
-                    ),
-                )
+            # if not self.concatCheck:
+            #     self.create_symlink4QL(
+            #         src=os.path.join(self.folder_path, self.h5fname_sqz),
+            #         link_name=self.text_lib["QL_LNAMES"]["SQZ_H5"],
+            #         fpath4link=self.folder_tools.get_dirname(self.h5fname_sqz),
+            #     )
+            #     self.create_symlink4QL(
+            #         src=os.path.join(
+            #             self.folder_path,
+            #             self.findLatest(self.file_tag["ABBR_DS"]),
+            #         ),
+            #         link_name=self.text_lib["QL_LNAMES"]["SMP_SQZ_H5"],
+            #         fpath4link=self.folder_tools.get_dirname(
+            #             os.path.join(
+            #                 self.folder_path, self.findLatest(self.file_tag["ABBR_DS"])
+            #             )
+            #         ),
+            #     )
 
     def pre_moco_h5_tools(self) -> None:
         """
@@ -1121,23 +1121,23 @@ class M2SD_manager(BC):
             if self.oneCh:
                 self.mmap_of_moco = self.moco[0].fname_tot_els.copy()
                 self.mmap_of_moco = self.mmap_of_moco[0]
-                mmap4ql = self.mmap_of_moco
+                # mmap4ql = self.mmap_of_moco
             elif self.twoCh:
                 self.mmap_of_moco_ch2 = self.moco[0].fname_tot_els.copy()
                 self.mmap_of_moco_ch1 = self.moco[1].fname_tot_els.copy()
                 # index 0th entry
                 self.mmap_of_moco_ch2 = self.mmap_of_moco_ch2[0]
                 self.mmap_of_moco_ch1 = self.mmap_of_moco_ch1[0]
-                mmap4ql = self.mmap_of_moco_ch2
+                # mmap4ql = self.mmap_of_moco_ch2
 
-            if not self.concatCheck:
-                mmap4ql = os.path.join(self.folder_path, mmap4ql)
+            # if not self.concatCheck:
+            #     mmap4ql = os.path.join(self.folder_path, mmap4ql)
 
-                self.create_symlink4QL(
-                    src=mmap4ql,
-                    link_name=self.text_lib["QL_LNAMES"]["NORM_MMAP"],
-                    fpath4link=self.folder_tools.get_dirname(mmap4ql),
-                )
+            #     self.create_symlink4QL(
+            #         src=mmap4ql,
+            #         link_name=self.text_lib["QL_LNAMES"]["NORM_MMAP"],
+            #         fpath4link=self.folder_tools.get_dirname(mmap4ql),
+            #     )
             # stop cluster to clear memory
             self.print_wFrm("Stopping cluster", end="", flush=True)
             self.stop_cluster()
@@ -1551,15 +1551,15 @@ class M2SD_manager(BC):
                 folder_path_subj=folder_path_subj,
             )
 
-            if not self.concatCheck:
-                for ftype in ["H5", "MAT", "PKL"]:
-                    latest_sd = self.findLatest(
-                        [self.file_tag["SD"], self.file_tag[ftype]]
-                    )
-                    self.create_symlink4QL(
-                        src=os.path.join(self.folder_path, latest_sd),
-                        link_name=self.text_lib["QL_LNAMES"][f"SD_{ftype}"],
-                    )
+            # if not self.concatCheck:
+            #     for ftype in ["H5", "MAT", "PKL"]:
+            #         latest_sd = self.findLatest(
+            #             [self.file_tag["SD"], self.file_tag[ftype]]
+            #         )
+            #         self.create_symlink4QL(
+            #             src=os.path.join(self.folder_path, latest_sd),
+            #             link_name=self.text_lib["QL_LNAMES"][f"SD_{ftype}"],
+            #         )
 
     ######################################################
     # view motion correction with denoised
@@ -1668,18 +1668,18 @@ class M2SD_manager(BC):
 
                     self._save_residual_movie(movies2save, moviefname, ftype)
 
-                    if (
-                        movies2save is concatenated_residual_movie
-                        and ftype == self.file_tag["AVI"]
-                    ):
-                        if not self.concatCheck:
-                            self.create_symlink4QL(
-                                src=moviefname + self.file_tag["AVI"],
-                                link_name=self.text_lib["QL_LNAMES"][
-                                    "RES_MOV_CCAT_AVI"
-                                ],
-                                fpath4link=self.folder_tools.get_dirname(moviefname),
-                            )
+                    # if (
+                    #     movies2save is concatenated_residual_movie
+                    #     and ftype == self.file_tag["AVI"]
+                    # ):
+                    #     if not self.concatCheck:
+                    #         self.create_symlink4QL(
+                    #             src=moviefname + self.file_tag["AVI"],
+                    #             link_name=self.text_lib["QL_LNAMES"][
+                    #                 "RES_MOV_CCAT_AVI"
+                    #             ],
+                    #             fpath4link=self.folder_tools.get_dirname(moviefname),
+                    #         )
             TKEEPER.setEndNprintDuration()
 
         print()
