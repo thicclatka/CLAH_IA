@@ -13,7 +13,7 @@ Documentation: [https://thicclatka.github.io/CLAH_IA](https://thicclatka.github.
 
 CLAH Image Analysis provides tools for:
 
-- 2-photon imaging analysis
+- 1- and 2-photon imaging analysis
 - Motion correction and segmentation
 - Cell registration
 - Unit analysis
