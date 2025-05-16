@@ -2,7 +2,6 @@
 dbs/
 .old/
 *.DS_Store
-*.vscode
 NNmodels/
 services/
 shell_scripts/

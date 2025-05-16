@@ -1,0 +1,6 @@
+{
+  "workbench.colorTheme": "paddy-emerald",
+  "markdownlint.config": {
+    "MD007": { "indent": 4 }
+  }
+}
