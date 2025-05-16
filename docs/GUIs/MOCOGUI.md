@@ -2,7 +2,7 @@
 
 ## Web App
 
-The M2SD Web App provides a streamlined interface for running motion correction and segmentation analysis on imaging data. The app is built using Streamlit and runs as a system service for continuous availability.
+The M2SD Web App provides a streamlined interface for running motion correction and segmentation analysis on imaging data. The app is built using Streamlit and can be run as a system service for continuous availability.
 
 ### Requirements
 

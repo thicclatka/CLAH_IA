@@ -2,11 +2,11 @@
 
 ## [Cell Registrar w/ROICaT](https://github.com/thicclatka/CLAH_IA/blob/main/CLAH_ImageAnalysis/registration/cellRegistrar_wROICaT.py)
 
-### Input
+### CRwROI Input
 
 - multSessSegStruc
 
-### Output
+### CRwROI Output
 
 - json with cluster info (\_cluster_info_ROICaT.json)
 - results dictionary (\_results_ROICaT)
@@ -14,7 +14,7 @@
 - json with CR_wROI parameters (CRwROIparams.json)
 - Figures (stored in /path/to/multSessSegStruc/\_Figures_ROICaT)
 
-### CLI
+### CRwROI CLI
 
 ```console
 usage: cellRegistrar_wROICaT.py   [-h] [-p PATH] [-s2p SESS2PROCESS]
@@ -47,16 +47,16 @@ options:
 
 ## [Cell Registrar Cluster Info Collater (CR_CI_collater)](https://github.com/thicclatka/CLAH_IA/blob/main/CLAH_ImageAnalysis/registration/CR_CI_collater.py)
 
-### Input
+### CICOLL Input
 
 - json with cluster info (\_cluster_info_ROICaT.json)
 
-### Output
+### CICOLL Output
 
 - csv with cluster info for all subjects (/path/to/\_MS_dir/~GroupData/ClusterInfo_all.csv)
 - csv with cluster info averages by group (/path/to/\_MS_dir/~GroupData/ClusterInfo_means.csv)
 
-### CLI
+### CICOLL CLI
 
 ```console
 usage: CR_CI_collater.py [-h] [-p PATH] [-s2p SESS2PROCESS] [-4p FORPRES]
