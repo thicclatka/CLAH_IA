@@ -1,4 +1,5 @@
 from enum import Enum
+
 from CLAH_ImageAnalysis.utils import text_dict
 
 # import multiprocessing as mp

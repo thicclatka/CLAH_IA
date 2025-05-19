@@ -1,23 +1,23 @@
-import isx
-import os
 import json
+import os
+from functools import partial
+from multiprocessing import Pool, cpu_count
+
+import isx
 import numpy as np
+from PIL import Image
 from skimage import img_as_uint
 from tqdm import tqdm
-from multiprocessing import cpu_count
-from multiprocessing import Pool
-from functools import partial
-from PIL import Image
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
+from CLAH_ImageAnalysis.dependencies import filter_utils, normalization_utils
 from CLAH_ImageAnalysis.tifStackFunc import MovieCropper
-from CLAH_ImageAnalysis.utils import print_wFrame
-from CLAH_ImageAnalysis.utils import section_breaker
-from CLAH_ImageAnalysis.dependencies import filter_utils
-from CLAH_ImageAnalysis.dependencies import normalization_utils
-from CLAH_ImageAnalysis.utils import caiman_utils
-from CLAH_ImageAnalysis.utils import image_utils
-# from skimage import exposure
-# import h5py
+from CLAH_ImageAnalysis.utils import (
+    caiman_utils,
+    image_utils,
+    # print_wFrame,
+    # section_breaker,
+)
 
 
 class MoCoPreprocessing(BC):

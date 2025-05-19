@@ -1,13 +1,12 @@
-import os
-import pandas as pd
-import numpy as np
 import argparse
-import tifffile as tif
 import glob
+import os
+
 import h5py
-
-
+import numpy as np
+import tifffile as tif
 from rich import print
+
 from CLAH_ImageAnalysis import utils
 
 
@@ -29,15 +28,23 @@ class OME2H5_converter:
             list[str]: Absolute paths to folders with OME-TIFF files
         """
         os.chdir(self.file_path)
-        folder_contents = os.listdir(self.file_path)
+        print(f"Searching for OME-TIFF files in {self.file_path}")
+        folder_contents = [
+            os.path.join(self.file_path, f)
+            for f in os.listdir(self.file_path)
+            if os.path.isdir(os.path.join(self.file_path, f))
+        ]
         self.folders2convert = []
         for folder in folder_contents:
-            if os.path.isdir(os.path.join(self.file_path, folder)):
-                ome_check = utils.findLatest(
-                    [self.file_tag["OME"], self.file_tag["CYCLE"]]
-                )
-                if ome_check:
-                    self.folders2convert.append(os.path.abspath(folder))
+            os.chdir(folder)
+            ome_check = utils.findLatest([self.file_tag["CYCLE"], self.file_tag["IMG"]])
+            tif_check = utils.findLatest(
+                self.file_tag["IMG"], notInclude=[self.file_tag["OME"]]
+            )
+            if ome_check:
+                self.folders2convert.append(folder)
+            elif tif_check:
+                self.folders2convert.append(folder)
 
         print(f"Found {len(self.folders2convert)} folders to convert")
 
@@ -65,7 +72,7 @@ class OME2H5_converter:
                 os.chdir(folder)
                 self.current_folder = folder
                 self._convert_ome_to_h5()
-                print(f"Finished processing: {folder}")
+                print(f"Finished processing: {folder}\n\n")
 
             except ValueError as e:
                 print(f"Error processing {self.current_folder}: {e}")
@@ -79,26 +86,54 @@ class OME2H5_converter:
         1. Extract components
         2. Create and export segDict
         """
-        ome_files = glob.glob(f"{self.file_tag['CYCLE']}*{self.file_tag['OME']}")
-        ome_files.sort()
+        h5_file = utils.findLatest([self.file_tag["CYCLE"], self.file_tag["H5"]])
+        if h5_file:
+            print(f"Found existing H5 file: {h5_file} \nSkipping conversion.")
+            return
+
+        ome_files = glob.glob(
+            f"*{self.file_tag['CYCLE']}*{self.file_tag['OME']}{self.file_tag['IMG']}"
+        )
+
+        if len(ome_files) == 0:
+            ome_files = glob.glob(f"*{self.file_tag['IMG']}")
+        elif len(ome_files) > 1:
+            ome_files.sort()
+
         utils.print_wFrame(f"Found {len(ome_files)} OME-TIFF files")
         for idx, ome_file in enumerate(ome_files):
             utils.print_wFrame(f"{idx + 1:02d} - {ome_file}", frame_num=1)
 
+        utils.print_wFrame("Each stack size pre concatenation:")
+
         initial_file = ome_files[0]
-        h5fname = initial_file.replace(self.file_tag["OME"], self.file_tag["H5"])
+
+        h5fname = initial_file.split(".")[0] + self.file_tag["H5"]
+        if self.file_tag["CYCLE"] not in initial_file:
+            h5fname = (
+                initial_file.split(".")[0]
+                + self.file_tag["CYCLE"]
+                + self.file_tag["CODE"]
+                + self.file_tag["H5"]
+            )
 
         image_stack = []
-        for ome_file in ome_files:
-            image_stack.append(tif.imread(ome_file))
+        for idx, ome_file in enumerate(ome_files):
+            curr_stack = tif.imread(ome_file)
+            utils.print_wFrame(f"{idx + 1:02d} - {curr_stack.shape}", frame_num=1)
+            image_stack.append(curr_stack)
 
-        image_stack = np.array(image_stack)
+        # image_stack is a list of (frames, x, y) arrays
+        # Concatenate them along the first axis (frames)
         image_stack = np.concatenate(image_stack, axis=0)
 
+        utils.print_wFrame(f"New Stack Size after concatenation: {image_stack.shape}")
+
+        utils.print_wFrame("Exporting to H5")
         with h5py.File(h5fname, "w") as f:
             f.create_dataset("imaging", data=image_stack)
 
-        utils.print_wFrame(f"Created: {h5fname}")
+        utils.print_wFrame(f"Created: {h5fname}", frame_num=1)
 
     @property
     def run(self) -> None:
@@ -124,4 +159,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    OME2H5_converter(args.path_to_isx).run
+    OME2H5_converter(args.path_to_ome).run

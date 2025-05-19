@@ -18,7 +18,6 @@ from CLAH_ImageAnalysis.behavior import behavior_utils
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.dependencies import runmean
 
-
 ######################################################
 #  vars for keys & subkeys for treadBehDict & tdml file
 ######################################################
@@ -441,8 +440,7 @@ class setup_vars:
         # Validate key_of_interest
         if key_of_interest not in [RFID_VNAME, CONTEXT_VNAME]:
             raise ValueError(
-                f"key_of_interest must be either '{RFID_VNAME}' or "
-                f"'{CONTEXT_VNAME}'"
+                f"key_of_interest must be either '{RFID_VNAME}' or '{CONTEXT_VNAME}'"
             )
 
         base_key = (

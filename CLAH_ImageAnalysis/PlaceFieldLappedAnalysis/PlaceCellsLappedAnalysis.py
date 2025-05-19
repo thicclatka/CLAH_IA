@@ -24,10 +24,13 @@ import copy
 import time
 
 import numpy as np
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
-from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_dependencies
-from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
-from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_utils
+from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import (
+    PCLA_dependencies,
+    PCLA_enum,
+    PCLA_utils,
+)
 
 
 class computePlaceCells(BC):
@@ -445,7 +448,7 @@ class computePlaceCells(BC):
         badPosition = np.isin(whichBin, badBins)
 
         self.print_wFrm(
-            f"Number of bins w/ insufficient occupancy across laps: {sum(badPosition==1)}",
+            f"Number of bins w/ insufficient occupancy across laps: {sum(badPosition == 1)}",
             frame_num=1,
         )
         # Assign lap-specific metrics to PCSimple

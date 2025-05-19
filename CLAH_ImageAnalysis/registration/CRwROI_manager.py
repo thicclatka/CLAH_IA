@@ -1,18 +1,16 @@
 import copy
 import tempfile
 from enum import Enum
-from typing import List
-from typing import Optional
 
+# from typing import List, Optional
 import numpy as np
 import roicat.visualization
 from aenum import extend_enum
-from CLAH_ImageAnalysis.core import BaseClass as BC
-from CLAH_ImageAnalysis.registration import CRwROI_enum
-from CLAH_ImageAnalysis.registration import CRwROI_plots
-from CLAH_ImageAnalysis.registration import CRwROI_utils
-from CLAH_ImageAnalysis.tifStackFunc.TSF_enum import segDict_Txt
 from roicat.data_importing import Data_roicat
+
+from CLAH_ImageAnalysis.core import BaseClass as BC
+from CLAH_ImageAnalysis.registration import CRwROI_enum, CRwROI_plots, CRwROI_utils
+from CLAH_ImageAnalysis.tifStackFunc.TSF_enum import segDict_Txt
 
 
 class CRwROI_manager(BC, Data_roicat):
@@ -436,9 +434,17 @@ class CRwROI_manager(BC, Data_roicat):
         # output dimensions for spatial footprints & FOV (not ROI)
         self.FOV_height_width = (FOV_height[0], FOV_width[0])
 
+        if (
+            self.SDstr["A_SPATIAL_ALL"]
+            in self.multSessSegStruc[self.subj_sessions[0]].keys()
+        ):
+            ASPAT_KEY = self.SDstr["A_SPATIAL_ALL"]
+        else:
+            ASPAT_KEY = self.SDstr["A_SPATIAL"]
+
         spatialFootprints = [
             self.CRTOOLS.reshape_spatial4ROICaT(
-                array=self.multSessSegStruc[session][self.SDstr["A_SPATIAL"]],
+                array=self.multSessSegStruc[session][ASPAT_KEY],
                 out_height_width=[FOV_height[session_index], FOV_width[session_index]],
                 transpose=True,
                 threeD=True,

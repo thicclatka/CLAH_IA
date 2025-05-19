@@ -39,8 +39,8 @@ Parser Arguments:
         --sess2process, -s2p: Sessions to process (default: []), can be a list of session numbers.
 """
 
-from CLAH_ImageAnalysis.registration import CRwROI_manager
 from CLAH_ImageAnalysis.core import run_CLAH_script
+from CLAH_ImageAnalysis.registration import CRwROI_manager
 
 
 class cellRegistrar_wROICaT(CRwROI_manager):

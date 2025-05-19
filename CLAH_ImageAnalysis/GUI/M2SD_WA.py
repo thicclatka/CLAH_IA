@@ -1,16 +1,20 @@
-import streamlit as st
-from pathlib import Path
-import os
 import getpass
 import multiprocessing
-import sqljobscheduler as sqljs
+import os
 import re
+from pathlib import Path
+
+import sqljobscheduler as sqljs
+import streamlit as st
+
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
-from CLAH_ImageAnalysis.utils import Streamlit_utils
-from CLAH_ImageAnalysis.utils import text_dict
-from CLAH_ImageAnalysis.utils import enum_utils
-from CLAH_ImageAnalysis.utils import paths
-from CLAH_ImageAnalysis.utils import db_utils
+from CLAH_ImageAnalysis.utils import (
+    Streamlit_utils,
+    db_utils,
+    enum_utils,
+    paths,
+    text_dict,
+)
 
 DB_NAME = "paths_cache4M2SD"
 
@@ -41,7 +45,7 @@ def file_check4dbCreation(filenames: list[str]) -> bool:
     """
     file_tag = text_dict()["file_tag"]
     h5check = any(
-        f.endswith(file_tag["H5"]) and file_tag["ELEMENT"] in f for f in filenames
+        f.endswith(file_tag["H5"]) and file_tag["CYCLE"] in f for f in filenames
     )
     isxdcheck = any(f.endswith(file_tag["ISXD"]) for f in filenames)
     return h5check or isxdcheck
@@ -59,7 +63,7 @@ def file_check4SessionDict(session: Path) -> bool:
     """
     file_tag = text_dict()["file_tag"]
     h5check = any(
-        p.is_file() and p.suffix == file_tag["H5"] and file_tag["ELEMENT"] in p.name
+        p.is_file() and p.suffix == file_tag["H5"] and file_tag["CODE"] in p.name
         for p in session.iterdir()
     )
     isxdcheck = any(

@@ -40,16 +40,18 @@ Note: Ensure that the necessary input data structures and dependencies are corre
 
 """
 
-import os
-import tomli
-import numpy as np
-from CLAH_ImageAnalysis import utils
-from CLAH_ImageAnalysis import dependencies
-from typing import Any
-from rich import print as rprint
-from pathlib import Path
 import functools
+import os
 import sys
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import tomli
+from rich import print as rprint
+
+from CLAH_ImageAnalysis import dependencies, utils
+
 # from contextlib import contextmanager
 
 # from functools import wraps

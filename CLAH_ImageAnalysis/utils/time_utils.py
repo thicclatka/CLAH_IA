@@ -1,5 +1,6 @@
-import time
 import datetime
+import time
+
 from CLAH_ImageAnalysis.utils import print_wFrame
 
 

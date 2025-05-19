@@ -1,9 +1,8 @@
 import caiman as cm
+import cv2
 import h5py
 import numpy as np
-import cv2
 from skimage.util import img_as_uint
-
 
 ######################################################
 #  movie funcs

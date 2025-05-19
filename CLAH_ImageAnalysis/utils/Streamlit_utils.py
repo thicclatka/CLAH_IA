@@ -1,11 +1,11 @@
-import streamlit as st
 import base64
 import os
 from pathlib import Path
 from typing import Callable
-from CLAH_ImageAnalysis.utils import db_utils
-from CLAH_ImageAnalysis.utils import paths
-from CLAH_ImageAnalysis.utils import text_dict
+
+import streamlit as st
+
+from CLAH_ImageAnalysis.utils import db_utils, paths, text_dict
 
 EMOJIS = text_dict()["emojis"]
 HASH = text_dict()["breaker"]["hash"]

@@ -1,32 +1,31 @@
-import os
 import glob
 import json
-from pathlib import Path
-import torch
-import torch.nn as nn
-import numpy as np
+import os
 import sqlite3
 from datetime import datetime
-from tqdm import tqdm
-from scipy.signal import welch
+from pathlib import Path
+
+import numpy as np
+import streamlit as st
+import torch
+import torch.nn as nn
+from optuna import Trial, create_study
+from optuna.samplers import TPESampler
+from scipy.signal import find_peaks, welch
+from scipy.stats import kurtosis, skew
 from skimage.measure import regionprops
 from skimage.morphology import label
-from scipy.stats import skew
-from scipy.stats import kurtosis
-from scipy.signal import find_peaks
-from sklearn.model_selection import KFold
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import roc_auc_score
-from CLAH_ImageAnalysis.utils import paths
-from CLAH_ImageAnalysis.utils import db_utils
-from CLAH_ImageAnalysis.utils import text_dict
-import streamlit as st
-from optuna import create_study, Trial
-from optuna.samplers import TPESampler
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import KFold, StratifiedKFold
+from tqdm import tqdm
+
+from CLAH_ImageAnalysis.utils import db_utils, paths, text_dict
 
 
 class NNModel4BinaryClassification(nn.Module):

@@ -1,22 +1,25 @@
+from typing import Dict, Literal, Tuple
+
 import numpy as np
-from typing import Literal, Tuple, Dict
-from sklearn.model_selection import StratifiedKFold, KFold
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    mean_squared_error,
+    r2_score,
+)
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
-
-from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
 from tqdm import tqdm
 
 try:
     import tensorflow as tf
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import LSTM, Dense, Dropout, Masking
-    from tensorflow.keras.utils import to_categorical
     from tensorflow.keras.callbacks import EarlyStopping
+    from tensorflow.keras.layers import LSTM, Dense, Dropout, Masking
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.utils import to_categorical
 
     TF_IMPORTED = True
 except ImportError:

@@ -1,16 +1,17 @@
-import os
-import pandas as pd
-import numpy as np
-import zipfile
 import argparse
-import tifffile as tif
-import isx
-from oasis.functions import deconvolve
+import os
+import zipfile
 
+import isx
+import numpy as np
+import pandas as pd
+import tifffile as tif
+from oasis.functions import deconvolve
+from rich import print
 
 # import easygui
 from scipy import sparse
-from rich import print
+
 from CLAH_ImageAnalysis import utils
 
 

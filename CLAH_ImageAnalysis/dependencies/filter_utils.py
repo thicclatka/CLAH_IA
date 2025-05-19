@@ -1,11 +1,9 @@
-import numpy as np
 import cv2
-from skimage.morphology import disk
+import numpy as np
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 from scipy.signal import convolve
-from scipy.fft import fft2
-from scipy.fft import fftshift
-from scipy.fft import ifft2
-from scipy.fft import ifftshift
+from skimage.morphology import disk
+
 from CLAH_ImageAnalysis.dependencies.normalization_utils import normalize_array
 
 

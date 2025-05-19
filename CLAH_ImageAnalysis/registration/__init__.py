@@ -14,10 +14,10 @@ modules_import_as_is = ["CRwROI_enum"]
 
 if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     from . import CRwROI_enum
-    from .CRwROI_utils import *
-    from .CRwROI_plots import *
-    from .CRwROI_manager import *
     from .cellRegistrar_wROICaT import *
+    from .CRwROI_manager import *
+    from .CRwROI_plots import *
+    from .CRwROI_utils import *
 else:
     # import modules accordingly
     for module in __all__:

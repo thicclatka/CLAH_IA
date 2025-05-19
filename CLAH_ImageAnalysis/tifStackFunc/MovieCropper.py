@@ -1,17 +1,21 @@
-import cv2
-import numpy as np
-import isx
-import os
 import argparse
 import json
-import easygui
+import os
 import sys
+
+import cv2
+import easygui
+import isx
+import numpy as np
 from tqdm import tqdm
-from CLAH_ImageAnalysis.utils import print_wFrame
-from CLAH_ImageAnalysis.utils import print_header
-from CLAH_ImageAnalysis.utils import print_done_small_proc
-from CLAH_ImageAnalysis.utils import text_dict
-from CLAH_ImageAnalysis.utils import folder_tools
+
+from CLAH_ImageAnalysis.utils import (
+    folder_tools,
+    print_done_small_proc,
+    print_header,
+    print_wFrame,
+    text_dict,
+)
 
 
 class MovieCropper:

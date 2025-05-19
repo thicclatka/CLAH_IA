@@ -1,9 +1,9 @@
 import numpy as np
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
 from CLAH_ImageAnalysis.registration import CRwROI_enum
-from CLAH_ImageAnalysis.unitAnalysis import UA_enum
-from CLAH_ImageAnalysis.unitAnalysis import PCR_CCF_Plotter
+from CLAH_ImageAnalysis.unitAnalysis import PCR_CCF_Plotter, UA_enum
 
 
 class PostCR_CueCellFinder(BC):

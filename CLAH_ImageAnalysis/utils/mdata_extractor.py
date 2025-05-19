@@ -1,12 +1,13 @@
+import glob
 import os
+
 import easygui
 from rich import print
+from rich.box import ROUNDED
 from rich.console import Console
 from rich.table import Table
-from rich.box import ROUNDED
-from CLAH_ImageAnalysis.utils import findLatest
-from CLAH_ImageAnalysis.utils import color_bool
-from CLAH_ImageAnalysis.utils import text_dict
+
+from CLAH_ImageAnalysis.utils import color_bool, findLatest, text_dict
 
 text_lib = text_dict()
 file_tag = text_lib["file_tag"]
@@ -83,7 +84,9 @@ def mouseExtrctr(dir_to_extract: str) -> tuple[str, str, str, str, str, bool]:
     return date, mouseid, test_type, ch, numSess, skip_folder
 
 
-def file_finder(session: str, filetag: str, notInclude: list = []) -> tuple[str, str]:
+def file_finder(
+    session: str, filetag: list | str, notInclude: list = []
+) -> tuple[str, str]:
     """
     Finds the latest file in the given session directory that matches the specified filetag.
 
@@ -97,7 +100,15 @@ def file_finder(session: str, filetag: str, notInclude: list = []) -> tuple[str,
     """
 
     os.chdir(session)
+    # if isinstance(filetag, str):
     last_file = findLatest(filetag, notInclude)
+    # else:
+    #     new_filetag = []
+    #     for tag in filetag:
+    #         new_filetag.append(f"*{tag}")
+    #     new_filetag = "".join(new_filetag)
+    #     last_file = glob.glob(new_filetag)
+
     if last_file:
         return last_file, "Yes"
     else:
@@ -129,7 +140,8 @@ def _create_metadata_dict(dayPath: str, dayDir: list) -> dict:
             _, emc_bool = file_finder(
                 current_sess, [file_tag["COMP_EMCFNAME"], file_tag["H5"]]
             )
-            _, h5_bool = file_finder(current_sess, file_tag["PRE_EMC_H5"])
+            # _, h5_bool = file_finder(current_sess, file_tag["PRE_EMC_H5"])
+            _, h5_bool = file_finder(current_sess, [file_tag["H5"], file_tag["CYCLE"]])
             _, isxd_bool = file_finder(current_sess, file_tag["ISXD"])
             _, sD_bool = file_finder(current_sess, file_tag["SD"])
             _, tdml_bool = file_finder(current_sess, file_tag["TDML"])

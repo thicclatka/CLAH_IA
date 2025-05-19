@@ -1,6 +1,8 @@
 import copy
+
 import numpy as np
 from sklearn.cluster import KMeans
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.unitAnalysis import UA_enum
 

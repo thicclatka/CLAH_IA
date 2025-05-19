@@ -1,11 +1,12 @@
 # from caiman import load as cm_load
 import os
 import shutil
+from enum import Enum
+
 import numpy as np
 from caiman.motion_correction import MotionCorrect
-from enum import Enum
-# from caiman.motion_correction import high_pass_filter_space
 
+# from caiman.motion_correction import high_pass_filter_space
 # from caiman.motion_correction import motion_correct_oneP_nonrigid
 from CLAH_ImageAnalysis import utils
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum

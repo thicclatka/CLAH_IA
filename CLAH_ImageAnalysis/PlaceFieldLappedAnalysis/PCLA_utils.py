@@ -6,11 +6,10 @@ from scipy.ndimage import convolve
 
 try:
     from scipy.signal import gaussian
-except:
+except ImportError:
     from scipy.signal.windows import gaussian
 
-from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_dependencies
-from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_enum
+from CLAH_ImageAnalysis.PlaceFieldLappedAnalysis import PCLA_dependencies, PCLA_enum
 from CLAH_ImageAnalysis.utils.enum_utils import enum2dict
 
 pcl_str = enum2dict(PCLA_enum.TXT)

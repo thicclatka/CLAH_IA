@@ -600,7 +600,8 @@ def text_dict(
 
     text_dict["selector"]["file_types"] = {
         stags["EMC"]: [ftags["COMP_EMCFNAME"], ftags["H5"]],
-        stags["H5"]: ftags["PRE_EMC_H5"],
+        # stags["H5"]: ftags["PRE_EMC_H5"],
+        stags["H5"]: [ftags["H5"], ftags["CYCLE"]],
         stags["SD"]: ftags["SD"],
         stags["CSS"]: ftags["CSS"],
         stags["TDML"]: ftags["TDML"],

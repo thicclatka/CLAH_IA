@@ -1,8 +1,10 @@
+import multiprocessing
+
+import cv2
 import numpy as np
 import tifffile as tiff
 from tqdm import tqdm
-import cv2
-import multiprocessing
+
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 

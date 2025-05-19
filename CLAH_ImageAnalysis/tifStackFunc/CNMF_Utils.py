@@ -1,11 +1,12 @@
 import os
 import shutil
+from enum import Enum
+
 import caiman as cm
 import matplotlib.pyplot as plt
 import numpy as np
-from caiman.source_extraction.cnmf import cnmf as cnmf
 from caiman.components_evaluation import estimate_components_quality_auto
-from enum import Enum
+from caiman.source_extraction.cnmf import cnmf as cnmf
 
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.tifStackFunc import TSF_enum
@@ -564,7 +565,6 @@ class CNMF_Utils(BC):
         concatCheck: bool = False,
         folder_path_concat: str = None,
         folder_path_subj: list = [],
-        # prev_sd_varnames: bool = False,
     ):
         """
         Creates and exports a segmentation dictionary (segDict).
@@ -611,19 +611,6 @@ class CNMF_Utils(BC):
             segFilename = f"{folder_path_concat}/" + segFilename
 
         SDkey = self.enum2dict(TSF_enum.segDict_Txt)
-
-        # if prev_sd_varnames:
-        #     segFilename = self.basename + "_prevNameVar_" + self.file_tag["SD"]
-        #     SDkey["A_SPATIAL"] = "A"
-        #     SDkey["C_TEMPORAL"] = "C"
-        #     SDkey["B_BACK_SPAT"] = "b"
-        #     SDkey["F_BACK_TEMP"] = "f"
-        #     SDkey["DFF"] = "dff"
-        #     SDkey["DX"] = "d1"
-        #     SDkey["DY"] = "d2"
-        #     SDkey["S_DECONV"] = "S"
-        #     SDkey["YRA"] = "YrA"
-        #     SDkey["RSR"] = "R"
 
         segDict = {
             SDkey["C_TEMPORAL"]: self.NonNegMatrix_post_refining.estimates.C,
@@ -689,7 +676,6 @@ class CNMF_Utils(BC):
                 segFname = (
                     f"{folder_path_subj[idx]}/"
                     + basename2use
-                    # + ("_prevNameVar_" if prev_sd_varnames else "")
                     + self.file_tag["COMP_SDFNAME"]
                 )
 

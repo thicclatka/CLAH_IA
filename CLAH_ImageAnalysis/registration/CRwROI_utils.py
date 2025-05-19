@@ -1,11 +1,11 @@
 import copy
-from typing import List
+
+# from typing import List
 import numpy as np
 import scipy
-from scipy.sparse import csr_matrix
-from scipy.sparse import issparse
-# from collections import OrderedDict
+from scipy.sparse import csr_matrix, issparse
 
+# from collections import OrderedDict
 from CLAH_ImageAnalysis.core import BaseClass as BC
 
 
@@ -577,7 +577,7 @@ class CRwROI_utils(BC):
     def isTC_incQC_counter(
         self,
         results: dict,
-        isCell: dict,
+        isCell: dict | None,
         alpha_labels: np.ndarray,
         rejected_label: int,
     ) -> dict:
@@ -595,8 +595,12 @@ class CRwROI_utils(BC):
                 The dictionary has two keys: "PRE_QC" and "POST_QC".
                 The value for each key is a numpy array containing the isPC values for each session.
         """
-        cellTypes = isCell.keys()
-        isCellCount_dict = {cT: {"PRE_QC": [], "POST_QC": []} for cT in cellTypes}
+        if isCell is None:
+            cellTypes = None
+            isCellCount_dict = None
+        else:
+            cellTypes = isCell.keys()
+            isCellCount_dict = {cT: {"PRE_QC": [], "POST_QC": []} for cT in cellTypes}
 
         if cellTypes is not None:
             for ct in cellTypes:
@@ -624,8 +628,6 @@ class CRwROI_utils(BC):
                     # append to isPC_dict accordingly
                     isCellCount_dict[ct]["PRE_QC"].append(np.array(isC_forSess))
                     isCellCount_dict[ct]["POST_QC"].append(np.array(isC_forSess_QC))
-        else:
-            isCellCount_dict = None
 
         return isCellCount_dict
 

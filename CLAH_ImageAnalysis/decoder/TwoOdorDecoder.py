@@ -1,12 +1,13 @@
 import json
-import numpy as np
 from typing import Literal
+
+import numpy as np
 from matplotlib.colors import ListedColormap
-from scipy.stats import mannwhitneyu
+
+# from scipy.stats import mannwhitneyu
 from CLAH_ImageAnalysis.core import BaseClass as BC
 from CLAH_ImageAnalysis.core import run_CLAH_script
-from CLAH_ImageAnalysis.decoder import decoder_enum
-from CLAH_ImageAnalysis.decoder import GeneralDecoder
+from CLAH_ImageAnalysis.decoder import GeneralDecoder, decoder_enum
 from CLAH_ImageAnalysis.unitAnalysis import pks_utils
 
 

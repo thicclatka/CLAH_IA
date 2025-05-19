@@ -22,10 +22,13 @@ Note: Ensure that the necessary input data structures (`cueShiftStruc`, `treadBe
 """
 
 import numpy as np
-from CLAH_ImageAnalysis.unitAnalysis import CCF_Dep
-from CLAH_ImageAnalysis.unitAnalysis import CCF_Plotter
-from CLAH_ImageAnalysis.unitAnalysis import CCF_StatTesting
-from CLAH_ImageAnalysis.unitAnalysis import CCF_Utils
+
+from CLAH_ImageAnalysis.unitAnalysis import (
+    CCF_Dep,
+    CCF_Plotter,
+    CCF_StatTesting,
+    CCF_Utils,
+)
 
 ######################################################
 #  main class func

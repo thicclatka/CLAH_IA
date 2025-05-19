@@ -18,10 +18,12 @@ functionality either directly or indirectly.
 CaImAn GitHub repository: https://github.com/flatironinstitute/CaImAn
 """
 
-import os
-import numpy as np
 import glob
+import os
+
 import caiman as cm
+import numpy as np
+
 from CLAH_ImageAnalysis.utils import text_dict
 
 text_lib = text_dict()
