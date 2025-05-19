@@ -185,6 +185,24 @@ class wrapMultSessStruc(BC):
             chosen_region = answer["brain_region"]
             return f"{output_folder}_{chosen_region}"
 
+        def _set_photon_type(output_folder: str) -> str:
+            """
+            Prompts the user to choose a photon type and appends it to the output folder name.
+            """
+            question = [
+                inquirer.List(
+                    "photon_type",
+                    message="Choose photon type",
+                    choices=[
+                        "2P",
+                        "1P",
+                    ],
+                )
+            ]
+            answer = inquirer.prompt(question)
+            photon_type = answer["photon_type"]
+            return f"{output_folder}_{photon_type}"
+
         # initiate BC static_class_var_init
         # given CSS, creates multSessIDDict, sess2process, ID_arr
         BC.static_class_var_init(
@@ -208,12 +226,15 @@ class wrapMultSessStruc(BC):
                 output_folder_base = f"_MS_{output_folder_base}"
             if "DG" not in output_folder_base and "CA3" not in output_folder_base:
                 output_folder_base = _choose_brain_region(output_folder_base)
+            if "2P" not in output_folder_base and "1P" not in output_folder_base:
+                output_folder_base = _set_photon_type(output_folder_base)
             output_folder = f"{output_folder_parent}/{output_folder_base}"
             self.COMB_FOLDER = output_folder
         else:
             output_folder = "_MS"
             output_folder = _setExpName(output_folder)
             output_folder = _choose_brain_region(output_folder)
+            output_folder = _set_photon_type(output_folder)
 
             self.COMB_FOLDER = (
                 f"{self.folder_tools.get_parent_dir(self.dayPath)}/{output_folder}"
