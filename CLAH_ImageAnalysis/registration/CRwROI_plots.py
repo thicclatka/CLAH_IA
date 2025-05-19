@@ -319,9 +319,15 @@ class CRwROI_plots(BC):
             ]
             ctkeysall = ctkeys2use + ["NON"]
 
+        if total_sess > 9 and isCell2plot is None:
+            nrows2use = total_sess // 4
+            ncols2use = (total_sess // nrows2use) + 1
+        else:
+            ncols2use = total_sess
+
         # plot the FOV clusters
         fig, axes = self.fig_tools.create_plt_subplots(
-            ncols=total_sess, nrows=nrows2use, figsize=self.FOV_cluster_size
+            ncols=ncols2use, nrows=nrows2use, figsize=self.FOV_cluster_size
         )
 
         cell_totals = []
