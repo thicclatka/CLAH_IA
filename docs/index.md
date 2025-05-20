@@ -17,5 +17,12 @@ CLAH Image Analysis provides tools for:
 - [Installation Guide](1_installation.md)
 - [Order of Operations](2_order-of-operations.md)
 - [Structure for path names](3_structure-folder-path-names.md)
-- [CLIs](CLIs/tifStackFunc.md)
-- [GUIs](GUIs/MOCOGUI.md)
+- [Command Line Tools](CLIs/CLI_index.md)
+- [Graphical User Interfaces](GUIs/GUI_index.md)
+
+## Getting Started
+
+1. Follow the [Installation Guide](1_installation.md) to set up your environment
+2. Review the [Order of Operations](2_order-of-operations.md) to understand the workflow
+3. Check the [Structure for path names](3_structure-folder-path-names.md) to organize your data
+4. Choose between [Command Line Tools](CLIs/CLI_index.md) or [Graphical User Interfaces](GUIs/GUI_index.md) based on your needs.

@@ -17,3 +17,9 @@
 3. cellRegistrar_wROICaT (Using data directory with multisession subdirectories from here)
 4. PostCR_CueCellFinder
 5. CR_CI_collater
+
+If QT cannot be used:
+
+1. M2SD
+2. wrapMultSessStruc
+3. cellRegistrat_wROICaT

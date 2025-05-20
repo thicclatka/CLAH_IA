@@ -38,7 +38,7 @@ The app uses SQL Job Scheduler to manage analysis tasks:
 
 ### Access
 
-The web app can be accessed at: `http://[server-address]:[port]/m2sd`
+The web app can be accessed at: `http://[server-address]:[port]/m2sd`. Based on what is in [Application settings](https://github.com/thicclatka/CLAH_IA/blob/main/SystemdServices/app_settings.json), the default port is `8503`.
 
 ### Usage Flow
 
