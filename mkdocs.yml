@@ -46,11 +46,15 @@ nav:
       - Order of Operations: 2_order-of-operations.md
       - Structure for path names: 3_structure-folder-path-names.md
   - Functions (CLIs):
+      - Index: CLIs/CLI_index.md
       - TifStack Utilities: CLIs/tifStackFunc.md
       - Unit Analysis: CLIs/unitAnalysis.md
       - Cell Registration: CLIs/cellRegistration.md
   - GUIs:
+      - Index: GUIs/GUI_index.md
       - Motion Correction & Segmentation: GUIs/MOCOGUI.md
+      - SegDict Utility: GUIs/SDGUI.md
+      - 1P Cropping Utility: GUIs/CROPPER.md
 
 markdown_extensions:
   - tables
