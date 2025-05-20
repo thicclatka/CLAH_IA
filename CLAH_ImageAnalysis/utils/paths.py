@@ -49,11 +49,19 @@ def get_code_dir_path(dir_name: str) -> Path:
 
 def get_config_dir_path() -> Path:
     """
-    Get the path to the config directory
+    Get the path to the config directory in the home directory of the user
     """
     home_dir = Path.home()
     config_dir = Path(home_dir, ".clah_ia")
     config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
+def get_config_wIN_pyDir() -> Path:
+    """
+    Get the path to the config directory in the python directory, which is located in CLAH_ImageAnalysis/config
+    """
+    config_dir = Path(get_directory_of_modules_from_file(), "config")
     return config_dir
 
 

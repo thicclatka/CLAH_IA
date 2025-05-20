@@ -1,57 +1,22 @@
+import json
+
 from rich import print
+
+from CLAH_ImageAnalysis.utils.paths import get_config_wIN_pyDir
 
 
 def color_dict() -> dict:
     """
     Returns a dictionary mapping color names to their corresponding hex values.
+    Loads colors from the config/colors.json file.
 
     Returns:
         dict: A dictionary with color names as keys and hex values as values.
     """
-    color_dict = {
-        ## base colors (RGB)
-        "red_base_rgb": (1, 0, 0),
-        "blue_base_rgb": (0, 0, 1),
-        "green_base_rgb": (0, 1, 0),
-        ## light colors
-        "black": "#000000",
-        "blue": "#4185BE",
-        "brown": "#B6835E",
-        "coral": "#FF7F50",
-        "cyan": "#2BC4C9",
-        "gold": "#DFB851",
-        "gray": "#808080",
-        "green": "#6DC067",
-        "indigo": "#4B0082",
-        "magenta": "#FF00FF",
-        "navy": "#000080",
-        "olive": "#808000",
-        "orange": "#F78822",
-        "pink": "#CB78A7",
-        "red": "#CF202E",
-        "turquoise": "#34B7AA",
-        "violet": "#8F499C",
-        "white": "#E6E6E6",
-        "yellow": "#F6DB35",
-        ## dark colors
-        "darkblue": "#050194",
-        "darkbrown": "#7E593E",
-        "darkcoral": "#CD5B45",
-        "darkcyan": "#008B8B",
-        "darkgold": "#9B813D",
-        "darkgray": "#3B3B3B",
-        "darkgreen": "#006400",
-        "darkindigo": "#310062",
-        "darkmagenta": "#8B008B",
-        "darkolive": "#4E4E0A",
-        "darkorange": "#B76519",
-        "darkpink": "#77144C",
-        "darkred": "#8B0000",
-        "darkturquoise": "#1B8177",
-        "darkviolet": "#5D2168",
-        "darkyellow": "#B8860B",
-    }
-    return color_dict
+    config_path = get_config_wIN_pyDir() / "colors.json"
+    with open(config_path, "r") as f:
+        color_data = json.load(f)
+    return color_data["colors"]
 
 
 def color_dict_4cues() -> dict:
@@ -231,45 +196,14 @@ def text_dict(
         ISX_ANLZR: "ISX Analysis",
     }
 
+    # load strings from config
+    with open(get_config_wIN_pyDir() / "text.json", "r") as f:
+        strings_from_config = json.load(f)
+
     text_dict = {
-        "frames": {
-            "FR": frame,
-            "EFR": empty_frame,
-        },
-        "cueType_abbrev": {
-            "CUE1": "C1",
-            "OMITCUE1": "OC1",
-            "CUE2": "C2",
-            "OMITCUE2": "OC2",
-            "CUE1_SWITCH": "C1S",
-            "CUE2_SWITCH": "C2S",
-            "CUEwOPTO": "CwO",
-            "OMITCUE1_SWITCH": "OC1S",
-            "TONE": "T",
-            "OMITTONE": "OT",
-            "LED": "L",
-            "OMITLED": "OL",
-            "OMITBOTH": "OB",
-            "OPTO": "OP",
-        },
-        "emojis": {
-            "bolt": "⚡",
-            "check": "✅",
-            "epage": "📄",
-            "gear": "⚙️",
-            "info": "ℹ️",
-            "knobs": "🎛️",
-            "pk": "📈",
-            "plus": "➕",
-            "preview": "👀",
-            "question": "❓",
-            "refresh": "🔄",
-            "save": "💾",
-            "trash": "🗑️",
-            "tools": "🛠️",
-            "warning": "⚠️",
-            "x": "❌",
-        },
+        "frames": strings_from_config["frames"],
+        "cueType_abbrev": strings_from_config["cueType_abbrev"],
+        "emojis": strings_from_config["emojis"],
         "headers": {
             **{
                 f"main_title_{key}": _add_CLAH(title)
@@ -317,9 +251,7 @@ def text_dict(
                 },
             },
         },
-        "parser": {
-            "forPres": "Whether to export .svg for figures in addition to the usual .png output. Default is False.",
-        },
+        "parser": strings_from_config["parser"],
         "breaker": {
             "hash": "#" * breaker_length,
             "lean": "-" * breaker_length,
@@ -338,91 +270,10 @@ def text_dict(
             "small_proc": "---done",
             "GUI": "done!",
         },
-        "wrappers": {
-            "btw_dots": "See output between the dotted lines:",
-        },
-        "file_tag": {
-            "8BIT": "_8bit",
-            "A": "ASpat",
-            "ABBR_DS": "_ABBREVDATASET",
-            "AVGCA": "_avCaCh",
-            "AVI": ".avi",
-            "BORIS": "Boris",
-            "C": "CTemp",
-            "CA": "_CaCh",
-            "CCF": "CueCellFinderDict",
-            "CLUSTER_INFO": "_cluster_info",
-            "CMAP": "_CMAP",
-            "CNMFE": "CNMFE",
-            "CNMFE2": "CNMFe",
-            "CODE": "00001",
-            "CONV": "convolved_data",
-            "CROP_DIMS": "crop_dims.json",
-            "CSS": "_cueShiftStruc",
-            "CSV": ".csv",
-            "CYCLE": "_Cycle",
-            "C_EVAL": "CompEval",
-            "DAT": ".dat",
-            "DOWNSAMPLE": "DS",
-            "ELEMENT": "_Element",
-            "EMC": "_eMC",
-            "EPS": ".eps",
-            "GPIO": ".gpio",
-            "GPIO_SUFFIX": "_gpio",
-            "H5": ".h5",
-            "HTML": ".html",
-            "IMG": ".tif",
-            "IMU": ".imu",
-            "ISXD": ".isxd",
-            "JPG": ".jpg",
-            "JSON": ".json",
-            "LAPD": "_lapDict",
-            "MAT": ".mat",
-            "MMAP": ".mmap",
-            "MMAP_BASE": "memmap_",
-            "MMAP_MC_PROC": "memmap_eMC_caChExpDS_",
-            "MOSSY": "MossyCellList",
-            "MP4": ".mp4",
-            "MSS": "_multSessSegStruc",
-            "NPZ": ".npz",
-            "OME": ".ome",
-            "PARAMS": "Parameters",
-            "PDF": ".pdf",
-            "PKL": ".pkl",
-            "PKS": "_pksDict",
-            "PNG": ".png",
-            "POST_SG": "PostSeg",
-            "PS_CDA_BDF_MOV": "PostSeg_Reconstructed_CdotA_bDotF",
-            "PS_CDA_MOV": "PostSeg_Residual_Movie_CdotA",
-            "PS_CON_RES_MOV": "PostSeg_Residual_Movie_Concat_CdotA_W_NonSegNoise",
-            "PS_NOISE_MOV": "PostSeg_Residual_Movie_NonSegNoise",
-            "PYTORCH": ".pth",
-            "ROICAT": "_ROICaT",
-            "SD": "_segDict",
-            "SQZ": "_sqz",
-            "SVG": ".svg",
-            "TBD": "_treadBehDict",
-            "TDML": ".tdml",
-            "TEMPFILT": "Exp",
-            "TIFF": ".tiff",
-            "TXT": ".txt",
-            "USER_CNMF_PARAMS": "UserSet_CNMF_Params",
-            "USER_MC_PARAMS": "UserSet_MC_Params",
-            "XLSX": ".xlsx",
-            "XML": ".xml",
-            "ZIP": ".zip",
-        },
-        "Folders": {
-            "MC_METRICS": "motion_correction_metrics",
-            "ASPAT_CHECK": "ASpatCheck",
-            "PARAMS": "Parameters_Used",
-            "QL": ".quickLinks",
-            "GENFIG": "Figures",
-        },
-        "GPU": {
-            "CUPY": "cupy",
-            "PYCUDA": "pycuda",
-        },
+        "wrappers": strings_from_config["wrappers"],
+        "file_tag": strings_from_config["file_tag"],
+        "Folders": strings_from_config["Folders"],
+        "GPU": strings_from_config["GPU"],
         "selector": {
             "tags": {
                 "EMC": "eMC",
@@ -506,69 +357,12 @@ def text_dict(
                 "user_abort": "User selected to abort analysis... exiting program now.\n",
             },
         },
-        "dict_name": {
-            "LAPDICT": "lapDict",
-            "TREADBEHDICT": "treadBehDict",
-            "CSS": "cueShiftStruc",
-            "SD": "segDict",
-            "PKS": "pksDict",
-            "MSS": "multSessSegStruc",
-            "CCF": "CueCellFinderDict",
-            f"{POSTCR_CFF}": "PCRTrigSigDict",
-        },
-        "brain_regions": ["CA3", "DG"],
-        "IMP_FILE_KW": ["OPTO", "eOPN3", "AD", "Ag"],
-        "GUI_ELEMENTS": {
-            "GUI_TITLE_START": "Starting up {}:",
-            "UNUSABLE": "[UNUSABLE NO FOLDER LOADED]",
-            "MMENU": "File",
-            "EDIT": "Edit",
-            "LOAD": "Load File",
-            "LOAD_SESS": "Load Sessions",
-            "LOAD_SESS_SELECTED": "Load Selected Session",
-            "RESET": "RESET",
-            "UPDATE": "Update Plot",
-            "QUIT": "Quit",
-            "MSS_ASPAT_TITLE": "A_Spatial Viewer/Cell Comparison",
-            "SD_TITLE": "SegDict GUI Check",
-            "SAV_FIG": "Save Figure",
-            "EGU_MSG": "Select a compatible {} .pkl file",
-            "EGU_MSG_SESS": "Select a session folder that contains the {} .pkl file",
-            "EGU_MSG_PAR": "Select a directory that contains session folders",
-            "LOAD_ID": " Loaded ID: {} | Date: {} | Session Type: {}",
-            "LOAD_ID_EMPTY": "{:^100}".format(
-                "Loaded ID: Please go to File > Load File to get started"
-            ),
-            "PLT_TITLE_CSS": "Date: {}\nSession: {}",
-            "PLT_TITLE": "Spatial Profile for ID {}",
-            "PLT_CELL": "Session {}: Cell {}",
-            "PLT_CELLS": "Session {}: Cells {} - {}",
-            "VIEW": "View",
-            "CONSOLE": "Console",
-            "CELL_SEL": " Select cells to plots per session:\n Type 'a/all' to plot all cells",
-            "ASPAT_ENTRY_LABEL": "",
-        },
-        "GUICLASSUTILS": {
-            "BU_LOAD": "LoadLabel",
-            "BU_UPDATE": "UpdateImage",
-            "BU_SESS": "SessLabel",
-            "BU_RANGE": "RangeLabel",
-            "BU_RESET": "Reset",
-            "BU_GLOBALVARS": "Initializing global variables",
-            "BU_INITWIDGETS": "Initializing GUI elements/objects",
-            "BU_MENUBAR": "Displaying menu bar",
-            "BU_CELL_SEL": "SEL_CELL",
-        },
-        "FIGSAVE": {
-            "DEFAULT": "Figures",
-            "GROUP": "~GroupData",
-        },
-        "YES_RESP": ["yes", "y", "true", "t"],
-        "NO_RESP": ["no", "n", "false", "f"],
-        "REGEX": {
-            "EXIT": "^(0|[Ee][Xx][Ii][Tt]|[Qq][Uu][Ii][Tt])$",
-            "ID": r"([^\s]+)\s*\((\d+)\)",
-        },
+        "dict_name": strings_from_config["dict_name"],
+        "brain_regions": strings_from_config["brain_regions"],
+        "IMP_FILE_KW": strings_from_config["IMP_FILE_KW"],
+        "YES_RESP": strings_from_config["YES_RESP"],
+        "NO_RESP": strings_from_config["NO_RESP"],
+        "REGEX": strings_from_config["REGEX"],
     }
 
     # adding other more complicated file tags given already set smaller ones

@@ -2,8 +2,8 @@ import os
 
 # set order for modules to import
 __all__ = [
-    "text_formatting",
     "paths",
+    "text_formatting",
     "time_utils",
     "debug_utils",
     "wrappers4output",
@@ -37,26 +37,27 @@ modules_import_as_is = [
 # Check for a specific environment variable or another condition
 if os.getenv("STATIC_IMPORTS", "false").lower() == "true":
     # Static imports for better LSP integration
-    from .text_formatting import *
-    from .paths import *
-    from .time_utils import *
-    from . import debug_utils
-    from .wrappers4output import *
-    from .folder_tools import *
-
     # from .array_toolkit import *
-    from . import enum_utils
-    from . import saveNloadUtils
+    from . import (
+        Streamlit_utils,
+        caiman_utils,
+        db_utils,
+        debug_utils,
+        enum_utils,
+        fig_tools,
+        image_utils,
+        isx_utils,
+        iter_utils,
+        parser_utils,
+        saveNloadUtils,
+    )
+    from .folder_tools import *
     from .mdata_extractor import *
-    from . import parser_utils
-    from . import db_utils
-    from . import Streamlit_utils
-    from . import isx_utils
+    from .paths import *
     from .selector import *
-    from . import iter_utils
-    from . import image_utils
-    from . import caiman_utils
-    from . import fig_tools
+    from .text_formatting import *
+    from .time_utils import *
+    from .wrappers4output import *
 
 else:
     # Dynamic imports using exec for flexibility
