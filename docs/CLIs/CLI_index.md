@@ -4,7 +4,7 @@ This directory contains documentation for the various command-line interface (CL
 
 ## CLI Categories
 
-### [Motion Correction & Segmentation](tifStackFunc.md)
+### [tifStackFunc](tifStackFunc.md)
 
 Core tools for processing raw imaging data:
 
