@@ -29,7 +29,7 @@ Usage:
 Example:
     To run the script directly:
     ```bash
-    python quickTuning.py --path /path/to/data --sess2process '1,2,3' --fps 15 --sdt 3 --to 3 --overwrite yes
+    python quickTuning.py --path /path/to/data --sess2process '1,2,3' --frameWindow 15 --sdt 3 --to 3 --overwrite yes
     ```
 
     To import and use within another script:
@@ -42,7 +42,7 @@ Example:
 
 Parser Arguments:
     The script uses the following parser arguments defined in `UA_enum.Parser`:
-        --fps, -f: Window size (in frames) used for smoothing for the event/peak detection (default: 15)
+        --frameWindow, -fw: Window size (in frames) used for smoothing for the event/peak detection (default: 15)
         --overwrite, -ow: Overwrite existing files (default: None)
         --path, -p: Path to the data folder (default: [])
         --sdThresh, -sdt: Threshold multiplier for event/peak detection based on the standard deviation of the signal's derivative (default: 3)
@@ -55,11 +55,11 @@ from CLAH_ImageAnalysis.unitAnalysis import QT_manager
 
 
 class quickTuning(QT_manager):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         self.program_name = "QT"
         QT_manager.__init__(self, program_name=self.program_name, **kwargs)
 
-    def process_order(self):
+    def process_order(self) -> None:
         """
         Process the order by importing the segmentation dictionary,
         initializing and creating the peaks dictionary,

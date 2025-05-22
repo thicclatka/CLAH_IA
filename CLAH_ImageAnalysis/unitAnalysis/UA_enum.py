@@ -403,11 +403,6 @@ class Parser4QT(Enum):
             "DEFAULT": None,
             "HELP": "Overwrite existing files (e.g. pkl & mat for treadBehDict, lapDict, cueShiftStruc)",
         },
-        # ("rewOmit", "ro"): {
-        #     "TYPE": "bool",
-        #     "DEFAULT": False,
-        #     "HELP": "Whether to consider being given reward as a separate lapType",
-        # },
         ("toPlotPks", "pp"): {
             "TYPE": "bool",
             "DEFAULT": False,
@@ -418,11 +413,6 @@ class Parser4QT(Enum):
             "DEFAULT": False,
             "HELP": text_lib["parser"]["forPres"],
         },
-        # ("concatCheck", "cat"): {
-        #     "TYPE": "bool",
-        #     "DEFAULT": False,
-        #     "HELP": "Set this to True if you are working with sessions that were motion corrected in a concatenated manner. Default is False",
-        # },
     }
 
 
