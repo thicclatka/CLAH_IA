@@ -113,7 +113,7 @@ class QT_manager(BC):
         #! SINCE CONCATCHECK IS STILL A WORK IN PROGRESS, IT IS NOT YET IMPLEMENTED
         #! SETTING TO FALSE FOR NOW
         concatCheck = False
-        print("ConcatCheck is still a work in progress. Setting to False for now.")
+        # print("ConcatCheck is still a work in progress. Setting to False for now.")
 
         BC.__init__(
             self,
