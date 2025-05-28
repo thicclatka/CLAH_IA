@@ -204,6 +204,7 @@ def text_dict(
         "frames": strings_from_config["frames"],
         "cueType_abbrev": strings_from_config["cueType_abbrev"],
         "emojis": strings_from_config["emojis"],
+        "FIGSAVE": strings_from_config["FIGSAVE"],
         "headers": {
             **{
                 f"main_title_{key}": _add_CLAH(title)

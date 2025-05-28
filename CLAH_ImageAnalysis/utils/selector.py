@@ -638,7 +638,11 @@ class subj_selector_utils:
     def _process_selection_by_ID_sel(self) -> None:
         """Process selection specifically for CSS ID selection."""
         if len(self.selected_folders) == 1:
-            self.idx2findID = [int(self.selected_folders)]
+            if isinstance(self.selected_folders, list):
+                selected_folders = self.selected_folders[0]
+            else:
+                selected_folders = self.selected_folders
+            self.idx2findID = [int(selected_folders)]
         else:
             self.idx2findID = self.selected_folders
 
@@ -658,7 +662,7 @@ class subj_selector_utils:
         print("Eligible subjects/sessions to select:")
         if self.select_by_ID:
             for id in self.ID:
-                if self.IDDict[id][f"ALL_{FOI}"]:
+                if self.IDDict[id][f"ALL_{FOI.upper()}"]:
                     print(f"--{id}:")
                     for sess in self.IDDict[id]["IDX"]:
                         self._print_sessNum_fname(sess)
