@@ -312,7 +312,7 @@ class CRwROI_manager(BC, Data_roicat):
             self.CueCellTable = []
             for sess in self.subj_sessions:
                 CCT = self.multSessSegStruc[sess]["CueCellFinderDict"]["CueCellTable"]
-            self.CueCellTable.append(CCT)
+                self.CueCellTable.append(CCT)
             self.isCell = self.CRTOOLS.organize_cellTypes_fromCCT(self.CueCellTable)
 
         except Exception as e:

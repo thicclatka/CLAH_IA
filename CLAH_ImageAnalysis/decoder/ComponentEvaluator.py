@@ -494,6 +494,8 @@ class GeneralModelRunner:
                     "features_order": self.features_order,  # Save feature configuration
                     "model_config": {
                         "input_size": input_size,
+                        "layer_sizes": self.model.layer_sizes,
+                        "dropout_rates": self.model.dropout_rates,
                     },
                     "metrics": self.metrics,
                 },
@@ -509,7 +511,9 @@ class GeneralModelRunner:
         checkpoint = torch.load(path2pth)
 
         model = NNModel4BinaryClassification(
-            feature_size=checkpoint["model_config"]["input_size"]
+            feature_size=checkpoint["model_config"]["input_size"],
+            layer_sizes=checkpoint["model_config"]["layer_sizes"],
+            dropout_rates=checkpoint["model_config"]["dropout_rates"],
         )
         model.load_state_dict(checkpoint["model_state_dict"])
 

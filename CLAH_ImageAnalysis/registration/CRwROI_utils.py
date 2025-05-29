@@ -149,7 +149,7 @@ class CRwROI_utils(BC):
         keys2check4both = [key for key in isCell if "CUE" in key and len(key) > 3]
 
         if len(keys2check4both) > 1:
-            isCell["BOTHCUES"] = []
+            isCell["BOTHCUES"] = [[] for _ in range(numSess)]
             for sess in range(numSess):
                 cue1 = isCell["CUE1"][sess]
                 cue2 = isCell["CUE2"][sess]
@@ -162,7 +162,7 @@ class CRwROI_utils(BC):
                 )
                 isCell["CUE1"][sess] = newcue1
                 isCell["CUE2"][sess] = newcue2
-                isCell["BOTHCUES"].append(both)
+                isCell["BOTHCUES"][sess] = both
 
         return isCell
 
