@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "CLAH_ImageAnalysis"
 version = "1.3.0"
-description = "Suite of Python programs used for 2-photon calcium imaging analysis"
+description = "Suite of Python programs used for 1- & 2-photon calcium imaging analysis"
 authors = [{ name = "Alex Hurowitz" }]
 readme = "README.md"
 keywords = [
