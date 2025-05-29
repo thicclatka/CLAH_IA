@@ -17,6 +17,11 @@ keywords = [
   "motion correction",
   "segmentation",
   "tracking",
+  "neuroscience",
+  "signal processing",
+  "computer vision",
+  "neural data analysis",
+  "machine learning",
 ]
 requires-python = ">=3.11"
 
